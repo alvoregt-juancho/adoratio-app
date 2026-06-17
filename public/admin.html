@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Ejecutivo | Adoratio</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+    <!-- Login -->
+    <div class="login-overlay" id="loginView">
+        <div class="login-card">
+            <h1 class="page-eyebrow">Adoratio</h1>
+            <h2 class="page-title small">Panel Ejecutivo</h2>
+            <p class="muted" style="margin:8px 0 0;font-size:0.82rem;">Centro de mando · RBAC</p>
+            <div class="booking-input-group">
+                <input type="email" id="loginEmail" class="touch-input-field dark-input" placeholder="Correo" autocomplete="username">
+            </div>
+            <div class="booking-input-group">
+                <input type="password" id="loginPass" class="touch-input-field dark-input" placeholder="Contraseña" autocomplete="current-password">
+            </div>
+            <button class="sheet-primary-btn" id="loginBtn">INGRESAR</button>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard hidden">
+        <header class="admin-topbar">
+            <div>
+                <h1 class="page-eyebrow">Adoratio · Back-Office</h1>
+                <span id="whoami" class="muted"></span>
+            </div>
+            <button class="ghost-btn" id="logoutBtn">Salir</button>
+        </header>
+
+        <nav class="admin-tabs" id="adminTabs">
+            <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW">Centro de Mando</button>
+            <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW">Reservas</button>
+            <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW">Turnos</button>
+            <button class="tab" data-tab="qrs" data-perm="QRS_VIEW">QR Capilla</button>
+            <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW">Perfiles</button>
+            <button class="tab" data-tab="admins" data-perm="USERS_VIEW">Administradores</button>
+            <button class="tab" data-tab="auditoria" data-perm="AUDIT_VIEW">Auditoría</button>
+        </nav>
+
+        <!-- Centro de Mando -->
+        <section class="tab-panel active" id="tab-resumen" data-perm="DASHBOARD_VIEW">
+            <div class="command-center">
+                <div class="command-header">
+                    <div>
+                        <h2>Estado de la capilla</h2>
+                        <p>Resumen en tiempo real · sin recargas</p>
+                    </div>
+                    <span class="command-date" id="commandDate"></span>
+                </div>
+                <div class="metrics-grid" id="metrics"></div>
+                <div class="panel-card timeline-panel">
+                    <div class="panel-card-header">
+                        <h3>Timeline de guardias</h3>
+                        <span class="muted" id="timelineDateLabel"></span>
+                    </div>
+                    <div class="panel-card-body chronos-feed" id="timelineFeed">
+                        <div class="empty-state">Cargando timeline…</div>
+                    </div>
+                </div>
+                <div class="command-panels">
+                    <div class="panel-card">
+                        <div class="panel-card-header">
+                            <h3>Actividad reciente</h3>
+                        </div>
+                        <div class="panel-card-body" id="activityFeed">
+                            <div class="empty-state">Cargando actividad…</div>
+                        </div>
+                    </div>
+                    <div class="panel-card">
+                        <div class="panel-card-header">
+                            <h3>Reservas de hoy</h3>
+                        </div>
+                        <div class="panel-card-body" id="todayReservations">
+                            <div class="empty-state">Cargando reservas…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Reservas / Participantes -->
+        <section class="tab-panel" id="tab-reservas" data-perm="RESERVATIONS_VIEW">
+            <div class="toolbar res-toolbar">
+                <label class="field"><span>Alcance</span>
+                    <input type="date" id="resDateScope" class="touch-input-field dark-input" title="Vacío = todas las reservas recientes">
+                </label>
+                <button class="ghost-btn" id="resLoadBtn">Cargar</button>
+                <button class="ghost-btn" id="resClearFilters">Limpiar filtros</button>
+                <span class="res-count-badge" id="resCountBadge">0 participantes</span>
+                <button class="ghost-btn" id="exportCsv" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
+            </div>
+            <div class="table-wrap"><table class="data-table res-participants-table" id="resTable"></table></div>
+        </section>
+
+        <!-- Turnos -->
+        <section class="tab-panel" id="tab-turnos" data-perm="SLOTS_VIEW">
+            <div class="settings-panel panel-card" data-perm="SLOTS_EDIT">
+                <div class="panel-card-header">
+                    <h3>Configuración de guardias</h3>
+                </div>
+                <div class="panel-card-body settings-grid" id="settingsForm">
+                    <fieldset class="settings-fieldset">
+                        <legend>Frecuencias habilitadas</legend>
+                        <label class="admin-check"><input type="checkbox" id="setFreqWeekly" checked><span>Semanal</span></label>
+                        <label class="admin-check"><input type="checkbox" id="setFreqDaily" checked><span>Diario</span></label>
+                        <label class="admin-check"><input type="checkbox" id="setFreqBiweekly" checked><span>Quincenal</span></label>
+                        <label class="admin-check"><input type="checkbox" id="setFreqMonthly" checked><span>Mensual</span></label>
+                        <label class="admin-check"><input type="checkbox" id="setFreqOnce" checked><span>Una sola vez</span></label>
+                    </fieldset>
+                    <fieldset class="settings-fieldset">
+                        <legend>Opciones de horario</legend>
+                        <label class="admin-check"><input type="checkbox" id="setAllowOffset"><span>Permitir inicio a media hora (:30)</span></label>
+                        <label class="admin-check"><input type="checkbox" id="setAllowThirtyMin"><span>Permitir guardias de 30 minutos</span></label>
+                    </fieldset>
+                    <button class="ghost-btn" id="saveSettingsBtn">Guardar configuración</button>
+                </div>
+            </div>
+            <div class="toolbar" data-perm="SLOTS_CREATE">
+                <input type="text" id="slotStart" class="touch-input-field dark-input" placeholder="Inicio (HH:MM)">
+                <input type="text" id="slotEnd" class="touch-input-field dark-input" placeholder="Fin (HH:MM)">
+                <input type="number" id="slotCap" class="touch-input-field dark-input" placeholder="Cupo" min="1" value="4">
+                <button class="ghost-btn" id="addSlot">+ Agregar turno</button>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="slotsTable"></table></div>
+        </section>
+
+        <!-- QRs -->
+        <section class="tab-panel" id="tab-qrs" data-perm="QRS_VIEW">
+            <div class="toolbar">
+                <button class="ghost-btn" id="newQrBtn" data-perm="QRS_CREATE">+ Generar nuevo QR</button>
+                <button class="ghost-btn" id="printBatchBtn" data-perm="QRS_CREATE">Imprimir lote (10)</button>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="qrTable"></table></div>
+        </section>
+
+        <!-- Perfiles RBAC -->
+        <section class="tab-panel" id="tab-perfiles" data-perm="ROLES_VIEW">
+            <div class="toolbar-spaced">
+                <button class="ghost-btn" id="newRoleBtn" data-perm="ROLES_MANAGE">+ Nuevo perfil</button>
+            </div>
+            <div class="rbac-layout">
+                <div class="role-list" id="roleList"></div>
+                <div class="permission-matrix" id="roleEditor">
+                    <div class="empty-state">Selecciona un perfil para ver o editar permisos.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Administradores -->
+        <section class="tab-panel" id="tab-admins" data-perm="USERS_VIEW">
+            <div class="toolbar-spaced" data-perm="USERS_MANAGE">
+                <button class="ghost-btn" id="newAdminBtn">+ Nuevo administrador</button>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="adminsTable"></table></div>
+        </section>
+
+        <!-- Auditoría -->
+        <section class="tab-panel" id="tab-auditoria" data-perm="AUDIT_VIEW">
+            <div class="audit-filters">
+                <input type="text" id="auditFilter" class="touch-input-field dark-input" placeholder="Filtrar por acción (ej: role, slot)">
+                <button class="ghost-btn" id="auditRefresh">Actualizar</button>
+            </div>
+            <div class="table-wrap"><table class="data-table audit-log-row" id="auditTable"></table></div>
+            <div class="toolbar-spaced" style="margin-top:12px;">
+                <button class="ghost-btn" id="auditPrev">← Anterior</button>
+                <span class="muted" id="auditPageInfo"></span>
+                <button class="ghost-btn" id="auditNext">Siguiente →</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal editar turno -->
+    <div class="premium-sheet-overlay" id="slotSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title">Editar turno</h2>
+            <input type="hidden" id="editSlotId">
+            <div class="booking-input-group">
+                <input type="text" id="editSlotStart" class="touch-input-field" placeholder="Inicio (HH:MM)" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="editSlotEnd" class="touch-input-field" placeholder="Fin (HH:MM)" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="number" id="editSlotCap" class="touch-input-field" placeholder="Cupo" min="1" style="background:#fff;color:#000;">
+            </div>
+            <label class="admin-check">
+                <input type="checkbox" id="editSlotActive">
+                <span>Turno activo</span>
+            </label>
+            <button class="sheet-primary-btn" id="saveSlotBtn">GUARDAR CAMBIOS</button>
+        </div>
+    </div>
+
+    <!-- Modal nuevo QR -->
+    <div class="premium-sheet-overlay" id="qrSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title">Nuevo QR</h2>
+            <div class="booking-input-group">
+                <input type="text" id="qrName" class="touch-input-field" placeholder="Nombre (ej: Entrada principal)" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="qrLocation" class="touch-input-field" placeholder="Ubicación (opcional)" style="background:#fff;color:#000;">
+            </div>
+            <button class="sheet-primary-btn" id="createQrBtn">GENERAR</button>
+            <div id="qrPreview" class="qr-preview"></div>
+        </div>
+    </div>
+
+    <!-- Modal nuevo perfil -->
+    <div class="premium-sheet-overlay" id="roleSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title" id="roleSheetTitle">Nuevo perfil</h2>
+            <div class="booking-input-group">
+                <input type="text" id="roleName" class="touch-input-field" placeholder="Nombre del perfil" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="roleDesc" class="touch-input-field" placeholder="Descripción (opcional)" style="background:#fff;color:#000;">
+            </div>
+            <div id="roleSheetMatrix" class="permission-matrix" style="margin-top:16px;padding:16px;"></div>
+            <button class="sheet-primary-btn" id="saveRoleBtn">GUARDAR PERFIL</button>
+        </div>
+    </div>
+
+    <!-- Modal nuevo administrador -->
+    <div class="premium-sheet-overlay" id="adminSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title">Nuevo administrador</h2>
+            <div class="booking-input-group">
+                <input type="text" id="adminName" class="touch-input-field" placeholder="Nombre completo" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="email" id="adminEmail" class="touch-input-field" placeholder="Correo" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="password" id="adminPassword" class="touch-input-field" placeholder="Contraseña temporal" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <select id="adminRoleSelect" class="touch-input-field" style="background:#fff;color:#000;width:100%;"></select>
+            </div>
+            <button class="sheet-primary-btn" id="createAdminBtn">CREAR ADMINISTRADOR</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

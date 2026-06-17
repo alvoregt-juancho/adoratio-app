@@ -1,0 +1,172 @@
+// Adoratio - esquema de datos.
+// Provider SQLite para desarrollo sin configuracion.
+// Para produccion (Postgres): cambia provider a "postgresql" y DATABASE_URL.
+// Nota: se usan campos String para role/status/frequency en lugar de enum, ya que
+// SQLite no soporta enums en Prisma. Valores permitidos documentados abajo.
+// CommitmentFrequency: "ONCE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" (ver src/constants/commitment.js)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// role: "superadmin" | "admin" | "lector" | "feligres" (legacy; prefer adminRoleId)
+model User {
+  id               Int       @id @default(autoincrement())
+  name             String
+  email            String    @unique
+  passwordHash     String?   @map("password_hash")
+  role             String    @default("feligres")
+  adminRoleId      Int?      @map("admin_role_id")
+  emailVerified    Boolean   @default(false) @map("email_verified")
+  verificationCode String?   @map("verification_code")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  adminRole     AdminRole?  @relation(fields: [adminRoleId], references: [id])
+  reservations  Reservation[]
+  generatedQrs  PhysicalQR[]
+  audits        AuditLog[]  @relation("AuditActor")
+  targetedAudits AuditLog[] @relation("AuditTarget")
+  createdRoles  AdminRole[] @relation("RoleCreator")
+
+  @@map("users")
+}
+
+// Perfil RBAC personalizable — privileges es un bitmask Int (ver src/constants/permissions.js)
+model AdminRole {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  privileges  Int      @default(0)
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users     User[]
+  createdBy User? @relation("RoleCreator", fields: [createdById], references: [id])
+
+  @@map("admin_roles")
+}
+
+model Slot {
+  id         Int      @id @default(autoincrement())
+  startTime  String   @map("start_time") // "HH:MM"
+  endTime    String   @map("end_time")   // "HH:MM"
+  capacity   Int      @default(4)
+  label      String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reservations Reservation[]
+
+  @@map("slots")
+}
+
+// frequency (CommitmentFrequency): "ONCE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY"
+// status: "confirmed" | "completed" | "cancelled" | "no_show"
+model Reservation {
+  id               Int       @id @default(autoincrement())
+  slotId           Int       @map("slot_id")
+  userId           Int?      @map("user_id")
+  userPhone        String    @map("user_phone")
+  userFirstName    String    @default("") @map("user_first_name")
+  userLastName     String    @default("") @map("user_last_name")
+  userName         String    @map("user_name") // nombre completo (denormalizado)
+  date             String    // "YYYY-MM-DD" del turno
+  frequency        String    @default("WEEKLY")
+  weekDays         String?   @map("week_days") // DAILY: "1,2,3" (Lun=1 … Dom=7)
+  biweeklyWeeks    String?   @map("biweekly_weeks") // BIWEEKLY: "1,3" | "2,4"
+  durationMinutes  Int       @default(60) @map("duration_minutes")
+  startTimeOffset  Int       @default(0) @map("start_time_offset") // 0 o 30 minutos
+  status           String    @default("confirmed")
+  checkedInAt      DateTime? @map("checked_in_at")
+  checkedInViaQrId Int?      @map("checked_in_via_qr_id")
+  cancelledAt      DateTime? @map("cancelled_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  slot           Slot        @relation(fields: [slotId], references: [id])
+  user           User?       @relation(fields: [userId], references: [id])
+  checkedInViaQR PhysicalQR? @relation(fields: [checkedInViaQrId], references: [id])
+  scanLogs       ScanLog[]
+  audits         AuditLog[]
+
+  @@map("reservations")
+}
+
+model PhysicalQR {
+  id          Int       @id @default(autoincrement())
+  qrCode      String    @unique @map("qr_code")
+  displayName String    @map("display_name")
+  location    String?
+  isActive    Boolean   @default(true) @map("is_active")
+  generatedBy Int?      @map("generated_by")
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  scans        ScanLog[]
+  reservations Reservation[]
+  user         User?     @relation(fields: [generatedBy], references: [id])
+
+  @@map("physical_qrs")
+}
+
+model ScanLog {
+  id            Int      @id @default(autoincrement())
+  physicalQrId  Int      @map("physical_qr_id")
+  reservationId Int?     @map("reservation_id")
+  scannedAt     DateTime @default(now()) @map("scanned_at")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  success       Boolean  @default(true)
+  errorMessage  String?  @map("error_message")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  physicalQR  PhysicalQR   @relation(fields: [physicalQrId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@map("scan_logs")
+}
+
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  action        String
+  entity        String
+  entityId      Int?     @map("entity_id")
+  userId        Int?     @map("user_id")
+  targetUserId  Int?     @map("target_user_id")
+  reservationId Int?     @map("reservation_id")
+  meta          String?
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User?        @relation("AuditActor", fields: [userId], references: [id])
+  targetUser  User?        @relation("AuditTarget", fields: [targetUserId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// Configuración global del admin (singleton id=1)
+model Settings {
+  id                         Int      @id @default(1)
+  freqOnceEnabled            Boolean  @default(true) @map("freq_once_enabled")
+  freqDailyEnabled           Boolean  @default(true) @map("freq_daily_enabled")
+  freqWeeklyEnabled          Boolean  @default(true) @map("freq_weekly_enabled")
+  freqBiweeklyEnabled        Boolean  @default(true) @map("freq_biweekly_enabled")
+  freqMonthlyEnabled         Boolean  @default(true) @map("freq_monthly_enabled")
+  allowOffsetStartTimes      Boolean  @default(false) @map("allow_offset_start_times")
+  allowThirtyMinuteDurations Boolean  @default(false) @map("allow_thirty_minute_durations")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}

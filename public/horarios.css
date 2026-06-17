@@ -1,0 +1,991 @@
+/* Adoratio Horarios — Light / Dark · paleta gris neutra */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap');
+
+.page-horarios {
+    --gq-alabaster: #F6F5F2;
+    --gq-charcoal: #111215;
+    --sacred-gold: #C5A059;
+    --safe-touch-target: 72px;
+    --transition-smooth: 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    --gold-soft: rgba(197, 160, 89, 0.12);
+    --gold-border: rgba(197, 160, 89, 0.45);
+    --surface-card: #FFFFFF;
+    --surface-muted: #E8E8EA;
+    --surface-elevated: #F0F0F2;
+    --border-subtle: rgba(17, 18, 21, 0.1);
+    --border-strong: #B8B8BE;
+    --text-muted: #6B6B72;
+    --text-subtle: #888890;
+    --border-radius-premium: 20px;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: 'Cormorant Garamond', Georgia, serif;
+    --horarios-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    background-color: var(--gq-alabaster);
+    color: var(--gq-charcoal);
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+    padding-bottom: 40px;
+}
+
+html:has(body.page-horarios),
+body.page-horarios {
+    background-color: var(--gq-alabaster);
+    color: var(--gq-charcoal);
+}
+
+/* ── Header ── */
+.page-horarios .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 20px 8px;
+    background-color: var(--gq-alabaster);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.page-horarios .header-titles h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(1.6rem, 5vw, 2rem);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--gq-charcoal);
+}
+
+.page-horarios .header-titles p {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.page-horarios .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.page-horarios .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--surface-muted);
+    border: 1px solid var(--border-subtle);
+    color: var(--gq-charcoal);
+    border-radius: 50%;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.25s var(--horarios-ease), border-color 0.25s var(--horarios-ease);
+}
+
+.page-horarios .theme-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+@media (hover: hover) {
+    .page-horarios .theme-toggle:hover {
+        border-color: var(--gold-border);
+        background: var(--gold-soft);
+        color: var(--sacred-gold);
+    }
+}
+
+.page-horarios .icon-btn-profile {
+    background: none;
+    border: 1px solid var(--sacred-gold);
+    color: var(--sacred-gold);
+    padding: 10px 16px;
+    border-radius: 50px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    transition: background 0.25s var(--horarios-ease);
+}
+
+@media (hover: hover) {
+    .page-horarios .icon-btn-profile:hover {
+        background: var(--gold-soft);
+    }
+}
+
+.page-horarios .icon-btn-profile:active {
+    transform: scale(0.97);
+}
+
+/* ── Carrusel de días ── */
+.page-horarios .days-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 10px;
+    padding: 12px 20px 20px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.page-horarios .days-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.page-horarios .day-pill {
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+    padding: 12px 22px;
+    border-radius: 50px;
+    border: none;
+    background-color: var(--surface-muted);
+    color: var(--gq-charcoal);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s var(--horarios-ease);
+    font-family: inherit;
+}
+
+.page-horarios .day-pill.active {
+    background-color: var(--gq-charcoal);
+    color: var(--gq-alabaster);
+    box-shadow: 0 4px 14px rgba(17, 18, 21, 0.12);
+}
+
+.page-horarios .schedule-note {
+    margin: 0 20px 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--gold-soft);
+    border: 1px solid var(--gold-border);
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+/* ── Tarjetas Chronos (GQ + Apple) ── */
+.page-horarios .schedule-feed {
+    padding: 0 12px;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (min-width: 540px) {
+    .page-horarios .schedule-feed {
+        padding: 0 20px;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+}
+
+.page-horarios .chronos-card {
+    background-color: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--border-radius-premium);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    container-type: inline-size;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+    color: inherit;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s var(--horarios-ease), border-color 0.3s var(--horarios-ease);
+    box-shadow: 0 2px 10px rgba(17, 18, 21, 0.03);
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-user-select: none;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+@media (min-width: 540px) {
+    .page-horarios .chronos-card {
+        padding: 20px 18px;
+        gap: 12px;
+        text-align: left;
+        align-items: flex-start;
+    }
+}
+
+.page-horarios .chronos-card:active:not(.full) {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) {
+    .page-horarios .chronos-card:not(.full):hover {
+        box-shadow: 0 6px 18px rgba(17, 18, 21, 0.06);
+        transform: translateY(-1px);
+    }
+}
+
+.page-horarios .chronos-card.full {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.page-horarios .chronos-card.empty-slot {
+    border-color: var(--gold-border);
+    background-color: var(--surface-card);
+}
+
+.page-horarios .chronos-card.needs-custody {
+    border-color: var(--gold-border);
+    background-color: var(--surface-card);
+}
+
+.page-horarios .chronos-card.fraction-30 {
+    border-left: 3px solid var(--sacred-gold);
+}
+
+.page-horarios .time-signature {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: clamp(0.58rem, 9.5cqi, 1.35rem);
+    color: var(--gq-charcoal);
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    box-sizing: border-box;
+}
+
+.page-horarios .status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 22px;
+    width: 100%;
+    min-width: 0;
+}
+
+@media (min-width: 540px) {
+    .page-horarios .status-indicator {
+        justify-content: flex-start;
+        gap: 8px;
+    }
+}
+
+.page-horarios .status-text {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: clamp(0.62rem, 6.5cqi, 0.88rem);
+    color: var(--text-muted);
+    line-height: 1.25;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.page-horarios .chronos-card.empty-slot .icon-add,
+.page-horarios .chronos-card.needs-custody .icon-add,
+.page-horarios .chronos-card.available .icon-add {
+    width: clamp(14px, 5cqi, 20px);
+    height: clamp(14px, 5cqi, 20px);
+    flex-shrink: 0;
+}
+
+.page-horarios .chronos-card.available .icon-add {
+    stroke: var(--text-muted);
+}
+
+.page-horarios .chronos-card.empty-slot .icon-add,
+.page-horarios .chronos-card.needs-custody .icon-add {
+    stroke: var(--sacred-gold);
+}
+
+.page-horarios .chronos-card.empty-slot .status-text,
+.page-horarios .chronos-card.needs-custody .status-text {
+    color: var(--sacred-gold);
+    font-weight: 600;
+}
+
+.page-horarios .chronos-card.full .status-text {
+    color: var(--text-subtle);
+}
+
+.page-horarios .schedule-notice,
+.page-horarios .schedule-feed .muted {
+    grid-column: 1 / -1;
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+/* ── Modal centrado ── */
+.page-horarios .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(17, 18, 21, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s var(--horarios-ease);
+}
+
+.page-horarios .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.page-horarios .modal-window {
+    background-color: var(--surface-card);
+    width: 100%;
+    max-width: 440px;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    border-radius: var(--border-radius-premium);
+    padding: 32px 24px 28px;
+    box-shadow: 0 20px 50px rgba(17, 18, 21, 0.12);
+    transform: scale(0.95);
+    transition: transform 0.3s var(--horarios-ease);
+    position: relative;
+}
+
+.page-horarios .modal-overlay.active .modal-window {
+    transform: scale(1);
+}
+
+.page-horarios .modal-window h3 {
+    font-family: var(--font-serif);
+    font-size: clamp(1.35rem, 4.5vw, 1.65rem);
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 6px;
+    color: var(--gq-charcoal);
+    letter-spacing: 0.04em;
+}
+
+.page-horarios .modal-subtitle {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    margin-bottom: 24px;
+    line-height: 1.4;
+}
+
+/* ── Floating labels ── */
+.page-horarios .floating-input-group {
+    position: relative;
+    margin-bottom: 18px;
+}
+
+.page-horarios .input-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--text-subtle);
+    line-height: 1.3;
+}
+
+.page-horarios .phone-digits-input {
+    font-variant-numeric: tabular-nums;
+}
+
+.page-horarios .floating-input {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 24px 16px 8px;
+    font-size: 1.05rem;
+    color: var(--gq-charcoal);
+    background-color: transparent;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.page-horarios .floating-input:focus {
+    border-color: var(--sacred-gold);
+}
+
+.page-horarios .floating-label {
+    position: absolute;
+    top: 18px;
+    left: 16px;
+    font-size: 1rem;
+    color: var(--text-subtle);
+    pointer-events: none;
+    transition: all 0.2s var(--horarios-ease);
+}
+
+.page-horarios .floating-input:focus ~ .floating-label,
+.page-horarios .floating-input:not(:placeholder-shown) ~ .floating-label {
+    top: 6px;
+    font-size: 0.72rem;
+    color: var(--sacred-gold);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.page-horarios .btn-primary {
+    width: 100%;
+    background-color: var(--gq-charcoal);
+    color: var(--gq-alabaster);
+    border: none;
+    padding: 17px;
+    border-radius: 12px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: opacity 0.2s;
+    font-family: inherit;
+}
+
+.page-horarios .btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.page-horarios .btn-close {
+    background: none;
+    border: none;
+    color: var(--text-subtle);
+    width: 100%;
+    padding: 14px;
+    margin-top: 4px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.page-horarios .modal-close-x {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Mis reservas ── */
+.page-horarios .my-list {
+    width: 100%;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.page-horarios .my-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--gq-charcoal);
+}
+
+.page-horarios .my-item strong {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.page-horarios .my-date {
+    display: block;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.page-horarios .my-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.page-horarios .status-pill {
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.page-horarios .status-confirmed {
+    color: var(--sacred-gold);
+    border-color: var(--gold-border);
+    background: var(--gold-soft);
+}
+
+.page-horarios .status-completed {
+    color: var(--text-muted);
+    border-color: var(--border-strong);
+}
+
+.page-horarios .status-cancelled {
+    color: var(--text-subtle);
+    border-color: var(--border-subtle);
+}
+
+.page-horarios .mini-btn {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-card);
+    color: var(--gq-charcoal);
+    font-size: 0.68rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.page-horarios .muted {
+    color: var(--text-subtle);
+    font-size: 0.88rem;
+    text-align: center;
+}
+
+/* ── Modo oscuro ── */
+.page-horarios[data-theme="dark"] {
+    --gq-alabaster: #060606;
+    --gq-charcoal: #ECECEF;
+    --sacred-gold: #D4B06A;
+    --gold-soft: rgba(212, 176, 106, 0.08);
+    --gold-border: rgba(212, 176, 106, 0.32);
+    --surface-card: #1B1912;
+    --surface-muted: #242320;
+    --surface-elevated: #1B1912;
+    --border-subtle: rgba(255, 255, 255, 0.07);
+    --border-strong: #3A3A3E;
+    --text-muted: #9A9AA2;
+    --text-subtle: #72727A;
+}
+
+html:has(body.page-horarios[data-theme="dark"]),
+body.page-horarios[data-theme="dark"] {
+    background-color: #060606;
+    color: #ECECEF;
+}
+
+.page-horarios[data-theme="dark"] .app-header {
+    background-color: #060606;
+}
+
+.page-horarios[data-theme="dark"] .day-pill {
+    background-color: #242320;
+    color: #ECECEF;
+}
+
+.page-horarios[data-theme="dark"] .day-pill.active {
+    background-color: #ECECEF;
+    color: #060606;
+    box-shadow: none;
+}
+
+.page-horarios[data-theme="dark"] .chronos-card {
+    background-color: #1B1912;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.page-horarios[data-theme="dark"] .chronos-card.empty-slot,
+.page-horarios[data-theme="dark"] .chronos-card.needs-custody {
+    background-color: #1B1912;
+    border-color: var(--gold-border);
+}
+
+.page-horarios[data-theme="dark"] .chronos-card.fraction-30 {
+    background-color: #1B1912;
+}
+
+.page-horarios[data-theme="dark"] .btn-primary {
+    background-color: #ECECEF;
+    color: #141518;
+}
+
+.page-horarios[data-theme="dark"] .icon-btn-profile {
+    border-color: var(--sacred-gold);
+    color: var(--sacred-gold);
+}
+
+@media (hover: hover) {
+    .page-horarios[data-theme="dark"] .icon-btn-profile:hover {
+        background: var(--gold-soft);
+    }
+}
+
+.page-horarios[data-theme="dark"] .floating-input:focus {
+    border-color: var(--sacred-gold);
+}
+
+.page-horarios[data-theme="dark"] .floating-input {
+    background: #060606;
+}
+
+.page-horarios[data-theme="dark"] .my-item {
+    background: #1B1912;
+    border-color: var(--border-subtle);
+}
+
+.page-horarios[data-theme="dark"] .mini-btn {
+    background: #1B1912;
+}
+
+.page-horarios[data-theme="dark"] .status-confirmed {
+    color: var(--sacred-gold);
+    background: var(--gold-soft);
+    border-color: var(--gold-border);
+}
+
+/* ── Controles segmentados estilo iOS ── */
+.page-horarios .ios-segmented-control {
+    display: flex;
+    background-color: #E5E5EA;
+    border-radius: 20px;
+    padding: 4px;
+    width: 100%;
+}
+
+.page-horarios .ios-segmented-control.small {
+    border-radius: 16px;
+}
+
+.page-horarios .ios-segmented-control input[type="radio"] {
+    display: none;
+}
+
+.page-horarios .ios-segmented-control .touch-target-compact {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 48px;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: #6E6E73;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.page-horarios .ios-segmented-control .touch-target-72 {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: var(--safe-touch-target);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #6E6E73;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.page-horarios .ios-segmented-control.small .touch-target-compact {
+    height: 44px;
+    font-size: 0.82rem;
+}
+
+.page-horarios .ios-segmented-control input[type="radio"]:checked + label {
+    background-color: #FFFFFF;
+    color: var(--gq-charcoal);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.page-horarios .section-subtitle {
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    color: var(--gq-charcoal);
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.page-horarios .micro-label {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: #8E8E93;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.page-horarios .btn-ghost-gold {
+    background: transparent;
+    border: none;
+    color: var(--sacred-gold);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 8px 0;
+    text-align: left;
+    transition: opacity 0.3s ease;
+    min-height: 40px;
+}
+
+.page-horarios .btn-ghost-gold:active {
+    opacity: 0.6;
+}
+
+.page-horarios .hidden-smooth {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.4s ease;
+}
+
+.page-horarios .modal-overlay.modal-stacked {
+    z-index: 120;
+}
+
+.page-horarios .modal-window-compact {
+    max-width: 360px;
+}
+
+.page-horarios .btn-daily-freq {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--gq-alabaster);
+    color: var(--gq-charcoal);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.page-horarios .btn-daily-freq:active {
+    border-color: var(--sacred-gold);
+}
+
+.page-horarios .btn-daily-freq.is-active {
+    border-color: var(--sacred-gold);
+    background: var(--gold-soft);
+}
+
+.page-horarios .freq-days-summary {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+.page-horarios .modal-slot-time {
+    text-align: center;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.15rem;
+    color: var(--gq-charcoal);
+    letter-spacing: -0.02em;
+    margin: 4px 0 6px;
+}
+
+.page-horarios .biweekly-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.page-horarios .biweekly-option {
+    display: block;
+    cursor: pointer;
+}
+
+.page-horarios .biweekly-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.page-horarios .biweekly-option-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--gq-alabaster);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gq-charcoal);
+    transition: var(--transition-smooth);
+}
+
+.page-horarios .biweekly-option input:checked + .biweekly-option-label {
+    border-color: var(--sacred-gold);
+    background: var(--gold-soft);
+}
+
+.page-horarios[data-theme="dark"] .biweekly-option-label {
+    background: #060606;
+    border-color: var(--border-subtle);
+    color: var(--gq-alabaster);
+}
+
+.page-horarios[data-theme="dark"] .biweekly-option input:checked + .biweekly-option-label {
+    background: #1B1912;
+    border-color: var(--sacred-gold);
+}
+
+.page-horarios .btn-select-all-days {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 12px;
+    min-height: 36px;
+}
+
+.page-horarios .weekday-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.page-horarios .weekday-toggle {
+    position: relative;
+}
+
+.page-horarios .weekday-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.page-horarios .weekday-toggle label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-family: var(--font-sans);
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--gq-charcoal);
+    background: var(--gq-alabaster);
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.page-horarios .weekday-toggle input:checked + label {
+    border-color: var(--sacred-gold);
+    background: var(--gold-soft);
+    color: var(--gq-charcoal);
+}
+
+.page-horarios[data-theme="dark"] .modal-slot-time {
+    color: var(--gq-alabaster);
+}
+
+.page-horarios[data-theme="dark"] .btn-daily-freq,
+.page-horarios[data-theme="dark"] .weekday-toggle label {
+    background: #060606;
+    border-color: var(--border-subtle);
+    color: var(--gq-alabaster);
+}
+
+.page-horarios[data-theme="dark"] .btn-daily-freq.is-active,
+.page-horarios[data-theme="dark"] .weekday-toggle input:checked + label {
+    background: #1B1912;
+    border-color: var(--sacred-gold);
+}
+
+.page-horarios .hidden-smooth.visible {
+    max-height: 320px;
+    opacity: 1;
+    margin-top: 10px;
+}
+
+.page-horarios .booking-input-group {
+    margin-bottom: 20px;
+}
+
+.page-horarios .touch-input-field {
+    width: 100%;
+    min-height: var(--safe-touch-target);
+    padding: 0 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    font-size: 1.05rem;
+    color: var(--gq-charcoal);
+    background-color: var(--gq-alabaster);
+    font-family: var(--font-sans);
+}
+
+.page-horarios .touch-input-field.touch-input-compact {
+    min-height: 48px;
+    padding: 0 14px;
+    font-size: 0.88rem;
+    border-radius: 10px;
+}
+
+.page-horarios .ios-segmented-control input[type="radio"]:disabled + label,
+.page-horarios .ios-segmented-control .touch-target-compact.is-disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.page-horarios .time-adjust-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.page-horarios[data-theme="dark"] .ios-segmented-control {
+    background-color: #2C2C2E;
+}
+
+.page-horarios[data-theme="dark"] .ios-segmented-control input[type="radio"]:checked + label {
+    background-color: #3A3A3C;
+    color: var(--gq-alabaster);
+}

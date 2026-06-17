@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Horarios de Adoración | Adoratio</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="horarios.css">
+</head>
+<body class="page-horarios" data-theme="light">
+
+    <header class="app-header">
+        <div class="header-titles">
+            <h1>ADORATIO</h1>
+            <p>Cristo Rey · Santísimo</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="theme-toggle" id="themeToggle" aria-label="Activar modo oscuro"></button>
+            <button type="button" class="icon-btn-profile" id="myReservationsBtn">Mis Turnos</button>
+        </div>
+    </header>
+
+    <div class="days-carousel" id="daysCarousel" role="tablist" aria-label="Días de la semana"></div>
+
+    <p class="schedule-note" id="scheduleNote" hidden></p>
+
+    <main class="schedule-feed" id="slotsList">
+        <p class="muted">Cargando turnos…</p>
+    </main>
+
+    <!-- Modal reserva (centrado) -->
+    <div class="modal-overlay" id="reserveModal" role="dialog" aria-modal="true" aria-labelledby="reserveTitle">
+        <div class="modal-window">
+            <button type="button" class="modal-close-x" data-close aria-label="Cerrar">×</button>
+            <h3 id="reserveTitle">Asumir Guardia</h3>
+            <p class="modal-subtitle" id="reserveSlotLabel"></p>
+
+            <div class="floating-input-group">
+                <input type="text" class="floating-input" id="resFirstName" placeholder=" " autocomplete="given-name">
+                <label class="floating-label" for="resFirstName">Tu nombre</label>
+            </div>
+            <div class="floating-input-group">
+                <input type="text" class="floating-input" id="resLastName" placeholder=" " autocomplete="family-name">
+                <label class="floating-label" for="resLastName">Tu apellido</label>
+            </div>
+            <div class="floating-input-group">
+                <input type="tel" class="floating-input phone-digits-input" id="resPhone" placeholder=" " autocomplete="tel-national" inputmode="numeric" pattern="[0-9]*" maxlength="8" aria-describedby="resPhoneHint">
+                <label class="floating-label" for="resPhone">Número de celular</label>
+                <span id="resPhoneHint" class="input-hint">8 dígitos, solo números</span>
+            </div>
+
+            <div class="booking-input-group">
+                <p class="section-subtitle">Frecuencia de Guardia</p>
+
+                <div class="ios-segmented-control" id="freqPrimaryControl">
+                    <input type="radio" id="freq-weekly" name="commitmentFreq" value="WEEKLY" checked>
+                    <label for="freq-weekly" class="touch-target-compact">Semanal</label>
+
+                    <input type="radio" id="freq-biweekly" name="commitmentFreq" value="BIWEEKLY">
+                    <label for="freq-biweekly" class="touch-target-compact">Quincenal</label>
+                </div>
+
+                <p id="biweeklyWeeksSummary" class="freq-days-summary" hidden></p>
+
+                <button type="button" id="btn-toggle-advanced-freq" class="btn-ghost-gold">
+                    + Más opciones de frecuencia
+                </button>
+
+                <div id="advanced-freq-container" class="hidden-smooth">
+                    <button type="button" id="btn-open-daily-days" class="btn-daily-freq">
+                        Diario — seleccionar días
+                    </button>
+                    <p id="dailyDaysSummary" class="freq-days-summary" hidden></p>
+                </div>
+            </div>
+
+            <div class="booking-input-group hidden-smooth" id="non-standard-time-container">
+                <p class="section-subtitle">Ajuste de Horario (Opcional)</p>
+
+                <div class="time-adjust-grid">
+                    <div class="control-column" id="durationColumn">
+                        <span class="micro-label">Duración:</span>
+                        <div class="ios-segmented-control small">
+                            <input type="radio" id="dur-60" name="duration" value="60" checked>
+                            <label for="dur-60" class="touch-target-compact">1 Hr</label>
+
+                            <input type="radio" id="dur-30" name="duration" value="30">
+                            <label for="dur-30" class="touch-target-compact">30 Min</label>
+                        </div>
+                    </div>
+
+                    <div class="control-column" id="startOffsetColumn">
+                        <span class="micro-label">Iniciar a las:</span>
+                        <div class="ios-segmented-control small">
+                            <input type="radio" id="start-00" name="startOffset" value="0" checked>
+                            <label for="start-00" class="touch-target-compact">:00</label>
+
+                            <input type="radio" id="start-30" name="startOffset" value="30">
+                            <label for="start-30" class="touch-target-compact">:30</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary" id="confirmReserveBtn">Confirmar Turno</button>
+            <button type="button" class="btn-close" data-close>Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal selección quincena -->
+    <div class="modal-overlay modal-stacked" id="biweeklySelectModal" role="dialog" aria-modal="true" aria-labelledby="biweeklySelectTitle">
+        <div class="modal-window modal-window-compact">
+            <button type="button" class="modal-close-x" data-close-biweekly aria-label="Cerrar">×</button>
+            <h3 id="biweeklySelectTitle">Guardia quincenal</h3>
+            <p class="modal-subtitle">Elige en qué semanas del mes participarás</p>
+
+            <div class="biweekly-options" role="radiogroup" aria-label="Semanas del mes">
+                <label class="biweekly-option">
+                    <input type="radio" name="biweeklyWeeks" value="1,3">
+                    <span class="biweekly-option-label">Semana 1 y 3</span>
+                </label>
+                <label class="biweekly-option">
+                    <input type="radio" name="biweeklyWeeks" value="2,4">
+                    <span class="biweekly-option-label">Semana 2 y 4</span>
+                </label>
+            </div>
+
+            <button type="button" class="btn-primary" id="confirmBiweeklyBtn">Confirmar quincena</button>
+            <button type="button" class="btn-close" data-close-biweekly>Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal selección de días (diario) -->
+    <div class="modal-overlay modal-stacked" id="daySelectModal" role="dialog" aria-modal="true" aria-labelledby="daySelectTitle">
+        <div class="modal-window modal-window-compact">
+            <button type="button" class="modal-close-x" data-close-day aria-label="Cerrar">×</button>
+            <h3 id="daySelectTitle">Días de guardia</h3>
+            <p class="modal-slot-time" id="daySelectSlotLabel"></p>
+            <p class="modal-subtitle">Elige los días de la semana para este horario</p>
+
+            <button type="button" id="selectAllDaysBtn" class="btn-ghost-gold btn-select-all-days">
+                Seleccionar todos los días
+            </button>
+
+            <div class="weekday-grid" id="weekdayGrid" role="group" aria-label="Días de la semana"></div>
+
+            <button type="button" class="btn-primary" id="confirmDaysBtn">Confirmar días</button>
+            <button type="button" class="btn-close" data-close-day>Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal mis reservas (centrado) -->
+    <div class="modal-overlay" id="myModal" role="dialog" aria-modal="true" aria-labelledby="myTitle">
+        <div class="modal-window">
+            <button type="button" class="modal-close-x" data-close aria-label="Cerrar">×</button>
+            <h3 id="myTitle">Mis Turnos</h3>
+            <p class="modal-subtitle">Consulta o cancela tus guardias agendadas</p>
+
+            <div class="floating-input-group">
+                <input type="tel" class="floating-input phone-digits-input" id="myPhone" placeholder=" " autocomplete="tel-national" inputmode="numeric" pattern="[0-9]*" maxlength="8">
+                <label class="floating-label" for="myPhone">Número de celular</label>
+            </div>
+
+            <button type="button" class="btn-primary" id="lookupBtn">Buscar</button>
+            <button type="button" class="btn-close" data-close>Cerrar</button>
+            <div id="myList" class="my-list"></div>
+        </div>
+    </div>
+
+    <select id="dayPicker" hidden aria-hidden="true" tabindex="-1">
+        <option value="1">Lunes</option>
+        <option value="2">Martes</option>
+        <option value="3">Miércoles</option>
+        <option value="4">Jueves</option>
+        <option value="5">Viernes</option>
+        <option value="6">Sábado</option>
+        <option value="7">Domingo</option>
+    </select>
+
+<script>
+    (function () {
+        var k = "adoratio_horarios_theme";
+        var t = localStorage.getItem(k) || "light";
+        document.body.dataset.theme = t;
+    })();
+</script>
+    <script src="app.js"></script>
+    <script src="horarios.js"></script>
+</body>
+</html>
