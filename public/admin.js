@@ -466,6 +466,89 @@
         else toast(data.error || "Error.", "error");
     }
 
+    // ── MURO DE INTENCIONES ──
+    var intentionsCache = [];
+
+    function whatsAppNotifyUrl(phone) {
+        if (!phone) return null;
+        const msg = encodeURIComponent(
+            "Hola, queremos notificarte que tu petición ha sido orada hoy durante la Adoración."
+        );
+        return "https://wa.me/506" + phone + "?text=" + msg;
+    }
+
+    function formatIntentionDate(iso) {
+        try {
+            return new Date(iso).toLocaleDateString("es-CR", {
+                day: "numeric", month: "short", year: "numeric",
+            });
+        } catch (_) {
+            return "—";
+        }
+    }
+
+    function renderMuroTable() {
+        const table = document.getElementById("muroTable");
+        const canNotify = hasPerm("RESERVATIONS_CHECKIN");
+        const tbody = intentionsCache;
+
+        table.innerHTML =
+            "<thead><tr>" +
+            "<th>Intención</th><th>Autor</th><th>Celular</th><th>Fecha</th><th>Estado</th><th></th>" +
+            "</tr></thead><tbody>" +
+            (tbody.length ? tbody.map(function (i) {
+                const waUrl = whatsAppNotifyUrl(i.userPhone);
+                const waBtn = waUrl
+                    ? "<a href='" + waUrl + "' target='_blank' rel='noopener' class='btn-whatsapp'>Notificar oración</a>"
+                    : "<span class='muted'>—</span>";
+                const markBtn = canNotify && i.status === "active"
+                    ? " <button class='mini-btn' data-prayed='" + i.id + "'>Marcar orada</button>"
+                    : "";
+                return "<tr>" +
+                    "<td class='muro-intention-text'>" + escapeHtml(i.text) + "</td>" +
+                    "<td>" + escapeHtml(i.displayName || "Anónimo") + "</td>" +
+                    "<td>" + escapeHtml(i.userPhone || "—") + "</td>" +
+                    "<td>" + formatIntentionDate(i.createdAt) + "</td>" +
+                    "<td><span class='status-pill status-" + (i.status === "prayed" ? "completed" : "confirmed") + "'>" +
+                    (i.status === "prayed" ? "Orada" : "Activa") + "</span></td>" +
+                    "<td><div class='admin-actions'>" + waBtn + markBtn + "</div></td></tr>";
+            }).join("") : "<tr><td colspan='6' class='muted'>Sin intenciones con este filtro.</td></tr>") +
+            "</tbody>";
+
+        const badge = document.getElementById("muroCountBadge");
+        if (badge) badge.textContent = tbody.length + (tbody.length === 1 ? " intención" : " intenciones");
+
+        table.querySelectorAll("[data-prayed]").forEach(function (b) {
+            b.addEventListener("click", function () { markIntentionPrayed(b.getAttribute("data-prayed")); });
+        });
+    }
+
+    async function loadIntentions() {
+        if (!hasPerm("RESERVATIONS_VIEW")) return;
+        const status = document.getElementById("muroStatusFilter").value;
+        const qs = new URLSearchParams();
+        if (status) qs.set("status", status);
+        const res = await api("/api/admin/intentions?" + qs.toString());
+        const data = await res.json();
+        if (!res.ok) {
+            toast(data.error || "Error al cargar intenciones.", "error");
+            return;
+        }
+        intentionsCache = data.intentions || [];
+        renderMuroTable();
+    }
+
+    async function markIntentionPrayed(id) {
+        const res = await api("/api/admin/intentions/" + id + "/prayed", { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Intención marcada como orada.", "success");
+            loadIntentions();
+        } else {
+            toast(data.error || "Error.", "error");
+        }
+    }
+
     // ── TURNOS ──
     async function loadSlots() {
         if (!hasPerm("SLOTS_VIEW")) return;
@@ -924,6 +1007,7 @@
                 const loaders = {
                     resumen: function () { loadMetrics(); loadActivity(); },
                     reservas: loadReservations,
+                    muro: loadIntentions,
                     turnos: function () { loadSettingsForm(); loadSlots(); },
                     qrs: loadQrs,
                     perfiles: loadRoles,
@@ -941,6 +1025,8 @@
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("resLoadBtn").addEventListener("click", loadReservations);
     document.getElementById("resClearFilters").addEventListener("click", clearResFilters);
+    document.getElementById("muroLoadBtn").addEventListener("click", loadIntentions);
+    document.getElementById("muroStatusFilter").addEventListener("change", loadIntentions);
     document.getElementById("exportCsv").addEventListener("click", exportCsv);
     document.getElementById("addSlot").addEventListener("click", addSlot);
     document.getElementById("saveSettingsBtn").addEventListener("click", saveSettingsForm);

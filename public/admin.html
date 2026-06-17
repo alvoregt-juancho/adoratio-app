@@ -37,6 +37,7 @@
         <nav class="admin-tabs" id="adminTabs">
             <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW">Centro de Mando</button>
             <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW">Reservas</button>
+            <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW">Muro</button>
             <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW">Turnos</button>
             <button class="tab" data-tab="qrs" data-perm="QRS_VIEW">QR Capilla</button>
             <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW">Perfiles</button>
@@ -97,6 +98,22 @@
                 <button class="ghost-btn" id="exportCsv" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
             </div>
             <div class="table-wrap"><table class="data-table res-participants-table" id="resTable"></table></div>
+        </section>
+
+        <!-- Muro de Intenciones -->
+        <section class="tab-panel" id="tab-muro" data-perm="RESERVATIONS_VIEW">
+            <div class="toolbar res-toolbar">
+                <label class="field"><span>Estado</span>
+                    <select id="muroStatusFilter" class="touch-input-field dark-input">
+                        <option value="active">Activas</option>
+                        <option value="prayed">Oradas</option>
+                        <option value="all">Todas</option>
+                    </select>
+                </label>
+                <button class="ghost-btn" id="muroLoadBtn">Actualizar</button>
+                <span class="res-count-badge" id="muroCountBadge">0 intenciones</span>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="muroTable"></table></div>
         </section>
 
         <!-- Turnos -->

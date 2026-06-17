@@ -2,37 +2,202 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Asistencia | Adoratio</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tótem de Ingreso — AdoraHora</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gq-onyx: #111215;
+            --sacred-gold: #C5A059;
+            --font-serif: 'Cormorant Garamond', serif;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body, html {
+            height: 100%;
+            background-color: var(--gq-onyx);
+            font-family: var(--font-sans);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .glass-santi-container {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            height: 100vh;
+            background-image: url('background.webp');
+            background-size: cover;
+            background-position: center center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .glass-santi-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        .totem-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 32px;
+            padding: 40px 24px;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .custodia-liturgica-svg {
+            width: 130px;
+            height: 130px;
+            margin: 0 auto 20px auto;
+            filter: drop-shadow(0 4px 12px rgba(182,146,77,0.4));
+        }
+
+        .totem-title {
+            font-family: var(--font-serif);
+            font-size: 2.2rem;
+            color: var(--gq-onyx);
+            margin-bottom: 8px;
+            font-weight: 400;
+        }
+
+        .totem-subtext {
+            font-size: 1.05rem;
+            color: #4A4A4A;
+            margin-bottom: 32px;
+            line-height: 1.4;
+        }
+
+        .input-phone-totem {
+            width: 100%;
+            height: 68px;
+            background: #FFFFFF;
+            border: 2px solid #D1D1D6;
+            border-radius: 18px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gq-onyx);
+            letter-spacing: 2px;
+            outline: none;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .input-phone-totem:focus { border-color: var(--sacred-gold); }
+
+        .btn-totem-checkin {
+            width: 100%;
+            height: 64px;
+            background: linear-gradient(135deg, #DBBF7C, #B6924D);
+            border: none;
+            border-radius: 18px;
+            color: #FFF;
+            font-size: 1.15rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(182,146,77,0.3);
+        }
+        .btn-totem-checkin:disabled { opacity: 0.65; }
+
+        .result-box {
+            margin-top: 16px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            display: none;
+        }
+        .result-box.show { display: block; }
+        .result-box.success { color: #1B7F3A; }
+        .result-box.error { color: #D9383A; }
+
+        .toast {
+            position: fixed;
+            top: 24px; left: 50%;
+            transform: translate(-50%, -150%);
+            background: var(--gq-onyx);
+            color: #FFF;
+            padding: 14px 20px;
+            border-radius: 16px;
+            font-weight: 600;
+            z-index: 100;
+            transition: transform 0.4s ease;
+            max-width: calc(100% - 48px);
+            text-align: center;
+        }
+        .toast.show { transform: translate(-50%, 0); }
+        .toast.error { background: #D9383A; }
+    </style>
 </head>
-<body style="background-color: #000;">
-    <div class="premium-sheet-overlay active">
-        <div class="sheet-window">
-            <div class="custodia-container">
-                <svg viewBox="0 0 200 300" width="120" height="180">
-                    <defs>
-                        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#DBBF7C" />
-                            <stop offset="50%" style="stop-color:#CDB16E" />
-                            <stop offset="80%" style="stop-color:#C1A364" />
-                            <stop offset="100%" style="stop-color:#B6924D" />
-                        </linearGradient>
-                    </defs>
-                    <circle cx="100" cy="150" r="35" fill="#FFF" stroke="#DBBF7C" stroke-width="2"/>
-                    <path d="M100 50 L100 250 M50 150 L150 150 M70 80 L130 220 M130 80 L70 220" stroke="url(#goldGrad)" stroke-width="4"/>
-                </svg>
-            </div>
-            <h2 class="sheet-title">Asistencia</h2>
-            <p class="sheet-caption" id="qrInfo">Confirma tu llegada a la capilla.</p>
-            <div class="booking-input-group">
-                <input type="tel" id="userPhone" class="touch-input-field phone-digits-input" autocomplete="tel-national" inputmode="numeric" pattern="[0-9]*" maxlength="8"
-                    placeholder="8 dígitos de tu celular" style="background:#fff;color:#000;">
-            </div>
-            <button class="sheet-primary-btn" id="checkinBtn" onclick="executeCommitment()">CONFIRMAR ASISTENCIA</button>
+<body>
+
+    <div class="glass-santi-container">
+        <div class="totem-card">
+
+            <svg class="custodia-liturgica-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="goldDegrade" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#DBBF7C" />
+                        <stop offset="35%" stop-color="#CDB16E" />
+                        <stop offset="70%" stop-color="#C1A364" />
+                        <stop offset="100%" stop-color="#B6924D" />
+                    </linearGradient>
+                    <radialGradient id="hostiaGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="1"/>
+                        <stop offset="70%" stop-color="#FFFDF0" stop-opacity="0.5"/>
+                        <stop offset="100%" stop-color="#C5A059" stop-opacity="0"/>
+                    </radialGradient>
+                </defs>
+                <circle cx="50" cy="45" r="24" fill="url(#hostiaGlow)" />
+                <path d="M35 88 C35 80, 65 80, 65 88 Z" fill="url(#goldDegrade)" />
+                <path d="M46 65 L54 65 L52 81 L48 81 Z" fill="url(#goldDegrade)" />
+                <path d="M46 70 C44 67, 44 61, 50 61 C56 61, 56 67, 54 70 Z" fill="url(#goldDegrade)" />
+                <g stroke="url(#goldDegrade)" stroke-width="1.2" stroke-linecap="round">
+                    <line x1="50" y1="45" x2="50" y2="12" />
+                    <line x1="50" y1="45" x2="50" y2="78" />
+                    <line x1="50" y1="45" x2="17" y2="45" />
+                    <line x1="50" y1="45" x2="83" y2="45" />
+                    <line x1="50" y1="45" x2="26" y2="21" />
+                    <line x1="50" y1="45" x2="74" y2="69" />
+                    <line x1="50" y1="45" x2="74" y2="21" />
+                    <line x1="50" y1="45" x2="26" y2="69" />
+                </g>
+                <circle cx="50" cy="45" r="13" fill="none" stroke="url(#goldDegrade)" stroke-width="2.5" />
+                <path d="M48 8 L52 8 M50 6 L50 12" stroke="url(#goldDegrade)" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="50" cy="45" r="9" fill="#FFFFFF" />
+                <path d="M47 45 L53 45 M50 42 L50 48" stroke="#E5E5EA" stroke-width="0.6" />
+            </svg>
+
+            <h1 class="totem-title">Marcar Ingreso</h1>
+            <p class="totem-subtext" id="qrInfo">Digita tu número de celular registrado para confirmar tu hora de adoración.</p>
+
+            <input type="tel" id="userPhone" class="input-phone-totem" placeholder="********" maxlength="8" inputmode="numeric" autocomplete="tel-national">
+
+            <button class="btn-totem-checkin" id="checkinBtn" onclick="executeCommitment()">
+                Confirmar Presencia
+            </button>
+
             <div id="result" class="result-box"></div>
         </div>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>

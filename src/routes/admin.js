@@ -247,6 +247,80 @@ router.post('/reservations/:id/checkin', requirePermission(PRIV.RESERVATIONS_CHE
     }
 });
 
+// ── MURO DE INTENCIONES ───────────────────────────────────────────────
+router.get('/intentions', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
+    try {
+        const status = req.query.status || 'active';
+        const where = { visibility: 'wall' };
+        if (status !== 'all') where.status = status;
+
+        const intentions = await prisma.prayerIntention.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+            include: {
+                reservation: {
+                    select: {
+                        id: true,
+                        userName: true,
+                        userPhone: true,
+                        date: true,
+                        slot: { select: { startTime: true, endTime: true } },
+                    },
+                },
+            },
+        });
+
+        res.json({
+            intentions: intentions.map((i) => ({
+                id: i.id,
+                text: i.text,
+                displayName: i.displayName,
+                userPhone: i.userPhone || i.reservation?.userPhone || null,
+                status: i.status,
+                createdAt: i.createdAt,
+                reservation: i.reservation
+                    ? {
+                        id: i.reservation.id,
+                        userName: i.reservation.userName,
+                        date: i.reservation.date,
+                        slot: i.reservation.slot.startTime + '–' + i.reservation.slot.endTime,
+                    }
+                    : null,
+            })),
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener intenciones.' });
+    }
+});
+
+router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.prayerIntention.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Intención no encontrada.' });
+
+        const updated = await prisma.prayerIntention.update({
+            where: { id },
+            data: { status: 'prayed' },
+        });
+
+        await writeAudit({
+            action: 'intention.prayed',
+            entity: 'prayer_intention',
+            entityId: id,
+            meta: { text: existing.text.slice(0, 80) },
+            req,
+        });
+
+        res.json({ message: 'Intención marcada como orada.', intention: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al actualizar la intención.' });
+    }
+});
+
 // ── QR FÍSICOS ────────────────────────────────────────────────────────
 router.get('/qrs', requirePermission(PRIV.QRS_VIEW), async (req, res) => {
     try {

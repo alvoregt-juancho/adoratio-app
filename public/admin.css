@@ -547,3 +547,36 @@ body.admin {
     letter-spacing: 0.06em;
     padding: 0 6px;
 }
+
+.btn-whatsapp {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #25D366;
+    color: #fff !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.btn-whatsapp:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+.muro-intention-text {
+    max-width: 280px;
+    font-style: italic;
+    font-family: var(--admin-serif);
+    line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+    .muro-intention-text {
+        max-width: 160px;
+    }
+}

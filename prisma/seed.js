@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../src/db');
 const config = require('../src/config');
+const { generateQrCodeId } = require('../src/utils/qr');
 const { splitFullName, buildFullName } = require('../src/utils/name');
 const {
     ALL_PRIVILEGES,

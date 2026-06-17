@@ -93,10 +93,29 @@ model Reservation {
   slot           Slot        @relation(fields: [slotId], references: [id])
   user           User?       @relation(fields: [userId], references: [id])
   checkedInViaQR PhysicalQR? @relation(fields: [checkedInViaQrId], references: [id])
-  scanLogs       ScanLog[]
-  audits         AuditLog[]
+  scanLogs          ScanLog[]
+  audits            AuditLog[]
+  prayerIntentions  PrayerIntention[]
 
   @@map("reservations")
+}
+
+// visibility: "private" | "wall"
+// status: "active" | "prayed"
+model PrayerIntention {
+  id            Int       @id @default(autoincrement())
+  text          String
+  displayName   String?   @map("display_name")
+  userPhone     String?   @map("user_phone")
+  visibility    String    @default("private")
+  status        String    @default("active")
+  reservationId Int?      @map("reservation_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@index([visibility, status])
+  @@map("prayer_intentions")
 }
 
 model PhysicalQR {

@@ -8,6 +8,7 @@ const { getSettings } = require('../utils/settings');
 const { isValidFrequency, COMMITMENT_FREQUENCY, getEnabledFrequencies } = require('../constants/commitment');
 const { parseWeekDays, isValidWeekDays } = require('../utils/weekDays');
 const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
+const { createWallIntention } = require('../utils/intentions');
 
 const router = express.Router();
 
@@ -128,6 +129,26 @@ router.post('/', async (req, res) => {
                 meta: JSON.stringify({ slotId: slot.id, date, frequency, weekDays, biweeklyWeeks, durationMinutes, startTimeOffset }),
             },
         });
+
+        const intencion = (req.body?.intencion || req.body?.intention || '').trim();
+        if (intencion) {
+            try {
+                await createWallIntention({
+                    text: intencion,
+                    userPhone,
+                    userName: full,
+                    reservationId: reservation.id,
+                });
+            } catch (intErr) {
+                if (intErr.message === 'INTENTION_TOO_LONG') {
+                    return res.status(400).json({ error: 'La intención de oración no puede superar 500 caracteres.' });
+                }
+                if (intErr.message === 'INVALID_PHONE') {
+                    return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+                }
+                throw intErr;
+            }
+        }
 
         return res.status(201).json({
             message: 'Reserva confirmada.',
