@@ -1,5 +1,18 @@
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+let client;
 
-module.exports = prisma;
+function getClient() {
+    if (!client) client = new PrismaClient();
+    return client;
+}
+
+module.exports = new Proxy(
+    {},
+    {
+        get(_target, prop) {
+            const value = getClient()[prop];
+            return typeof value === 'function' ? value.bind(getClient()) : value;
+        },
+    },
+);

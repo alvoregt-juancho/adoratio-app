@@ -143,11 +143,28 @@ router.delete('/roles/:id', attachPrivileges, requirePermission(PRIV.ROLES_MANAG
             include: { _count: { select: { users: true } } },
         });
         if (!existing) return res.status(404).json({ error: 'Perfil no encontrado.' });
-        if (existing.isSystem) {
-            return res.status(403).json({ error: 'Los perfiles de sistema no pueden eliminarse.' });
+        if (existing.slug === 'super-admin') {
+            return res.status(403).json({ error: 'El perfil Super Admin no puede eliminarse.' });
         }
+        const reassignToRoleId = Number(req.body?.reassignToRoleId) || null;
         if (existing._count.users > 0) {
-            return res.status(409).json({ error: 'Hay administradores asignados a este perfil.' });
+            if (!reassignToRoleId) {
+                return res.status(409).json({
+                    error: `Hay ${existing._count.users} administrador(es) con este perfil. Reasígnalos o indica otro perfil al eliminar.`,
+                    userCount: existing._count.users,
+                });
+            }
+            if (reassignToRoleId === id) {
+                return res.status(400).json({ error: 'El perfil de reasignación debe ser distinto.' });
+            }
+            const targetRole = await prisma.adminRole.findUnique({ where: { id: reassignToRoleId } });
+            if (!targetRole) return res.status(404).json({ error: 'Perfil de reasignación no encontrado.' });
+            const legacyRole = targetRole.slug === 'super-admin' ? 'superadmin'
+                : targetRole.privileges & PRIV.ROLES_MANAGE ? 'admin' : 'lector';
+            await prisma.user.updateMany({
+                where: { adminRoleId: id },
+                data: { adminRoleId: reassignToRoleId, role: legacyRole },
+            });
         }
         await prisma.adminRole.delete({ where: { id } });
         await writeAudit({
@@ -328,6 +345,38 @@ router.get('/audit-logs', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), 
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al obtener auditoría.' });
+    }
+});
+
+// ── ZONA TEMPORAL: reset datos de demostración ───────────────────────
+const { runDemoSeed } = require('../../prisma/demoData');
+
+router.post('/demo/reset', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), async (req, res) => {
+    try {
+        if (!req.user.isSuperAdmin && req.user.adminRoleSlug !== 'super-admin') {
+            return res.status(403).json({ error: 'Solo Super Admin puede resetear los datos de demostración.' });
+        }
+        if (String(req.body?.confirm || '').trim() !== 'BORRAR') {
+            return res.status(400).json({ error: 'Escribe BORRAR en el campo de confirmación.' });
+        }
+
+        const counts = await runDemoSeed({ adminId: req.user.id, wipeFirst: true });
+
+        await writeAudit({
+            action: 'demo.reset',
+            entity: 'database',
+            userId: req.user.id,
+            meta: counts,
+            req,
+        });
+
+        res.json({
+            message: 'Datos de demostración restaurados. Usuarios y perfiles RBAC se conservaron.',
+            counts,
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al resetear los datos de demostración.' });
     }
 });
 

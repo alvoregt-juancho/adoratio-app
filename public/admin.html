@@ -36,24 +36,25 @@
                     <span id="whoami" class="muted"></span>
                 </div>
             </div>
+            <button class="ghost-btn hints-toggle-btn" id="hintsToggleBtn" type="button" aria-pressed="true">Ocultar guía</button>
             <button class="ghost-btn" id="logoutBtn">Salir</button>
         </header>
 
         <nav class="admin-tabs" id="adminTabs">
-            <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW">Centro de Mando</button>
-            <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW">Reservas</button>
-            <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW">Muro</button>
-            <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW">Turnos</button>
-            <button class="tab" data-tab="qrs" data-perm="QRS_VIEW">QR Capilla</button>
-            <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW">Perfiles</button>
-            <button class="tab" data-tab="admins" data-perm="USERS_VIEW">Administradores</button>
-            <button class="tab" data-tab="auditoria" data-perm="AUDIT_VIEW">Auditoría</button>
+            <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW" data-hint-key="tab-resumen">Centro de Mando</button>
+            <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-reservas">Reservas</button>
+            <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-muro">Muro</button>
+            <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW" data-hint-key="tab-turnos">Turnos</button>
+            <button class="tab" data-tab="qrs" data-perm="QRS_VIEW" data-hint-key="tab-qrs">QR Capilla</button>
+            <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW" data-hint-key="tab-perfiles">Perfiles</button>
+            <button class="tab" data-tab="admins" data-perm="USERS_VIEW" data-hint-key="tab-admins">Administradores</button>
+            <button class="tab" data-tab="auditoria" data-perm="AUDIT_VIEW" data-hint-key="tab-auditoria">Auditoría</button>
         </nav>
 
         <!-- Centro de Mando -->
         <section class="tab-panel active" id="tab-resumen" data-perm="DASHBOARD_VIEW">
             <div class="command-center">
-                <div class="command-header">
+                <div class="command-header" data-hint-key="section-resumen">
                     <div>
                         <h2>Estado de la capilla</h2>
                         <p>Resumen en tiempo real · sin recargas</p>
@@ -61,7 +62,14 @@
                     <span class="command-date" id="commandDate"></span>
                 </div>
                 <div class="metrics-grid" id="metrics"></div>
-                <div class="panel-card timeline-panel">
+                <div class="metric-detail-panel hidden" id="metricDetailPanel" aria-live="polite">
+                    <div class="metric-detail-header">
+                        <h3 id="metricDetailTitle">Detalle</h3>
+                        <button type="button" class="ghost-btn metric-detail-close" id="metricDetailClose" aria-label="Cerrar detalle">×</button>
+                    </div>
+                    <div class="metric-detail-body" id="metricDetailBody"></div>
+                </div>
+                <div class="panel-card timeline-panel" data-hint-key="timeline-panel">
                     <div class="panel-card-header">
                         <h3>Timeline de guardias</h3>
                         <span class="muted" id="timelineDateLabel"></span>
@@ -93,29 +101,39 @@
 
         <!-- Reservas / Participantes -->
         <section class="tab-panel" id="tab-reservas" data-perm="RESERVATIONS_VIEW">
-            <div class="toolbar res-toolbar">
-                <label class="field"><span>Alcance</span>
-                    <input type="date" id="resDateScope" class="touch-input-field dark-input" title="Vacío = todas las reservas recientes">
-                </label>
-                <button class="ghost-btn" id="resLoadBtn">Cargar</button>
-                <button class="ghost-btn" id="resClearFilters">Limpiar filtros</button>
+            <p class="roster-intro muted" data-hint-key="section-reservas">Adoradores con guardia programada en el período seleccionado. Incluye compromisos semanales, diarios y recurrentes expandidos por fecha.</p>
+            <div class="toolbar res-toolbar calendar-toolbar">
+                <div class="calendar-view-toggle" role="group" aria-label="Alcance">
+                    <button type="button" class="ghost-btn res-view-btn active" data-res-view="week" data-hint-key="res-view-week">Semana</button>
+                    <button type="button" class="ghost-btn res-view-btn" data-res-view="month" data-hint-key="res-view-month">Mes</button>
+                </div>
+                <div class="calendar-nav">
+                    <button type="button" class="ghost-btn" id="resPrev" aria-label="Anterior">‹</button>
+                    <span class="calendar-range-label" id="resRangeLabel">—</span>
+                    <button type="button" class="ghost-btn" id="resNext" aria-label="Siguiente">›</button>
+                </div>
+                <div class="calendar-quick-select">
+                    <button type="button" class="ghost-btn res-quick" data-res-quick="this-week">Esta semana</button>
+                    <button type="button" class="ghost-btn res-quick" data-res-quick="next-week">Próxima semana</button>
+                    <button type="button" class="ghost-btn res-quick" data-res-quick="this-month">Este mes</button>
+                </div>
+                <button class="ghost-btn" id="resClearFilters" data-hint-key="res-clear-filters">Limpiar filtros</button>
                 <span class="res-count-badge" id="resCountBadge">0 participantes</span>
-                <button class="ghost-btn" id="exportCsv" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
+                <button class="ghost-btn" id="exportCsv" data-perm="RESERVATIONS_EXPORT" data-hint-key="export-csv">Exportar CSV</button>
             </div>
             <div class="table-wrap"><table class="data-table res-participants-table" id="resTable"></table></div>
         </section>
 
         <!-- Muro de Intenciones -->
         <section class="tab-panel" id="tab-muro" data-perm="RESERVATIONS_VIEW">
-            <div class="toolbar res-toolbar">
+            <div class="toolbar res-toolbar" data-hint-key="section-muro">
                 <label class="field"><span>Estado</span>
-                    <select id="muroStatusFilter" class="touch-input-field dark-input">
+                    <select id="muroStatusFilter" class="touch-input-field dark-input" data-hint-key="muro-filter">
                         <option value="active">Activas</option>
                         <option value="prayed">Oradas</option>
                         <option value="all">Todas</option>
                     </select>
                 </label>
-                <button class="ghost-btn" id="muroLoadBtn">Actualizar</button>
                 <span class="res-count-badge" id="muroCountBadge">0 intenciones</span>
             </div>
             <div class="table-wrap"><table class="data-table" id="muroTable"></table></div>
@@ -123,7 +141,113 @@
 
         <!-- Turnos -->
         <section class="tab-panel" id="tab-turnos" data-perm="SLOTS_VIEW">
-            <div class="settings-panel panel-card" data-perm="SLOTS_EDIT">
+            <nav class="turnos-subtabs" id="turnosSubtabs">
+                <button type="button" class="subtab active" data-turnos-view="calendario" data-hint-key="turnos-calendario">Calendario</button>
+                <button type="button" class="subtab" data-turnos-view="lista" data-hint-key="turnos-lista">Lista</button>
+                <button type="button" class="subtab" data-turnos-view="directorio" data-hint-key="turnos-directorio">Directorio</button>
+                <button type="button" class="subtab" data-turnos-view="config" data-hint-key="turnos-config">Configuración</button>
+            </nav>
+
+            <!-- Calendario semana / mes -->
+            <div class="turnos-view active" id="turnos-calendario">
+                <div class="toolbar res-toolbar calendar-toolbar">
+                    <div class="calendar-view-toggle" role="group" aria-label="Vista">
+                        <button type="button" class="ghost-btn calendar-view-btn active" data-cal-view="week">Semana</button>
+                        <button type="button" class="ghost-btn calendar-view-btn" data-cal-view="month">Mes</button>
+                    </div>
+                    <div class="calendar-nav">
+                        <button type="button" class="ghost-btn" id="calPrev" aria-label="Anterior">‹</button>
+                        <span class="calendar-range-label" id="calRangeLabel">—</span>
+                        <button type="button" class="ghost-btn" id="calNext" aria-label="Siguiente">›</button>
+                    </div>
+                    <div class="calendar-quick-select">
+                        <button type="button" class="ghost-btn cal-quick" data-cal-quick="this-week">Esta semana</button>
+                        <button type="button" class="ghost-btn cal-quick" data-cal-quick="next-week">Próxima semana</button>
+                        <button type="button" class="ghost-btn cal-quick" data-cal-quick="this-month">Este mes</button>
+                    </div>
+                    <span class="res-count-badge" id="calNeedsBadge" data-hint-key="cal-needs">0 huecos</span>
+                </div>
+                <div class="calendar-wrap" id="calendarWrap">
+                    <div class="empty-state">Cargando calendario…</div>
+                </div>
+            </div>
+
+            <!-- Lista / Roster -->
+            <div class="turnos-view" id="turnos-lista">
+                <p class="roster-intro muted">Compromisos de adoración, capitanes y sustitutos por día y hora. Filtra por tu responsabilidad: p. ej. día <em>Todos</em> + hora <em>07:00</em> para el capitán de las 7 AM.</p>
+                <div class="toolbar res-toolbar roster-toolbar">
+                    <label class="field"><span>Día</span>
+                        <select id="rosterDayFilter" class="touch-input-field dark-input">
+                            <option value="">Todos</option>
+                            <option value="7">Domingo</option>
+                            <option value="1">Lunes</option>
+                            <option value="2">Martes</option>
+                            <option value="3">Miércoles</option>
+                            <option value="4">Jueves</option>
+                            <option value="5">Viernes</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                    </label>
+                    <label class="field"><span>Hora</span>
+                        <select id="rosterTimeFilter" class="touch-input-field dark-input">
+                            <option value="">Todas</option>
+                        </select>
+                    </label>
+                    <div class="roster-section-toggles">
+                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowCommitments" checked><span>Turnos</span></label>
+                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowCaptains" checked><span>Capitanes</span></label>
+                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowSubstitutes" checked><span>Sustitutos</span></label>
+                    </div>
+                </div>
+
+                <div class="roster-section" id="rosterCommitmentsSection">
+                    <div class="roster-section-header">
+                        <h3>Turnos de adoración <span class="roster-count" id="rosterCommitmentsCount">0</span></h3>
+                        <div class="roster-section-actions">
+                            <button type="button" class="ghost-btn roster-message" data-message="commitments" data-hint-key="roster-message">Mensaje adoradores</button>
+                            <button type="button" class="ghost-btn roster-export" data-export="commitments" data-perm="RESERVATIONS_EXPORT" data-hint-key="roster-export">Exportar CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table class="data-table roster-table" id="rosterCommitmentsTable"></table></div>
+                </div>
+
+                <div class="roster-section" id="rosterCaptainsSection">
+                    <div class="roster-section-header">
+                        <h3>Capitanes <span class="roster-count" id="rosterCaptainsCount">0</span></h3>
+                        <div class="roster-section-actions">
+                            <button type="button" class="ghost-btn roster-message" data-message="captains">Mensaje capitanes</button>
+                            <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Capitán</button>
+                            <button type="button" class="ghost-btn roster-export" data-export="captains" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table class="data-table roster-table" id="rosterCaptainsTable"></table></div>
+                </div>
+
+                <div class="roster-section" id="rosterSubstitutesSection">
+                    <div class="roster-section-header">
+                        <h3>Sustitutos <span class="roster-count" id="rosterSubstitutesCount">0</span></h3>
+                        <div class="roster-section-actions">
+                            <button type="button" class="ghost-btn roster-message" data-message="substitutes">Mensaje sustitutos</button>
+                            <button type="button" class="ghost-btn" id="newSubstituteBtn" data-perm="SLOTS_EDIT" data-hint-key="new-substitute">+ Sustituto</button>
+                            <button type="button" class="ghost-btn roster-export" data-export="substitutes" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
+                </div>
+            </div>
+
+            <!-- Directorio de adoradores -->
+            <div class="turnos-view" id="turnos-directorio">
+                <div class="toolbar res-toolbar">
+                    <span class="res-count-badge" id="dirCountBadge">0 adoradores</span>
+                    <button type="button" class="ghost-btn" id="dirClearFilters">Limpiar filtros</button>
+                </div>
+                <div class="table-wrap"><table class="data-table res-participants-table" id="dirTable"></table></div>
+            </div>
+
+            <!-- Configuración de turnos -->
+            <div class="turnos-view" id="turnos-config">
+            <div class="settings-panel panel-card" data-perm="SLOTS_EDIT" data-hint-key="slot-settings">
                 <div class="panel-card-header">
                     <h3>Configuración de guardias</h3>
                 </div>
@@ -148,26 +272,43 @@
                 <input type="text" id="slotStart" class="touch-input-field dark-input" placeholder="Inicio (HH:MM)">
                 <input type="text" id="slotEnd" class="touch-input-field dark-input" placeholder="Fin (HH:MM)">
                 <input type="number" id="slotCap" class="touch-input-field dark-input" placeholder="Cupo" min="1" value="4">
-                <button class="ghost-btn" id="addSlot">+ Agregar turno</button>
+                <button class="ghost-btn" id="addSlot" data-hint-key="add-slot">+ Agregar turno</button>
             </div>
             <div class="table-wrap"><table class="data-table" id="slotsTable"></table></div>
+            </div>
         </section>
 
         <!-- QRs -->
         <section class="tab-panel" id="tab-qrs" data-perm="QRS_VIEW">
-            <div class="toolbar">
-                <button class="ghost-btn" id="newQrBtn" data-perm="QRS_CREATE">+ Generar nuevo QR</button>
-                <button class="ghost-btn" id="printBatchBtn" data-perm="QRS_CREATE">Imprimir lote (10)</button>
+            <div class="panel-card chapel-qr-panel" data-hint-key="section-qrs">
+                <div class="panel-card-header">
+                    <h3>QR de la capilla</h3>
+                    <span class="res-count-badge" id="chapelQrUses">0 escaneos</span>
+                </div>
+                <div class="panel-card-body chapel-qr-body">
+                    <p class="muted chapel-qr-intro">Un solo código para <strong>todos los adoradores</strong>. Imprímelo en la entrada; cada persona registra su guardia en horarios y valida su visita escaneando este mismo QR con su celular.</p>
+                    <div class="chapel-qr-preview" id="chapelQrPreview">
+                        <div class="empty-state">Cargando QR de capilla…</div>
+                    </div>
+                    <div class="toolbar-spaced chapel-qr-actions">
+                        <button class="ghost-btn" id="printChapelQrBtn" data-perm="QRS_VIEW" data-hint-key="print-chapel-qr">Imprimir QR</button>
+                        <button class="ghost-btn" id="replaceChapelQrBtn" data-perm="QRS_CREATE" data-hint-key="replace-chapel-qr">Generar nuevo QR</button>
+                    </div>
+                    <p class="muted chapel-qr-note">Al generar uno nuevo, el anterior se desactiva. No necesitas un QR por hora, día ni persona.</p>
+                </div>
             </div>
-            <div class="table-wrap"><table class="data-table" id="qrTable"></table></div>
+            <details class="qr-history-details">
+                <summary class="qr-history-summary">Historial de códigos anteriores</summary>
+                <div class="table-wrap"><table class="data-table" id="qrTable"></table></div>
+            </details>
         </section>
 
         <!-- Perfiles RBAC -->
         <section class="tab-panel" id="tab-perfiles" data-perm="ROLES_VIEW">
             <div class="toolbar-spaced">
-                <button class="ghost-btn" id="newRoleBtn" data-perm="ROLES_MANAGE">+ Nuevo perfil</button>
+                <button class="ghost-btn" id="newRoleBtn" data-perm="ROLES_MANAGE" data-hint-key="new-role">+ Nuevo perfil</button>
             </div>
-            <div class="rbac-layout">
+            <div class="rbac-layout" data-hint-key="section-perfiles">
                 <div class="role-list" id="roleList"></div>
                 <div class="permission-matrix" id="roleEditor">
                     <div class="empty-state">Selecciona un perfil para ver o editar permisos.</div>
@@ -178,16 +319,28 @@
         <!-- Administradores -->
         <section class="tab-panel" id="tab-admins" data-perm="USERS_VIEW">
             <div class="toolbar-spaced" data-perm="USERS_MANAGE">
-                <button class="ghost-btn" id="newAdminBtn">+ Nuevo administrador</button>
+                <button class="ghost-btn" id="newAdminBtn" data-hint-key="new-admin">+ Nuevo administrador</button>
             </div>
             <div class="table-wrap"><table class="data-table" id="adminsTable"></table></div>
         </section>
 
         <!-- Auditoría -->
         <section class="tab-panel" id="tab-auditoria" data-perm="AUDIT_VIEW">
+            <div class="audit-demo-zone hidden" id="auditDemoZone" data-hint-key="audit-demo">
+                <div class="audit-demo-zone-inner">
+                    <div>
+                        <h3>Zona temporal — datos de demostración</h3>
+                        <p class="muted">Borra reservas, turnos, roster, intenciones, QR y auditoría. Conserva administradores y perfiles RBAC. Luego carga datos de ejemplo para probar el back-office.</p>
+                    </div>
+                    <div class="audit-demo-actions">
+                        <input type="text" id="demoResetConfirm" class="touch-input-field dark-input" placeholder='Escribe BORRAR para confirmar' autocomplete="off">
+                        <button type="button" class="ghost-btn danger-btn" id="demoResetBtn">Resetear y cargar demo</button>
+                    </div>
+                </div>
+            </div>
             <div class="audit-filters">
                 <input type="text" id="auditFilter" class="touch-input-field dark-input" placeholder="Filtrar por acción (ej: role, slot)">
-                <button class="ghost-btn" id="auditRefresh">Actualizar</button>
+                <button class="ghost-btn" id="auditRefresh" data-hint-key="audit-refresh">Actualizar</button>
             </div>
             <div class="table-wrap"><table class="data-table audit-log-row" id="auditTable"></table></div>
             <div class="toolbar-spaced" style="margin-top:12px;">
@@ -196,6 +349,51 @@
                 <button class="ghost-btn" id="auditNext">Siguiente →</button>
             </div>
         </section>
+    </div>
+
+    <!-- Modal capitán / sustituto -->
+    <div class="premium-sheet-overlay" id="rosterMemberSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title" id="rosterMemberSheetTitle">Capitán</h2>
+            <input type="hidden" id="rosterMemberId">
+            <input type="hidden" id="rosterMemberRole">
+            <div class="booking-input-group">
+                <input type="text" id="rosterMemberFirst" class="touch-input-field" placeholder="Nombre" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="rosterMemberLast" class="touch-input-field" placeholder="Apellido" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="rosterMemberPhone" class="touch-input-field" placeholder="Celular (8 dígitos)" style="background:#fff;color:#000;">
+            </div>
+            <div class="booking-input-group">
+                <input type="email" id="rosterMemberEmail" class="touch-input-field" placeholder="Correo (opcional)" style="background:#fff;color:#000;">
+            </div>
+            <fieldset class="settings-fieldset roster-sheet-fieldset">
+                <legend>Días responsables</legend>
+                <p class="muted roster-hint">Vacío = todos los días</p>
+                <div class="roster-day-grid" id="rosterMemberDays">
+                    <label class="admin-check"><input type="checkbox" value="7"><span>Dom</span></label>
+                    <label class="admin-check"><input type="checkbox" value="1"><span>Lun</span></label>
+                    <label class="admin-check"><input type="checkbox" value="2"><span>Mar</span></label>
+                    <label class="admin-check"><input type="checkbox" value="3"><span>Mié</span></label>
+                    <label class="admin-check"><input type="checkbox" value="4"><span>Jue</span></label>
+                    <label class="admin-check"><input type="checkbox" value="5"><span>Vie</span></label>
+                    <label class="admin-check"><input type="checkbox" value="6"><span>Sáb</span></label>
+                </div>
+            </fieldset>
+            <fieldset class="settings-fieldset roster-sheet-fieldset">
+                <legend>Horas responsables</legend>
+                <p class="muted roster-hint">Vacío = todas las horas del día seleccionado</p>
+                <div class="roster-time-grid" id="rosterMemberTimes"></div>
+            </fieldset>
+            <div class="booking-input-group">
+                <textarea id="rosterMemberNotes" class="touch-input-field" placeholder="Notas internas (opcional)" rows="3" style="background:#fff;color:#000;resize:vertical;"></textarea>
+            </div>
+            <button class="sheet-primary-btn" id="saveRosterMemberBtn">GUARDAR</button>
+            <button class="sheet-primary-btn danger-outline" id="deleteRosterMemberBtn" style="margin-top:10px;display:none;">ELIMINAR</button>
+        </div>
     </div>
 
     <!-- Modal editar turno -->
@@ -221,35 +419,22 @@
         </div>
     </div>
 
-    <!-- Modal nuevo QR -->
-    <div class="premium-sheet-overlay" id="qrSheet">
-        <div class="sheet-window">
-            <button class="sheet-close" data-close>×</button>
-            <h2 class="sheet-title">Nuevo QR</h2>
-            <div class="booking-input-group">
-                <input type="text" id="qrName" class="touch-input-field" placeholder="Nombre (ej: Entrada principal)" style="background:#fff;color:#000;">
-            </div>
-            <div class="booking-input-group">
-                <input type="text" id="qrLocation" class="touch-input-field" placeholder="Ubicación (opcional)" style="background:#fff;color:#000;">
-            </div>
-            <button class="sheet-primary-btn" id="createQrBtn">GENERAR</button>
-            <div id="qrPreview" class="qr-preview"></div>
-        </div>
-    </div>
-
     <!-- Modal nuevo perfil -->
-    <div class="premium-sheet-overlay" id="roleSheet">
-        <div class="sheet-window">
-            <button class="sheet-close" data-close>×</button>
+    <div class="premium-sheet-overlay" id="roleSheet" aria-hidden="true">
+        <div class="sheet-window sheet-window--form" role="dialog" aria-labelledby="roleSheetTitle">
+            <button class="sheet-close" data-close type="button" aria-label="Cerrar">×</button>
             <h2 class="sheet-title" id="roleSheetTitle">Nuevo perfil</h2>
             <div class="booking-input-group">
-                <input type="text" id="roleName" class="touch-input-field" placeholder="Nombre del perfil" style="background:#fff;color:#000;">
+                <input type="text" id="roleName" class="touch-input-field sheet-field" placeholder="Nombre del perfil" autocomplete="off">
             </div>
             <div class="booking-input-group">
-                <input type="text" id="roleDesc" class="touch-input-field" placeholder="Descripción (opcional)" style="background:#fff;color:#000;">
+                <input type="text" id="roleDesc" class="touch-input-field sheet-field" placeholder="Descripción (opcional)" autocomplete="off">
             </div>
-            <div id="roleSheetMatrix" class="permission-matrix" style="margin-top:16px;padding:16px;"></div>
-            <button class="sheet-primary-btn" id="saveRoleBtn">GUARDAR PERFIL</button>
+            <div class="sheet-form-body">
+                <p class="sheet-section-label">Permisos granulares</p>
+                <div id="roleSheetMatrix" class="permission-matrix permission-matrix--sheet"></div>
+            </div>
+            <button class="sheet-primary-btn sheet-form-footer" id="saveRoleBtn" type="button">GUARDAR PERFIL</button>
         </div>
     </div>
 

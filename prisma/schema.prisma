@@ -127,6 +127,7 @@ model PhysicalQR {
   displayName String    @map("display_name")
   location    String?
   isActive    Boolean   @default(true) @map("is_active")
+  isChapelTotem Boolean @default(false) @map("is_chapel_totem")
   generatedBy Int?      @map("generated_by")
   generatedAt DateTime  @default(now()) @map("generated_at")
   lastUsedAt  DateTime? @map("last_used_at")
@@ -191,4 +192,25 @@ model Settings {
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// role: "captain" | "substitute"
+// weekDays: "1,3" (Lun=1 … Dom=7); vacío = todos los días
+// slotTimes: "07:00,10:00"; vacío = todas las horas
+model RosterMember {
+  id            Int      @id @default(autoincrement())
+  role          String
+  firstName     String   @map("first_name")
+  lastName      String   @default("") @map("last_name")
+  phone         String
+  email         String?
+  internalNotes String?  @map("internal_notes")
+  weekDays      String?  @map("week_days")
+  slotTimes     String?  @map("slot_times")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([role, isActive])
+  @@map("roster_members")
 }

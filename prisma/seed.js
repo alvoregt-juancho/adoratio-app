@@ -1,13 +1,13 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../src/db');
 const config = require('../src/config');
-const { generateQrCodeId } = require('../src/utils/qr');
 const { splitFullName, buildFullName } = require('../src/utils/name');
 const {
     ALL_PRIVILEGES,
     ADMIN_PRIVILEGES,
     LECTOR_PRIVILEGES,
 } = require('../src/constants/permissions');
+const { runDemoSeed } = require('./demoData');
 
 const SYSTEM_ROLES = [
     {
@@ -77,20 +77,10 @@ async function main() {
     });
     console.log(`  ✓ Admin: ${admin.email} → ${roles['super-admin'].name}`);
 
-    console.log('  ↻ Actualizando plantilla de turnos (7:00–20:00, lun–vie)…');
-    await prisma.scanLog.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.reservation.deleteMany();
-    await prisma.slot.deleteMany();
-
-    const slots = [];
-    for (let h = 7; h < 20; h++) {
-        const start = `${String(h).padStart(2, '0')}:00`;
-        const end = `${String(h + 1).padStart(2, '0')}:00`;
-        slots.push({ startTime: start, endTime: end, capacity: 4, label: `${start} – ${end}` });
-    }
-    await prisma.slot.createMany({ data: slots });
-    console.log(`  ✓ ${slots.length} turnos creados (7:00–20:00)`);
+    console.log('  ↻ Sembrando datos de demostración…');
+    const demo = await runDemoSeed({ adminId: admin.id, wipeFirst: true });
+    console.log(`  ✓ ${demo.slots} turnos · ${demo.reservations} compromisos · ${demo.roster} roster · ${demo.intentions} intenciones`);
+    if (demo.qrCode) console.log(`  ✓ QR de ejemplo: ${demo.qrCode}`);
 
     await prisma.settings.upsert({
         where: { id: 1 },
@@ -107,22 +97,6 @@ async function main() {
         },
     });
     console.log('  ✓ Configuración global (Settings) inicializada');
-
-    const existingQr = await prisma.physicalQR.count();
-    if (existingQr === 0) {
-        const qr = await prisma.physicalQR.create({
-            data: {
-                qrCode: generateQrCodeId(),
-                displayName: 'Entrada Principal',
-                location: 'Puerta principal de la capilla',
-                isActive: true,
-                generatedBy: admin.id,
-            },
-        });
-        console.log(`  ✓ QR de ejemplo: ${qr.qrCode}`);
-    } else {
-        console.log(`  • ${existingQr} QR ya existen, se omite`);
-    }
 
     // Migrar usuarios legacy sin adminRoleId
     const legacyMap = {

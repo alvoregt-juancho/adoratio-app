@@ -1137,6 +1137,14 @@ body.admin .tab.active {
 body.admin .metric-card {
     background: #fafafa;
     border: 1px solid #e5e5ea;
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+body.admin .metric-card--clickable:focus-visible {
+    outline: 2px solid var(--admin-ink);
+    outline-offset: 2px;
 }
 
 body.admin .metric-card.critical {
@@ -1230,12 +1238,79 @@ body.admin .status-cancelled {
 
 body.admin .premium-sheet-overlay {
     background: rgba(0, 0, 0, 0.35);
+    z-index: 200;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    align-items: flex-start;
+    justify-content: center;
 }
 
 body.admin .sheet-window {
     background: #ffffff;
     border: 1px solid #e5e5ea;
     box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.12);
+    align-items: stretch;
+    transform: none;
+    animation: adminSheetIn 0.3s var(--admin-ease) forwards;
+}
+
+body.admin .sheet-window--form {
+    max-height: min(92vh, 900px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+}
+
+body.admin .sheet-field {
+    background: #fff;
+    color: #111215;
+    border-color: #d1d1d6;
+}
+
+body.admin .sheet-form-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    width: 100%;
+    margin-top: 4px;
+    padding-right: 2px;
+}
+
+body.admin .sheet-section-label {
+    margin: 0 0 10px;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+}
+
+body.admin .sheet-form-footer {
+    flex-shrink: 0;
+    width: 100%;
+    margin-top: 16px;
+}
+
+body.admin .permission-matrix--sheet {
+    padding: 16px;
+    margin: 0;
+}
+
+#roleEditor.permission-matrix {
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+}
+
+@keyframes adminSheetIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 body.admin .sheet-title {

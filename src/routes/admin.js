@@ -10,12 +10,36 @@ const {
 } = require('../middleware/auth');
 const rbacRoutes = require('./rbac');
 const qrUtil = require('../utils/qr');
+const {
+    ensureChapelQr,
+    replaceChapelQr,
+    formatChapelQrPayload,
+} = require('../utils/chapelQr');
 const { writeAudit } = require('../utils/audit');
 const { normalizeReservationNames } = require('../utils/name');
+const { normalizePhone, isValidPhone } = require('../utils/phone');
 const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
-const { filterSlotsForDate } = require('../utils/schedule');
+const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
 const { checkTimelineGaps, hasFractionalCoverage, GAP_STATUS } = require('../utils/timeline');
+const {
+    commitmentAppliesOn,
+    participationWeekdays,
+    dateRangeForView,
+    weekdayShortLabel,
+    resolveReservationScope,
+    expandReservationsInRange,
+} = require('../utils/commitmentMatch');
+const { FREQUENCY_LABELS } = require('../constants/commitment');
+const { formatWeekDays } = require('../utils/weekDays');
+const {
+    rosterMemberMatchesFilter,
+    commitmentRowMatchesFilter,
+    reservationToCommitmentRows,
+    rosterMemberToRow,
+    sortRosterRows,
+    sortMembersByName,
+} = require('../utils/roster');
 
 const router = express.Router();
 
@@ -23,31 +47,97 @@ router.use(requireAuth, attachPrivileges, requireAdminAccess);
 router.use(rbacRoutes);
 
 // ── MÉTRICAS / DASHBOARD ──────────────────────────────────────────────
+function formatReservationBrief(r) {
+    const name = [r.userFirstName, r.userLastName].filter(Boolean).join(' ').trim() || r.userName;
+    return {
+        id: r.id,
+        name,
+        phone: r.userPhone,
+        slot: `${r.slot.startTime}–${r.slot.endTime}`,
+        status: r.status,
+        checkedInAt: r.checkedInAt,
+    };
+}
+
 router.get('/metrics', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) => {
     try {
         const date = req.query.date || todayStr();
-        const [totalSlots, reservations, scansToday] = await Promise.all([
-            prisma.slot.count({ where: { isActive: true } }),
+        const dayStart = new Date(`${date}T00:00:00`);
+        const dayEnd = new Date(`${date}T23:59:59.999`);
+
+        const [activeSlots, reservations, scansToday] = await Promise.all([
+            prisma.slot.findMany({
+                where: { isActive: true },
+                orderBy: { startTime: 'asc' },
+            }),
             prisma.reservation.findMany({
                 where: { date, status: { in: ['confirmed', 'completed', 'no_show'] } },
-                select: { slotId: true, status: true, checkedInAt: true },
+                include: { slot: true },
+                orderBy: { slot: { startTime: 'asc' } },
             }),
-            prisma.scanLog.count({
-                where: { scannedAt: { gte: new Date(date + 'T00:00:00'), lte: new Date(date + 'T23:59:59') } },
+            prisma.scanLog.findMany({
+                where: { scannedAt: { gte: dayStart, lte: dayEnd } },
+                include: {
+                    reservation: {
+                        select: {
+                            userName: true,
+                            userFirstName: true,
+                            userLastName: true,
+                            userPhone: true,
+                        },
+                    },
+                },
+                orderBy: { scannedAt: 'desc' },
+                take: 50,
             }),
         ]);
 
         const slotsWithReservation = new Set(reservations.map((r) => r.slotId));
-        const checkedIn = reservations.filter((r) => r.checkedInAt).length;
+        const checkedInRows = reservations.filter((r) => r.checkedInAt);
+        const pendingRows = reservations.filter((r) => !r.checkedInAt && r.status === 'confirmed');
+        const criticalSlotRows = activeSlots.filter((s) => !slotsWithReservation.has(s.id));
 
         res.json({
             date,
-            totalSlots,
+            totalSlots: activeSlots.length,
             totalReservations: reservations.length,
-            checkedIn,
-            pending: reservations.length - checkedIn,
-            criticalSlots: totalSlots - slotsWithReservation.size,
-            scansToday,
+            checkedIn: checkedInRows.length,
+            pending: pendingRows.length,
+            criticalSlots: criticalSlotRows.length,
+            scansToday: scansToday.length,
+            details: {
+                activeSlots: activeSlots.map((s) => ({
+                    id: s.id,
+                    label: s.label,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                    capacity: s.capacity,
+                })),
+                reservationsToday: reservations.map(formatReservationBrief),
+                checkedIn: checkedInRows.map(formatReservationBrief),
+                pending: pendingRows.map(formatReservationBrief),
+                criticalSlots: criticalSlotRows.map((s) => ({
+                    id: s.id,
+                    label: s.label,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                    capacity: s.capacity,
+                })),
+                scansToday: scansToday.map((s) => {
+                    const r = s.reservation;
+                    const name = r
+                        ? ([r.userFirstName, r.userLastName].filter(Boolean).join(' ').trim() || r.userName)
+                        : null;
+                    return {
+                        id: s.id,
+                        scannedAt: s.scannedAt,
+                        success: s.success,
+                        errorMessage: s.errorMessage,
+                        adorerName: name,
+                        phone: r?.userPhone ?? null,
+                    };
+                }),
+            },
         });
     } catch (e) {
         console.error(e);
@@ -191,33 +281,67 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
 });
 
 // ── RESERVAS ──────────────────────────────────────────────────────────
-router.get('/reservations', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
-    try {
-        const { date, slotId, status, firstName, lastName, phone, slotTime } = req.query;
-        const where = {};
-        if (date) where.date = date;
-        if (slotId) where.slotId = Number(slotId);
-        if (status) where.status = status;
-        if (firstName) where.userFirstName = { contains: String(firstName) };
-        if (lastName) where.userLastName = { contains: String(lastName) };
-        if (phone) where.userPhone = { contains: String(phone) };
+function buildReservationQueryFilters(query) {
+    const where = {};
+    if (query.slotId) where.slotId = Number(query.slotId);
+    if (query.status) where.status = query.status;
+    if (query.firstName) where.userFirstName = { contains: String(query.firstName) };
+    if (query.lastName) where.userLastName = { contains: String(query.lastName) };
+    if (query.phone) where.userPhone = { contains: String(query.phone) };
+    return where;
+}
 
+function filterBySlotTime(list, slotTime) {
+    if (!slotTime) return list;
+    const q = String(slotTime).toLowerCase();
+    return list.filter((r) =>
+        (r.slot.startTime + '–' + r.slot.endTime).toLowerCase().includes(q)
+    );
+}
+
+async function fetchReservationsForAdmin(query) {
+    const scope = resolveReservationScope(query, todayStr());
+    const baseWhere = buildReservationQueryFilters(query);
+
+    if (scope.expand) {
+        const where = {
+            ...baseWhere,
+            status: baseWhere.status
+                ? baseWhere.status
+                : { in: ['confirmed', 'completed', 'no_show'] },
+        };
         const reservations = await prisma.reservation.findMany({
             where,
             include: { slot: true, checkedInViaQR: true },
-            orderBy: [{ date: 'desc' }, { slot: { startTime: 'asc' } }, { userLastName: 'asc' }],
-            take: 500,
         });
+        let list = expandReservationsInRange(
+            reservations.map(normalizeReservationNames),
+            scope.start,
+            scope.end,
+        );
+        list = filterBySlotTime(list, query.slotTime);
+        return { reservations: list, total: list.length, scope };
+    }
 
-        let list = reservations.map(normalizeReservationNames);
-        if (slotTime) {
-            const q = String(slotTime).toLowerCase();
-            list = list.filter((r) =>
-                (r.slot.startTime + '–' + r.slot.endTime).toLowerCase().includes(q)
-            );
-        }
+    const where = { ...baseWhere };
+    if (query.date) where.date = query.date;
 
-        res.json({ reservations: list, total: list.length });
+    const reservations = await prisma.reservation.findMany({
+        where,
+        include: { slot: true, checkedInViaQR: true },
+        orderBy: [{ date: 'desc' }, { slot: { startTime: 'asc' } }, { userLastName: 'asc' }],
+        take: 500,
+    });
+
+    let list = reservations.map(normalizeReservationNames);
+    list = filterBySlotTime(list, query.slotTime);
+    return { reservations: list, total: list.length, scope: null };
+}
+
+router.get('/reservations', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
+    try {
+        const result = await fetchReservationsForAdmin(req.query);
+        res.json(result);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al obtener reservas.' });
@@ -322,6 +446,55 @@ router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKI
 });
 
 // ── QR FÍSICOS ────────────────────────────────────────────────────────
+router.get('/qrs/chapel', requirePermission(PRIV.QRS_VIEW), async (req, res) => {
+    try {
+        const qr = await ensureChapelQr(req.user?.id ?? null);
+        const image = await qrUtil.toDataURL(qr.qrCode);
+        res.json({
+            chapel: formatChapelQrPayload(qr, qrUtil),
+            image,
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener el QR de la capilla.' });
+    }
+});
+
+router.post('/qrs/chapel/replace', requirePermission(PRIV.QRS_CREATE), async (req, res) => {
+    try {
+        const qr = await replaceChapelQr(req.user.id);
+        const image = await qrUtil.toDataURL(qr.qrCode);
+        await writeAudit({
+            action: 'qr.chapel.replace',
+            entity: 'physical_qr',
+            entityId: qr.id,
+            meta: { qrCode: qr.qrCode },
+            req,
+        });
+        res.status(201).json({
+            message: 'Nuevo QR de capilla generado. Imprime y coloca en la entrada; el anterior quedó desactivado.',
+            chapel: formatChapelQrPayload(qr, qrUtil),
+            image,
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al generar el QR de la capilla.' });
+    }
+});
+
+router.get('/qrs/chapel/png', requirePermission(PRIV.QRS_VIEW), async (req, res) => {
+    try {
+        const qr = await ensureChapelQr(req.user?.id ?? null);
+        const buffer = await qrUtil.toBuffer(qr.qrCode);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', 'attachment; filename="qr-capilla.png"');
+        res.send(buffer);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al generar PNG.' });
+    }
+});
+
 router.get('/qrs', requirePermission(PRIV.QRS_VIEW), async (req, res) => {
     try {
         const qrs = await prisma.physicalQR.findMany({
@@ -335,6 +508,7 @@ router.get('/qrs', requirePermission(PRIV.QRS_VIEW), async (req, res) => {
                 displayName: q.displayName,
                 location: q.location,
                 isActive: q.isActive,
+                isChapelTotem: q.isChapelTotem,
                 lastUsedAt: q.lastUsedAt,
                 uses: q._count.scans,
                 scanUrl: qrUtil.buildScanUrl(q.qrCode),
@@ -553,6 +727,387 @@ router.put('/settings', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => 
     }
 });
 
+// ── CALENDARIO DE GUARDIAS (vista semana / mes) ───────────────────────
+router.get('/calendar', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
+    try {
+        const view = req.query.view === 'month' ? 'month' : 'week';
+        const anchor = req.query.start || req.query.date || todayStr();
+        const range = dateRangeForView(view, anchor);
+
+        const [allSlots, reservations] = await Promise.all([
+            prisma.slot.findMany({ where: { isActive: true }, orderBy: { startTime: 'asc' } }),
+            prisma.reservation.findMany({
+                where: { status: { in: ['confirmed', 'completed'] } },
+                include: { slot: true },
+            }),
+        ]);
+
+        const days = range.dates.map((dateStr) => {
+            const weekday = weekdayFromDate(dateStr);
+            const { slots: eligible } = filterSlotsForDate(allSlots, dateStr);
+
+            const slotBlocks = eligible.map((slot) => {
+                const commitments = reservations
+                    .filter((r) => r.slotId === slot.id && commitmentAppliesOn(r, dateStr))
+                    .map((r) => ({
+                        id: r.id,
+                        userFirstName: r.userFirstName,
+                        userLastName: r.userLastName,
+                        userName: r.userName,
+                        userPhone: r.userPhone,
+                        frequency: r.frequency,
+                        startTimeOffset: r.startTimeOffset,
+                        durationMinutes: r.durationMinutes,
+                    }));
+
+                const gapStatus = checkTimelineGaps(commitments);
+                const taken = commitments.length;
+
+                return {
+                    slotId: slot.id,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    capacity: slot.capacity,
+                    taken,
+                    available: Math.max(0, slot.capacity - taken),
+                    needsMore: Math.max(0, slot.capacity - taken),
+                    gapAlert: gapStatus === GAP_STATUS.CRITICAL_GAP,
+                    commitments,
+                };
+            });
+
+            return {
+                date: dateStr,
+                weekday,
+                label: weekdayShortLabel(dateStr),
+                slots: slotBlocks,
+            };
+        });
+
+        res.json({
+            view,
+            label: range.label,
+            start: range.start,
+            end: range.end,
+            days,
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener el calendario.' });
+    }
+});
+
+// ── DIRECTORIO DE ADORADORES ──────────────────────────────────────────
+router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
+    try {
+        const reservations = await prisma.reservation.findMany({
+            where: { status: { in: ['confirmed', 'completed'] } },
+            include: { slot: true },
+            orderBy: [{ userLastName: 'asc' }, { userFirstName: 'asc' }],
+        });
+
+        const byPhone = new Map();
+
+        for (const r of reservations) {
+            const phone = r.userPhone;
+            if (!phone) continue;
+
+            let entry = byPhone.get(phone);
+            if (!entry) {
+                entry = {
+                    phone,
+                    firstName: r.userFirstName || '',
+                    lastName: r.userLastName || '',
+                    userName: r.userName,
+                    weekdays: new Set(),
+                    slots: new Set(),
+                    frequencies: new Set(),
+                };
+                byPhone.set(phone, entry);
+            }
+
+            if (r.userFirstName && !entry.firstName) entry.firstName = r.userFirstName;
+            if (r.userLastName && !entry.lastName) entry.lastName = r.userLastName;
+
+            participationWeekdays(r).forEach((wd) => entry.weekdays.add(wd));
+            if (r.slot) {
+                entry.slots.add(`${r.slot.startTime}–${r.slot.endTime}`);
+            }
+            if (r.frequency) entry.frequencies.add(r.frequency);
+        }
+
+        const adoradores = [...byPhone.values()]
+            .map((a) => ({
+                phone: a.phone,
+                firstName: a.firstName,
+                lastName: a.lastName,
+                userName: a.userName,
+                weekdays: [...a.weekdays].sort((x, y) => x - y),
+                weekdaysLabel: formatWeekDays([...a.weekdays].join(',')),
+                slots: [...a.slots].sort(),
+                frequencies: [...a.frequencies].map((f) => FREQUENCY_LABELS[f] || f),
+            }))
+            .sort((a, b) => {
+                const la = (a.lastName || a.firstName || '').toLowerCase();
+                const lb = (b.lastName || b.firstName || '').toLowerCase();
+                if (la !== lb) return la.localeCompare(lb);
+                return (a.firstName || '').toLowerCase().localeCompare((b.firstName || '').toLowerCase());
+            });
+
+        res.json({ adoradores, total: adoradores.length });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener el directorio.' });
+    }
+});
+
+// ── LISTA / ROSTER (compromisos, capitanes, sustitutos) ─────────────
+const ROSTER_ROLES = ['captain', 'substitute'];
+
+router.get('/roster', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
+    try {
+        const weekdayFilter = req.query.weekday ? String(req.query.weekday) : '';
+        const slotTimeFilter = req.query.slotTime ? String(req.query.slotTime) : '';
+
+        const [reservations, members, slots] = await Promise.all([
+            prisma.reservation.findMany({
+                where: { status: { in: ['confirmed', 'completed'] } },
+                include: { slot: true },
+            }),
+            prisma.rosterMember.findMany({
+                where: { isActive: true },
+                orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+            }),
+            prisma.slot.findMany({
+                where: { isActive: true },
+                orderBy: { startTime: 'asc' },
+                select: { startTime: true },
+            }),
+        ]);
+
+        const slotTimes = [...new Set(slots.map((s) => s.startTime))];
+
+        let commitments = [];
+        for (const r of reservations) {
+            commitments.push(...reservationToCommitmentRows(r));
+        }
+        commitments = sortRosterRows(
+            commitments.filter((row) => commitmentRowMatchesFilter(row, weekdayFilter, slotTimeFilter))
+        );
+
+        const captains = sortMembersByName(
+            members
+                .filter((m) => m.role === 'captain')
+                .map(rosterMemberToRow)
+                .filter((m) => rosterMemberMatchesFilter(m, weekdayFilter, slotTimeFilter))
+        );
+
+        const substitutes = sortMembersByName(
+            members
+                .filter((m) => m.role === 'substitute')
+                .map(rosterMemberToRow)
+                .filter((m) => rosterMemberMatchesFilter(m, weekdayFilter, slotTimeFilter))
+        );
+
+        res.json({
+            filters: { weekday: weekdayFilter || null, slotTime: slotTimeFilter || null },
+            slotTimes,
+            commitments,
+            captains,
+            substitutes,
+            counts: {
+                commitments: commitments.length,
+                captains: captains.length,
+                substitutes: substitutes.length,
+            },
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener la lista.' });
+    }
+});
+
+router.get('/roster/export.csv', requirePermission(PRIV.RESERVATIONS_EXPORT), async (req, res) => {
+    try {
+        const section = req.query.section || 'commitments';
+        const weekdayFilter = req.query.weekday ? String(req.query.weekday) : '';
+        const slotTimeFilter = req.query.slotTime ? String(req.query.slotTime) : '';
+
+        let header = '';
+        let rows = [];
+
+        if (section === 'commitments') {
+            const reservations = await prisma.reservation.findMany({
+                where: { status: { in: ['confirmed', 'completed'] } },
+                include: { slot: true },
+            });
+            let commitments = [];
+            for (const r of reservations) {
+                commitments.push(...reservationToCommitmentRows(r));
+            }
+            commitments = sortRosterRows(
+                commitments.filter((row) => commitmentRowMatchesFilter(row, weekdayFilter, slotTimeFilter))
+            );
+            header = 'turno,duracion,frecuencia,nombre,apellido,celular,notas\n';
+            rows = commitments.map((c) =>
+                [
+                    `"${c.turno.replace(/"/g, '""')}"`,
+                    `"${c.durationLabel.replace(/"/g, '""')}"`,
+                    `"${c.frequencyLabel.replace(/"/g, '""')}"`,
+                    `"${(c.firstName || '').replace(/"/g, '""')}"`,
+                    `"${(c.lastName || '').replace(/"/g, '""')}"`,
+                    c.phone,
+                    '""',
+                ].join(',')
+            );
+        } else if (section === 'captains' || section === 'substitutes') {
+            const members = await prisma.rosterMember.findMany({
+                where: { isActive: true, role: section === 'captains' ? 'captain' : 'substitute' },
+            });
+            const list = sortMembersByName(
+                members
+                    .map(rosterMemberToRow)
+                    .filter((m) => rosterMemberMatchesFilter(m, weekdayFilter, slotTimeFilter))
+            );
+            header = 'nombre,apellido,celular,correo,dias,horas,notas\n';
+            rows = list.map((m) =>
+                [
+                    `"${(m.firstName || '').replace(/"/g, '""')}"`,
+                    `"${(m.lastName || '').replace(/"/g, '""')}"`,
+                    m.phone,
+                    `"${(m.email || '').replace(/"/g, '""')}"`,
+                    `"${(m.daysLabel || '').replace(/"/g, '""')}"`,
+                    `"${(m.timesLabel || '').replace(/"/g, '""')}"`,
+                    `"${(m.internalNotes || '').replace(/"/g, '""')}"`,
+                ].join(',')
+            );
+        } else {
+            return res.status(400).json({ error: 'Sección de exportación inválida.' });
+        }
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="lista-${section}.csv"`);
+        res.send(header + rows.join('\n'));
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al exportar la lista.' });
+    }
+});
+
+router.post('/roster-members', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
+    try {
+        const body = req.body || {};
+        const role = String(body.role || '').trim();
+        const firstName = String(body.firstName || '').trim();
+        const lastName = String(body.lastName || '').trim();
+        const phone = normalizePhone(body.phone);
+        const email = body.email ? String(body.email).trim() : null;
+        const internalNotes = body.internalNotes ? String(body.internalNotes).trim() : null;
+        const weekDays = body.weekDays ? String(body.weekDays).trim() : null;
+        const slotTimes = body.slotTimes ? String(body.slotTimes).trim() : null;
+
+        if (!ROSTER_ROLES.includes(role)) {
+            return res.status(400).json({ error: 'Rol inválido (captain o substitute).' });
+        }
+        if (!firstName || !phone) {
+            return res.status(400).json({ error: 'Nombre y celular son requeridos.' });
+        }
+        if (!isValidPhone(phone)) {
+            return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+        }
+
+        const member = await prisma.rosterMember.create({
+            data: {
+                role,
+                firstName,
+                lastName,
+                phone,
+                email,
+                internalNotes,
+                weekDays: weekDays || null,
+                slotTimes: slotTimes || null,
+            },
+        });
+
+        await writeAudit({
+            action: 'roster.create',
+            entity: 'roster_member',
+            entityId: member.id,
+            meta: { role, firstName, lastName },
+            req,
+        });
+
+        res.status(201).json({ member: rosterMemberToRow(member) });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al crear el registro.' });
+    }
+});
+
+router.put('/roster-members/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const body = req.body || {};
+        const data = {};
+
+        if (body.firstName !== undefined) data.firstName = String(body.firstName).trim();
+        if (body.lastName !== undefined) data.lastName = String(body.lastName).trim();
+        if (body.phone !== undefined) {
+            const phone = normalizePhone(body.phone);
+            if (!isValidPhone(phone)) {
+                return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+            }
+            data.phone = phone;
+        }
+        if (body.email !== undefined) data.email = body.email ? String(body.email).trim() : null;
+        if (body.internalNotes !== undefined) {
+            data.internalNotes = body.internalNotes ? String(body.internalNotes).trim() : null;
+        }
+        if (body.weekDays !== undefined) data.weekDays = body.weekDays ? String(body.weekDays).trim() : null;
+        if (body.slotTimes !== undefined) data.slotTimes = body.slotTimes ? String(body.slotTimes).trim() : null;
+        if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+
+        const member = await prisma.rosterMember.update({ where: { id }, data });
+
+        await writeAudit({
+            action: 'roster.update',
+            entity: 'roster_member',
+            entityId: id,
+            meta: { role: member.role },
+            req,
+        });
+
+        res.json({ member: rosterMemberToRow(member) });
+    } catch (e) {
+        console.error(e);
+        if (e.code === 'P2025') return res.status(404).json({ error: 'Registro no encontrado.' });
+        res.status(500).json({ error: 'Error al actualizar el registro.' });
+    }
+});
+
+router.delete('/roster-members/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.rosterMember.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Registro no encontrado.' });
+
+        await prisma.rosterMember.update({ where: { id }, data: { isActive: false } });
+
+        await writeAudit({
+            action: 'roster.deactivate',
+            entity: 'roster_member',
+            entityId: id,
+            meta: { role: existing.role },
+            req,
+        });
+
+        res.json({ message: 'Registro desactivado.' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al eliminar el registro.' });
+    }
+});
+
 // ── TIMELINE (detección de huecos de 30 min) ──────────────────────────
 router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) => {
     try {
@@ -609,32 +1164,14 @@ router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res)
 // ── REPORTES ──────────────────────────────────────────────────────────
 router.get('/reports/reservations.csv', requirePermission(PRIV.RESERVATIONS_EXPORT), async (req, res) => {
     try {
-        const { date, status, firstName, lastName, phone, slotTime } = req.query;
-        const where = {};
-        if (date) where.date = date;
-        if (status) where.status = status;
-        if (firstName) where.userFirstName = { contains: String(firstName) };
-        if (lastName) where.userLastName = { contains: String(lastName) };
-        if (phone) where.userPhone = { contains: String(phone) };
-
-        let rows = await prisma.reservation.findMany({
-            where,
-            include: { slot: true },
-            orderBy: [{ date: 'desc' }, { slot: { startTime: 'asc' } }],
-        });
-        rows = rows.map(normalizeReservationNames);
-        if (slotTime) {
-            const q = String(slotTime).toLowerCase();
-            rows = rows.filter((r) =>
-                (r.slot.startTime + '-' + r.slot.endTime).toLowerCase().includes(q)
-            );
-        }
+        const result = await fetchReservationsForAdmin(req.query);
+        const rows = result.reservations;
 
         const header = 'id,fecha,turno,nombre,apellido,celular,frecuencia,duracion_min,desfase_min,estado,checkin\n';
         const body = rows
             .map((r) =>
                 [
-                    r.id,
+                    r.reservationId || r.id,
                     r.date,
                     `${r.slot.startTime}-${r.slot.endTime}`,
                     `"${(r.userFirstName || '').replace(/"/g, '""')}"`,
