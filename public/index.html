@@ -19,6 +19,7 @@
         :root {
             --bg-canvas: #130F0B;
             --bg-home-dark: #130F0B;
+            --bg-menu-dark: rgba(19, 15, 11, 0.94);
             --surface-card: #1B1912;
             --surface-muted: #242320;
             --text-primary: #ECECEF;
@@ -708,7 +709,7 @@
             left: 0;
             width: 100%;
             height: calc(60px + env(safe-area-inset-bottom));
-            background-color: rgba(6, 6, 6, 0.94);
+            background-color: var(--bg-menu-dark);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-top: 1px solid var(--border-subtle);
