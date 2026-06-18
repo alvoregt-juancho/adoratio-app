@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#060606">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>AdoraHora — Parroquia Cristo Rey</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +26,8 @@
             --gold-soft: rgba(212, 176, 106, 0.08);
             --gold-border: rgba(212, 176, 106, 0.32);
             --border-subtle: rgba(255, 255, 255, 0.07);
-            --apple-red-alert: #D9383A;
+            --apple-red-alert: #AD3E3D;
+            --card-urgent-accent: #AD3E3D;
             --font-serif: 'Cormorant Garamond', serif;
             --font-sans: 'Plus Jakarta Sans', sans-serif;
             --border-radius-premium: 24px;
@@ -52,8 +54,15 @@
             overflow: hidden;
         }
 
+        .app-viewport,
+        .scrollable-content {
+            background-color: var(--bg-canvas);
+        }
+
         body.view-home,
-        body.view-home html {
+        body.view-home html,
+        body.view-home .app-viewport,
+        body.view-home .scrollable-content {
             background-color: #060606 !important;
         }
 
@@ -74,8 +83,10 @@
             position: relative;
             width: 100%;
             height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
+            padding-top: 0;
             padding-bottom: calc(64px + env(safe-area-inset-bottom));
         }
 
@@ -89,7 +100,7 @@
         .app-module {
             display: none;
             padding: 24px;
-            padding-top: calc(72px + env(safe-area-inset-top));
+            padding-top: 56px;
             max-width: 480px;
             margin: 0 auto;
             width: 100%;
@@ -125,13 +136,23 @@
             justify-content: center;
         }
 
+        #mod-home .hero-visual {
+            margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+            height: calc(clamp(240px, 46svh, 380px) + env(safe-area-inset-top, 0px));
+        }
+
         .cinematic-bg {
             position: absolute;
             inset: 0;
-            background: url('background.webp') center 22% / cover no-repeat;
+            background: url('background.webp') 47.5% 20% / cover no-repeat;
             transform: scale(1.02);
-            transform-origin: center 30%;
+            transform-origin: 47.5% 28%;
             will-change: transform;
+        }
+
+        #mod-home .cinematic-bg {
+            top: calc(-1 * env(safe-area-inset-top, 0px));
+            height: calc(100% + env(safe-area-inset-top, 0px));
         }
 
         .hero-visual::after {
@@ -217,6 +238,11 @@
             color: #ECECEF;
         }
 
+        #mod-home .card-urgente {
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-left: 3.5px solid var(--card-urgent-accent);
+        }
+
         #mod-home .section-title,
         #mod-home .time-signature {
             color: #ECECEF;
@@ -236,10 +262,20 @@
         }
 
         body.theme-light #mod-home .premium-card {
-            background: #FFFFFF;
+            background: #F6F5F2;
             border-color: rgba(17, 18, 21, 0.08);
             color: #111215;
             box-shadow: 0 4px 16px rgba(17, 18, 21, 0.04);
+        }
+
+        body.theme-light #mod-home .card-urgente {
+            border: 1px solid rgba(17, 18, 21, 0.08);
+            border-left: 3.5px solid var(--card-urgent-accent);
+        }
+
+        body.theme-light #mod-home .action-circle-icon {
+            background: #F6F5F2;
+            color: #C5A059;
         }
 
         body.theme-light #mod-home .section-title,
@@ -259,11 +295,6 @@
         body.theme-light #mod-home .card-label,
         body.theme-light #mod-home .card-place {
             color: #6B6B72;
-        }
-
-        body.theme-light #mod-home .action-circle-icon {
-            background: #F6F5F2;
-            color: #C5A059;
         }
 
         .section-title {
@@ -318,7 +349,7 @@
 
         .card-urgente {
             border: 1px solid var(--gold-border);
-            border-left: 3px solid var(--apple-red-alert);
+            border-left: 3.5px solid var(--card-urgent-accent);
             background: var(--surface-card);
         }
 
@@ -813,9 +844,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: calc(14px + env(safe-area-inset-top)) 20px 12px;
+            gap: 12px;
+            padding: 10px 20px 10px;
             background: var(--bg-canvas);
-            border-bottom: 1px solid var(--border-subtle);
+            border-bottom: none;
         }
 
         body.view-home .app-header {
@@ -823,31 +855,61 @@
             border-bottom: none;
             justify-content: flex-end;
             pointer-events: none;
+            padding: 8px 16px 0;
         }
 
         body.view-home .app-header > * {
             pointer-events: auto;
         }
 
-        body.view-home .header-titles {
+        body.view-home .brand-logo-link {
             display: none;
         }
 
-        .header-titles h1 {
-            font-family: var(--font-serif);
-            font-size: 1.15rem;
-            font-weight: 500;
-            letter-spacing: 0.1em;
-            color: var(--text-primary);
+        .hero-logo-wrap {
+            position: absolute;
+            bottom: clamp(4px, 1.2svh, 12px);
+            left: 50%;
+            z-index: 2;
+            width: max-content;
+            max-width: 92vw;
+            padding: 0;
+            /* Pico del arco dorado alineado con eje de la custodia */
+            transform: translateX(-47.08%);
+            line-height: 0;
         }
 
-        .header-titles p {
-            font-size: 0.62rem;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: var(--text-muted);
-            margin-top: 2px;
+        .brand-logo-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+            flex-shrink: 0;
+            line-height: 0;
+            background: transparent;
         }
+
+        .brand-logo {
+            display: block;
+            width: auto;
+            object-fit: contain;
+            background: transparent;
+        }
+
+        .brand-logo--header {
+            height: 34px;
+            max-width: 152px;
+        }
+
+        .brand-logo--hero {
+            height: clamp(75px, 22.1vw, 109px);
+            max-width: min(468px, 92vw);
+            filter: drop-shadow(0 6px 28px rgba(0, 0, 0, 0.45));
+        }
+
+        .brand-logo--on-light { display: none; }
+        body.theme-light .brand-logo--on-dark { display: none; }
+        body.theme-light .brand-logo--on-light { display: block; }
+        body:not(.theme-light) .brand-logo--on-dark { display: block; }
 
         .theme-toggle {
             display: flex;
@@ -866,11 +928,11 @@
         }
 
         body.view-home .theme-toggle {
-            background: rgba(27, 25, 18, 0.55);
-            border-color: rgba(212, 176, 106, 0.28);
+            background: transparent;
+            border-color: transparent;
             color: var(--gold-light);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
 
         .theme-icon {
@@ -1094,10 +1156,10 @@
     <div id="toast" class="toast-system" role="status" aria-live="polite"></div>
 
     <header class="app-header">
-        <div class="header-titles">
-            <h1>AdoraHora</h1>
-            <p>Cristo Rey · Santísimo</p>
-        </div>
+        <a href="#" class="brand-logo-link" onclick="switchTab('home'); return false;" aria-label="adorahora.com — inicio">
+            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--header brand-logo--on-dark" width="152" height="51">
+            <img src="logo-adorahora.png" alt="" class="brand-logo brand-logo--header brand-logo--on-light" aria-hidden="true" width="152" height="51">
+        </a>
         <button type="button" class="theme-toggle" id="themeToggle" aria-label="Activar modo claro"></button>
     </header>
 
@@ -1108,10 +1170,8 @@
                 <div class="landing-hero">
                     <div class="hero-visual">
                         <div class="cinematic-bg" id="heroBg"></div>
-                        <div class="hero-title-block">
-                            <p class="hero-editorial-badge">Cristo Rey</p>
-                            <h1 class="hero-title">AdoraHora</h1>
-                            <p class="hero-tagline">Capilla del Santísimo</p>
+                        <div class="hero-logo-wrap">
+                            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--hero" width="468" height="156">
                         </div>
                     </div>
                     <div class="hero-content-panel">
@@ -1165,8 +1225,8 @@
                     </div>
 
                     <div class="horizontal-scroller" id="privacyScroller">
-                        <div class="scroller-pill active" data-privacy="private" onclick="selectPrivacy('private', this)">Privada</div>
-                        <div class="scroller-pill" data-privacy="wall" onclick="selectPrivacy('wall', this)">Muro de Oración Anónimo</div>
+                        <div class="scroller-pill active" data-privacy="private" onclick="selectPrivacy('private', this)">Personal</div>
+                        <div class="scroller-pill" data-privacy="wall" onclick="selectPrivacy('wall', this)">Anónimo</div>
                     </div>
 
                     <div id="anonPreview" class="anon-preview">
@@ -1914,8 +1974,19 @@
 
             scrollContainer.scrollTop = 0;
             document.body.classList.toggle('view-home', moduleName === 'home');
+            syncThemeColor();
             if (moduleName === 'turnos') loadSlots();
             if (moduleName === 'intenciones' && intencionesView === 'muro') cargarMuro();
+        }
+
+        function syncThemeColor() {
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (!meta) return;
+            if (document.body.classList.contains('view-home')) {
+                meta.content = '#060606';
+            } else {
+                meta.content = document.body.classList.contains('theme-light') ? '#F6F5F2' : '#060606';
+            }
         }
 
         function applyTheme(theme) {
@@ -1927,6 +1998,7 @@
                 btn.innerHTML = isLight ? THEME_ICONS.moon : THEME_ICONS.sun;
                 btn.setAttribute('aria-label', isLight ? 'Activar modo oscuro' : 'Activar modo claro');
             }
+            syncThemeColor();
         }
 
         function toggleTheme() {

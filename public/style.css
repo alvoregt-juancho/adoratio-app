@@ -875,7 +875,21 @@ select.dark-input { appearance: none; }
     justify-content: space-between;
     align-items: center;
     margin-bottom: 22px;
+    gap: 16px;
 }
+
+.admin-topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.admin-topbar-brand .page-eyebrow {
+    display: block;
+    margin: 0;
+}
+
 .admin-topbar .muted { display: block; margin-top: 4px; font-size: 0.78rem; }
 
 .admin-tabs {
@@ -1154,4 +1168,78 @@ body.admin .qr-preview code {
 
 body.admin .sheet-primary-btn {
     color: #111215;
+}
+
+/* ── Brand logo (AdoraHora) ── */
+.brand-logo-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+    line-height: 0;
+    background: transparent;
+}
+
+.brand-logo {
+    display: block;
+    width: auto;
+    object-fit: contain;
+    background: transparent;
+}
+
+.brand-logo--header {
+    height: 34px;
+    max-width: 152px;
+}
+
+.brand-logo--hero {
+    height: clamp(58px, 17vw, 84px);
+    max-width: min(360px, 92vw);
+    margin: 0 auto 6px;
+    filter: drop-shadow(0 6px 28px rgba(0, 0, 0, 0.45));
+}
+
+.brand-logo--totem {
+    height: clamp(40px, 11vw, 52px);
+    max-width: min(280px, 86vw);
+    margin: 0 auto 18px;
+}
+
+.brand-logo--on-light {
+    display: none;
+}
+
+body.theme-light .brand-logo--on-dark,
+.page-horarios[data-theme="light"] .brand-logo--on-dark {
+    display: none;
+}
+
+body.theme-light .brand-logo--on-light,
+.page-horarios[data-theme="light"] .brand-logo--on-light {
+    display: block;
+}
+
+body:not(.theme-light) .brand-logo--on-dark,
+.page-horarios[data-theme="dark"] .brand-logo--on-dark {
+    display: block;
+}
+
+.page-horarios[data-theme="dark"] .brand-logo--on-light {
+    display: none;
+}
+
+.scan-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    padding: calc(14px + env(safe-area-inset-top)) 20px 10px;
+    pointer-events: none;
+}
+
+.scan-header .brand-logo-link {
+    pointer-events: auto;
 }
