@@ -347,6 +347,159 @@
             color: var(--text-muted);
         }
 
+        .card-next-turn .petition-chip {
+            display: block;
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--gold-border);
+            background: var(--gold-soft);
+            color: var(--sacred-gold);
+            font-family: var(--font-sans);
+            font-size: 0.88rem;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .pray-wall-option { margin-bottom: 8px; }
+
+        .pray-wall-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .pray-wall-toggle input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .pray-wall-toggle-ui {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            border: 1.5px solid var(--gold-border);
+            background: transparent;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .pray-wall-toggle input:checked + .pray-wall-toggle-ui {
+            background: var(--sacred-gold);
+            border-color: var(--sacred-gold);
+        }
+
+        .pray-wall-toggle input:checked + .pray-wall-toggle-ui::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 6px;
+            height: 11px;
+            border: solid #060606;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        body.theme-light .pray-wall-toggle input:checked + .pray-wall-toggle-ui::after {
+            border-color: #fff;
+        }
+
+        .pray-wall-toggle-text {
+            font-size: 0.95rem;
+            line-height: 1.35;
+        }
+
+        .petition-detail-box {
+            padding: 18px;
+            border-radius: 16px;
+            border: 1px solid var(--border-subtle);
+            background: rgba(255, 255, 255, 0.03);
+            font-family: var(--font-serif);
+            font-size: 1.15rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+        }
+
+        body.theme-light .petition-detail-box {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .my-shift-item {
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .my-shift-item:last-child { border-bottom: none; }
+
+        .my-shift-time {
+            font-family: var(--font-serif);
+            font-size: 1.2rem;
+        }
+
+        .my-shift-meta {
+            font-size: 0.82rem;
+            opacity: 0.72;
+            margin-top: 4px;
+        }
+
+        .petition-link-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--gold-border);
+            background: transparent;
+            color: var(--sacred-gold);
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+
+        .spiritual-modal-box {
+            max-height: min(78vh, 720px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .spiritual-modal-body {
+            overflow-y: auto;
+            padding-right: 4px;
+            text-align: left;
+        }
+
+        .spiritual-section {
+            margin-bottom: 18px;
+        }
+
+        .spiritual-section h4 {
+            font-family: var(--font-serif);
+            font-size: 1.15rem;
+            color: var(--sacred-gold);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .spiritual-section p,
+        .spiritual-section li {
+            font-size: 0.92rem;
+            line-height: 1.55;
+            color: var(--text-primary);
+        }
+
+        .spiritual-section ol,
+        .spiritual-section ul {
+            padding-left: 1.2rem;
+            margin-top: 6px;
+        }
+
+        .spiritual-section li + li {
+            margin-top: 6px;
+        }
+
         .card-urgente {
             border: 1px solid var(--gold-border);
             border-left: 3.5px solid var(--card-urgent-accent);
@@ -1179,6 +1332,9 @@
                             <div class="card-label">Tu próximo turno</div>
                             <div id="nextTurnTime" class="card-time">—</div>
                             <div class="card-place">Capilla Cristo Rey</div>
+                            <button type="button" id="nextTurnPetitionBtn" class="petition-chip" hidden onclick="openPetitionModalFromNext()">
+                                🙏 Petición asignada — toca para ver
+                            </button>
                         </div>
 
                         <button class="gold-action-btn" onclick="switchTab('turnos')">elegir un turno</button>
@@ -1254,17 +1410,24 @@
                     <div style="font-family: var(--font-serif); font-size: 1.4rem;">Muro de Intenciones</div>
                     <div class="card-desc">Intercede por tus hermanos durante tu Hora Santa.</div>
                 </div>
-                <div class="premium-card static card-highlight" style="cursor: default;">
+                <div class="premium-card card-highlight" onclick="openSpiritualGuide('hora-santa')">
                     <div style="font-family: var(--font-serif); font-size: 1.4rem;">Guía de la Hora Santa</div>
-                    <div class="card-desc">Meditación y pautas minuto a minuto.</div>
+                    <div class="card-desc">Meditación y pautas minuto a minuto ante el Santísimo.</div>
                 </div>
-                <div class="premium-card static" style="cursor: default;">
+                <div class="premium-card" onclick="openSpiritualGuide('rosario')">
                     <div style="font-family: var(--font-serif); font-size: 1.4rem;">Santo Rosario ante el Altar</div>
+                    <div class="card-desc">Cómo rezar el Rosario en la capilla de adoración.</div>
                 </div>
             </div>
 
             <div id="mod-mas" class="app-module">
                 <h2 class="section-title" style="margin-top: 8px;">Ajustes de la aplicación</h2>
+                <div class="premium-card" onclick="openMyShifts()">
+                    <div class="card-flex-row">
+                        <span>Mis guardias</span>
+                        <div class="action-circle-icon">→</div>
+                    </div>
+                </div>
                 <div class="premium-card" onclick="openContactModal()">
                     <div class="card-flex-row">
                         <span>Contactar al coordinador</span>
@@ -1294,10 +1457,13 @@
                     <span class="input-hint">8 dígitos, solo números</span>
                 </div>
 
-                <div class="floating-group">
-                    <input type="text" id="uIntencion" class="clean-input" placeholder=" ">
-                    <label class="floating-label">¿Intención de oración para el muro?</label>
-                    <span class="input-hint">Opcional — visible de forma anónima para quien adore</span>
+                <div class="booking-group pray-wall-option">
+                    <label class="pray-wall-toggle">
+                        <input type="checkbox" id="uPrayForWall">
+                        <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
+                        <span class="pray-wall-toggle-text">Deseo orar por alguien del muro</span>
+                    </label>
+                    <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
                 </div>
 
                 <div class="booking-group">
@@ -1375,6 +1541,31 @@
             </div>
         </div>
 
+        <div class="centered-overlay stacked" id="spiritualModal">
+            <div class="modal-box spiritual-modal-box">
+                <h3 id="spiritualModalTitle" style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 8px;"></h3>
+                <div id="spiritualModalBody" class="spiritual-modal-body"></div>
+                <button class="gold-action-btn btn-ghost" onclick="closeSpiritualGuide()" style="margin-top:12px;">cerrar</button>
+            </div>
+        </div>
+
+        <div class="centered-overlay stacked" id="myShiftsModal">
+            <div class="modal-box">
+                <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 12px;">Mis guardias</h3>
+                <div id="myShiftsList"><p class="input-hint" style="text-align:center;">Cargando…</p></div>
+                <button class="gold-action-btn btn-ghost" onclick="closeMyShifts()" style="margin-top:12px;">cerrar</button>
+            </div>
+        </div>
+
+        <div class="centered-overlay stacked" id="petitionModal">
+            <div class="modal-box">
+                <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 8px;">Petición asignada</h3>
+                <p class="modal-subtitle" id="petitionModalMeta"></p>
+                <div class="petition-detail-box" id="petitionModalText"></div>
+                <button class="gold-action-btn btn-ghost" onclick="closePetitionModal()" style="margin-top:12px;">cerrar</button>
+            </div>
+        </div>
+
         <div class="centered-overlay" id="contactModal">
             <div class="modal-box">
                 <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 12px;">Coordinación</h3>
@@ -1436,6 +1627,8 @@
         let selectedWeekDays = [];
         let selectedBiweeklyWeeks = null;
         let intencionesView = 'ofrecer';
+        let nextTurnPetition = null;
+        let myShiftsCache = [];
         let appSettings = {
             frequencies: ['WEEKLY', 'BIWEEKLY', 'DAILY'],
             allowOffsetStartTimes: false,
@@ -1770,6 +1963,52 @@
             switchIntencionesView('muro', muroPill);
         }
 
+        const SPIRITUAL_GUIDES = {
+            'hora-santa': {
+                title: 'Guía de la Hora Santa',
+                html:
+                    '<div class="spiritual-section"><h4>1. Llegada (2 min)</h4>' +
+                    '<p>Genuflecta al entrar, siéntate en silencio y reconoce la presencia real de Jesús. Respira profundo tres veces.</p></div>' +
+                    '<div class="spiritual-section"><h4>2. Adoración (10 min)</h4>' +
+                    '<p>Contempla el Santísimo. Repite en silencio: «Señor, creo que estás aquí. Te adoro.» Deja que el silencio hable.</p></div>' +
+                    '<div class="spiritual-section"><h4>3. Contrición (5 min)</h4>' +
+                    '<p>Pide perdón con sencillez. Puedes rezar: «Señor, ten piedad de mí, pecador.»</p></div>' +
+                    '<div class="spiritual-section"><h4>4. Acción de gracias (10 min)</h4>' +
+                    '<p>Agradece los dones recibidos: la fe, la familia, la Iglesia, la Eucaristía.</p></div>' +
+                    '<div class="spiritual-section"><h4>5. Intercesión (15 min)</h4>' +
+                    '<p>Ora por las peticiones del muro, por la parroquia, por los enfermos y por quienes no conocen a Cristo. Si tienes una petición asignada en tu turno, intercede por ella con detalle.</p></div>' +
+                    '<div class="spiritual-section"><h4>6. Petición personal (10 min)</h4>' +
+                    '<p>Presenta tus necesidades con confianza filial. Escucha lo que el Señor quiera decirte.</p></div>' +
+                    '<div class="spiritual-section"><h4>7. Conclusión (5 min)</h4>' +
+                    '<p>Reza un Padrenuestro, una Avemaría y un Gloria. Agradece la guardia y genuflecta al retirarte.</p></div>'
+            },
+            rosario: {
+                title: 'Santo Rosario ante el Altar',
+                html:
+                    '<div class="spiritual-section"><p>El Rosario es una meditación de los misterios de la vida de Cristo en compañía de María, idealmente ante el Santísimo expuesto.</p></div>' +
+                    '<div class="spiritual-section"><h4>Antes de empezar</h4>' +
+                    '<ul><li>Señal de la Cruz</li><li>Credo</li><li>Padrenuestro, 3 Avemarías, 1 Gloria (por fe, esperanza y caridad)</li></ul></div>' +
+                    '<div class="spiritual-section"><h4>Cada misterio (×10)</h4>' +
+                    '<ol><li>Anuncia el misterio y medita un momento en silencio.</li><li>Reza 1 Padrenuestro.</li><li>Reza 10 Avemarías.</li><li>Reza 1 Gloria.</li><li>Ora por las intenciones del Santo Padre.</li></ol></div>' +
+                    '<div class="spiritual-section"><h4>Misterios según el día</h4>' +
+                    '<ul><li><strong>Lunes y sábado:</strong> Gozosos</li><li><strong>Martes y viernes:</strong> Dolorosos</li><li><strong>Miércoles y domingo:</strong> Gloriosos</li><li><strong>Jueves:</strong> Luminosos</li></ul></div>' +
+                    '<div class="spiritual-section"><h4>Al terminar</h4>' +
+                    '<p>Reza la Salve Regina y pide a María que te acompañe el resto de tu guardia de adoración.</p></div>'
+            }
+        };
+
+        function openSpiritualGuide(key) {
+            const guide = SPIRITUAL_GUIDES[key];
+            if (!guide) return;
+            document.getElementById('spiritualModalTitle').textContent = guide.title;
+            document.getElementById('spiritualModalBody').innerHTML = guide.html;
+            document.getElementById('spiritualModal').classList.add('active');
+        }
+
+        function closeSpiritualGuide() {
+            document.getElementById('spiritualModal').classList.remove('active');
+        }
+
         async function cargarMuro() {
             const feed = document.getElementById('muroFeed');
             if (!feed) return;
@@ -1842,9 +2081,76 @@
                 showToast(privacyMode === 'wall'
                     ? '🙏 Intención en el muro como «' + (displayName || 'Un hermano en la fe') + '»'
                     : '🙏 Intención colocada en el altar del Santísimo');
+                if (intencionesView === 'muro') cargarMuro();
             } catch (e) {
-                showToast(e.message);
+                showToast(e.message || 'No se pudo guardar la intención.');
             }
+        }
+
+        function formatIntentionDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('es-CR', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function showPetitionModal(intention, meta) {
+            if (!intention) return;
+            document.getElementById('petitionModalMeta').textContent = meta || ('Petición de ' + (intention.displayName || 'Un hermano en la fe'));
+            document.getElementById('petitionModalText').textContent = intention.text;
+            document.getElementById('petitionModal').classList.add('active');
+        }
+
+        function closePetitionModal() {
+            document.getElementById('petitionModal').classList.remove('active');
+        }
+
+        function openPetitionModalFromNext() {
+            if (nextTurnPetition) showPetitionModal(nextTurnPetition);
+        }
+
+        function openMyShiftPetition(index) {
+            const item = myShiftsCache[index];
+            if (item?.assignedIntention) {
+                showPetitionModal(item.assignedIntention, 'Guardia del ' + formatDateShort(item.date));
+            }
+        }
+
+        async function openMyShifts() {
+            const phone = localStorage.getItem('adorahora_phone');
+            const listEl = document.getElementById('myShiftsList');
+            document.getElementById('myShiftsModal').classList.add('active');
+            if (!phone) {
+                listEl.innerHTML = '<p class="input-hint" style="text-align:center;">Reserva un turno para ver tus guardias aquí.</p>';
+                return;
+            }
+            listEl.innerHTML = '<p class="input-hint" style="text-align:center;">Cargando…</p>';
+            try {
+                const res = await fetch('/api/reservations/my?phone=' + encodeURIComponent(phone));
+                const data = await res.json();
+                myShiftsCache = (data.reservations || []).filter(r => r.status === 'confirmed' || r.status === 'completed');
+                if (!myShiftsCache.length) {
+                    listEl.innerHTML = '<p class="input-hint" style="text-align:center;">No tienes guardias registradas.</p>';
+                    return;
+                }
+                listEl.innerHTML = myShiftsCache.map(function (r, i) {
+                    const d = new Date(r.date + 'T12:00:00');
+                    let html = '<div class="my-shift-item">' +
+                        '<div class="my-shift-time">' + DAY_NAMES[d.getDay()] + ' · ' +
+                        formatSlotTime(r.slot.startTime, r.slot.endTime) + '</div>' +
+                        '<div class="my-shift-meta">' + formatDateShort(r.date) + '</div>';
+                    if (r.assignedIntention) {
+                        html += '<button type="button" class="petition-link-btn" onclick="openMyShiftPetition(' + i + ')">🙏 Ver petición asignada</button>';
+                    }
+                    html += '</div>';
+                    return html;
+                }).join('');
+            } catch (_) {
+                listEl.innerHTML = '<p class="input-hint" style="text-align:center;">No se pudieron cargar tus guardias.</p>';
+            }
+        }
+
+        function closeMyShifts() {
+            document.getElementById('myShiftsModal').classList.remove('active');
         }
 
         async function refreshHome() {
@@ -1863,8 +2169,10 @@
             }
 
             const nextCard = document.getElementById('nextTurnCard');
+            const petitionBtn = document.getElementById('nextTurnPetitionBtn');
             const urgentSection = document.getElementById('urgentHomeSection');
             const urgentList = document.getElementById('urgentHomeList');
+            nextTurnPetition = nextReservation?.assignedIntention || null;
 
             if (nextReservation) {
                 nextCard.style.display = 'block';
@@ -1873,8 +2181,15 @@
                 document.getElementById('nextTurnTime').textContent =
                     DAY_NAMES[d.getDay()] + ', ' +
                     formatSlotTime(nextReservation.slot.startTime, nextReservation.slot.endTime);
+                if (nextTurnPetition && petitionBtn) {
+                    petitionBtn.hidden = false;
+                } else if (petitionBtn) {
+                    petitionBtn.hidden = true;
+                }
             } else {
                 nextCard.style.display = 'none';
+                if (petitionBtn) petitionBtn.hidden = true;
+                nextTurnPetition = null;
                 urgentSection.style.display = 'block';
                 try {
                     const res = await fetch('/api/slots?date=' + todayISO());
@@ -2010,6 +2325,8 @@
             selectedDate = slot.date || selectedDate;
             resetBookingFrequency();
             resetBookingTimeControls();
+            const prayBox = document.getElementById('uPrayForWall');
+            if (prayBox) prayBox.checked = false;
             modalTime.textContent = formatSlotTime(slot.startTime, slot.endTime) + ' · ' +
                 dayLabelFromDate(selectedDate) + ' ' + formatDateShort(selectedDate);
             applyBookingSettings();
@@ -2054,8 +2371,7 @@
                 };
                 if (commitment.weekDays) payload.weekDays = commitment.weekDays;
                 if (commitment.biweeklyWeeks) payload.biweeklyWeeks = commitment.biweeklyWeeks;
-                const intencion = document.getElementById('uIntencion').value.trim();
-                if (intencion) payload.intencion = intencion;
+                if (document.getElementById('uPrayForWall').checked) payload.prayForWall = true;
 
                 const res = await fetch('/api/reservations', {
                     method: 'POST',
@@ -2069,9 +2385,9 @@
                 document.getElementById('uFirstName').value = '';
                 document.getElementById('uLastName').value = '';
                 document.getElementById('uPhone').value = '';
-                document.getElementById('uIntencion').value = '';
+                document.getElementById('uPrayForWall').checked = false;
                 selectedSlot = null;
-                showToast('✨ ¡Gracias ' + firstName + ', tu guardia está lista!');
+                showToast(data.message || ('✨ ¡Gracias ' + firstName + ', tu guardia está lista!'));
                 loadSlots();
                 refreshHome();
             } catch (e) {

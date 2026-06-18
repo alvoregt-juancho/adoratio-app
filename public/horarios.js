@@ -42,8 +42,10 @@
     const myModal = document.getElementById("myModal");
     const daySelectModal = document.getElementById("daySelectModal");
     const biweeklySelectModal = document.getElementById("biweeklySelectModal");
+    const petitionModal = document.getElementById("petitionModal");
 
     let selectedSlot = null;
+    let myReservationsCache = [];
     let dailyModeActive = false;
     let selectedWeekDays = [];
     let selectedBiweeklyWeeks = null;
@@ -592,6 +594,18 @@
             });
         }
 
+        document.querySelectorAll("[data-close-petition]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                closeModal(petitionModal);
+            });
+        });
+
+        if (petitionModal) {
+            petitionModal.addEventListener("click", function (e) {
+                if (e.target === petitionModal) closeModal(petitionModal);
+            });
+        }
+
         primaryRadioButtons.forEach(function (radio) {
             radio.addEventListener("change", function () {
                 if (radio.value === "BIWEEKLY" && radio.checked) {
@@ -609,10 +623,26 @@
         });
     }
 
+    function openPetitionModal(intention, meta) {
+        if (!petitionModal || !intention) return;
+        document.getElementById("petitionMeta").textContent = meta || ("Petición de " + (intention.displayName || "Un hermano en la fe"));
+        document.getElementById("petitionText").textContent = intention.text;
+        openModal(petitionModal);
+    }
+
+    function openCachedPetition(index) {
+        const item = myReservationsCache[index];
+        if (item && item.assignedIntention) {
+            openPetitionModal(item.assignedIntention, "Guardia del " + formatDateShort(item.date));
+        }
+    }
+
     function openReserveModal(slot) {
         selectedSlot = slot;
         resetBookingFrequency();
         resetBookingTimeControls();
+        const prayBox = document.getElementById("resPrayForWall");
+        if (prayBox) prayBox.checked = false;
         document.getElementById("reserveSlotLabel").textContent =
             slot.startTime + " – " + slot.endTime + " · " +
             selectedDayLabel() + " " + formatDateShort(selectedDate());
@@ -661,6 +691,7 @@
             };
             if (commitment.weekDays) payload.weekDays = commitment.weekDays;
             if (commitment.biweeklyWeeks) payload.biweeklyWeeks = commitment.biweeklyWeeks;
+            if (document.getElementById("resPrayForWall")?.checked) payload.prayForWall = true;
 
             const res = await fetch("/api/reservations", {
                 method: "POST",
@@ -669,11 +700,13 @@
             });
             const data = await res.json();
             if (res.ok) {
-                toast("Reserva confirmada.", "success");
+                toast(data.message || "Reserva confirmada.", "success");
                 closeModal(reserveModal);
                 document.getElementById("resFirstName").value = "";
                 document.getElementById("resLastName").value = "";
                 document.getElementById("resPhone").value = "";
+                const prayBox = document.getElementById("resPrayForWall");
+                if (prayBox) prayBox.checked = false;
                 selectedSlot = null;
                 loadSlots();
             } else {
@@ -696,21 +729,33 @@
             const res = await fetch("/api/reservations/my?phone=" + encodeURIComponent(phone));
             const data = await res.json();
             const items = data.reservations || [];
+            myReservationsCache = items;
             if (!items.length) {
                 list.innerHTML = '<p class="muted">No se encontraron reservas.</p>';
                 return;
             }
             list.innerHTML = "";
-            items.forEach(function (r) {
+            items.forEach(function (r, index) {
                 const row = document.createElement("div");
                 row.className = "my-item status-" + r.status;
                 const canCancel = r.status === "confirmed";
-                row.innerHTML =
-                    "<div><strong>" + r.slot.startTime + "–" + r.slot.endTime + "</strong>" +
-                    '<span class="my-date">' + formatDateShort(r.date) + "</span></div>" +
+                let body =
+                    '<div class="my-item-block"><strong>' + r.slot.startTime + "–" + r.slot.endTime + "</strong>" +
+                    '<span class="my-date">' + formatDateShort(r.date) + "</span>";
+                if (r.assignedIntention) {
+                    body += '<button type="button" class="petition-link-btn" data-index="' + index + '">🙏 Ver petición asignada</button>';
+                }
+                body += "</div>" +
                     '<div class="my-actions"><span class="status-pill">' + statusLabel(r.status) + "</span>" +
                     (canCancel ? '<button type="button" class="mini-btn" data-id="' + r.id + '">Cancelar</button>' : "") +
                     "</div>";
+                row.innerHTML = body;
+                const petitionBtn = row.querySelector(".petition-link-btn");
+                if (petitionBtn) {
+                    petitionBtn.addEventListener("click", function () {
+                        openCachedPetition(Number(petitionBtn.dataset.index));
+                    });
+                }
                 if (canCancel) {
                     row.querySelector(".mini-btn").addEventListener("click", function () {
                         cancelReservation(r.id, phone, this);

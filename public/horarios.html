@@ -49,6 +49,15 @@
                 <span id="resPhoneHint" class="input-hint">8 dígitos, solo números</span>
             </div>
 
+            <div class="booking-input-group pray-wall-option">
+                <label class="pray-wall-toggle">
+                    <input type="checkbox" id="resPrayForWall">
+                    <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
+                    <span class="pray-wall-toggle-text">Deseo orar por alguien del muro</span>
+                </label>
+                <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
+            </div>
+
             <div class="booking-input-group">
                 <p class="section-subtitle">Frecuencia de Guardia</p>
 
@@ -146,6 +155,17 @@
 
             <button type="button" class="btn-primary" id="confirmDaysBtn">Confirmar días</button>
             <button type="button" class="btn-close" data-close-day>Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal petición asignada -->
+    <div class="modal-overlay modal-stacked" id="petitionModal" role="dialog" aria-modal="true" aria-labelledby="petitionTitle">
+        <div class="modal-window modal-window-compact">
+            <button type="button" class="modal-close-x" data-close-petition aria-label="Cerrar">×</button>
+            <h3 id="petitionTitle">Petición asignada</h3>
+            <p class="modal-subtitle" id="petitionMeta"></p>
+            <div class="petition-detail-box" id="petitionText"></div>
+            <button type="button" class="btn-close" data-close-petition>Cerrar</button>
         </div>
     </div>
 

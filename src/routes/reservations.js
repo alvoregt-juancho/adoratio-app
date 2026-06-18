@@ -8,7 +8,7 @@ const { getSettings } = require('../utils/settings');
 const { isValidFrequency, COMMITMENT_FREQUENCY, getEnabledFrequencies } = require('../constants/commitment');
 const { parseWeekDays, isValidWeekDays } = require('../utils/weekDays');
 const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
-const { createWallIntention } = require('../utils/intentions');
+const { assignWallIntentionToReservation, formatIntentionPayload, releaseWallIntentionAssignment } = require('../utils/intentions');
 
 const router = express.Router();
 
@@ -102,6 +102,8 @@ router.post('/', async (req, res) => {
             return res.status(409).json({ error: 'Este turno ya está completo.' });
         }
 
+        const prayForWall = req.body?.prayForWall === true || req.body?.prayForWall === 'true';
+
         const reservation = await prisma.reservation.create({
             data: {
                 slotId: slot.id,
@@ -130,33 +132,23 @@ router.post('/', async (req, res) => {
             },
         });
 
-        const intencion = (req.body?.intencion || req.body?.intention || '').trim();
-        if (intencion) {
-            try {
-                await createWallIntention({
-                    text: intencion,
-                    userPhone,
-                    userName: full,
-                    reservationId: reservation.id,
-                });
-            } catch (intErr) {
-                if (intErr.message === 'INTENTION_TOO_LONG') {
-                    return res.status(400).json({ error: 'La intención de oración no puede superar 500 caracteres.' });
-                }
-                if (intErr.message === 'INVALID_PHONE') {
-                    return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
-                }
-                throw intErr;
-            }
+        let assignedIntention = null;
+        if (prayForWall) {
+            assignedIntention = await assignWallIntentionToReservation(reservation.id);
         }
 
         return res.status(201).json({
-            message: 'Reserva confirmada.',
+            message: assignedIntention
+                ? 'Reserva confirmada. Se te asignó una petición del muro para interceder.'
+                : prayForWall
+                    ? 'Reserva confirmada. No había peticiones disponibles en el muro por ahora.'
+                    : 'Reserva confirmada.',
             reservation: {
                 id: reservation.id,
                 date: reservation.date,
                 status: reservation.status,
                 slot: { startTime: slot.startTime, endTime: slot.endTime },
+                assignedIntention: formatIntentionPayload(assignedIntention),
             },
         });
     } catch (e) {
@@ -172,10 +164,27 @@ router.get('/my', async (req, res) => {
         if (!phone) return res.status(400).json({ error: 'Celular requerido.' });
         const list = await prisma.reservation.findMany({
             where: { userPhone: phone },
-            include: { slot: true },
+            include: {
+                slot: true,
+                assignedPrayerIntention: true,
+            },
             orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         });
-        res.json({ reservations: list });
+        res.json({
+            reservations: list.map((r) => ({
+                id: r.id,
+                date: r.date,
+                status: r.status,
+                frequency: r.frequency,
+                weekDays: r.weekDays,
+                biweeklyWeeks: r.biweeklyWeeks,
+                durationMinutes: r.durationMinutes,
+                startTimeOffset: r.startTimeOffset,
+                checkedInAt: r.checkedInAt,
+                slot: r.slot,
+                assignedIntention: formatIntentionPayload(r.assignedPrayerIntention),
+            })),
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al obtener reservas.' });
@@ -202,6 +211,7 @@ router.delete('/:id', async (req, res) => {
             where: { id },
             data: { status: 'cancelled', cancelledAt: new Date() },
         });
+        await releaseWallIntentionAssignment(id);
         await prisma.auditLog.create({
             data: { action: 'reservation.cancel', entity: 'reservation', entityId: id, reservationId: id },
         });

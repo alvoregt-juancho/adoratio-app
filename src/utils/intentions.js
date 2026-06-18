@@ -12,27 +12,45 @@ function anonymizeName(fullName) {
     return initials.length <= 5 ? initials : 'Un hermano en la fe';
 }
 
-async function createWallIntention({ text, userPhone, userName, reservationId }) {
-    const trimmed = (text || '').trim();
-    if (!trimmed) return null;
-    if (trimmed.length > 500) {
-        throw new Error('INTENTION_TOO_LONG');
-    }
-    const phone = normalizePhone(userPhone);
-    if (phone && !isValidPhone(phone)) {
-        throw new Error('INVALID_PHONE');
-    }
+function formatIntentionPayload(intention) {
+    if (!intention) return null;
+    return {
+        id: intention.id,
+        text: intention.text,
+        displayName: intention.displayName || 'Un hermano en la fe',
+        createdAt: intention.createdAt,
+    };
+}
 
-    return prisma.prayerIntention.create({
-        data: {
-            text: trimmed,
-            displayName: anonymizeName(userName),
-            userPhone: phone || null,
-            visibility: 'wall',
-            status: 'active',
-            reservationId: reservationId || null,
-        },
+async function assignWallIntentionToReservation(reservationId) {
+    return prisma.$transaction(async (tx) => {
+        const available = await tx.prayerIntention.findFirst({
+            where: {
+                visibility: 'wall',
+                status: 'active',
+                assignedToReservationId: null,
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        if (!available) return null;
+
+        return tx.prayerIntention.update({
+            where: { id: available.id },
+            data: { assignedToReservationId: reservationId },
+        });
     });
 }
 
-module.exports = { anonymizeName, createWallIntention };
+async function releaseWallIntentionAssignment(reservationId) {
+    await prisma.prayerIntention.updateMany({
+        where: { assignedToReservationId: reservationId },
+        data: { assignedToReservationId: null },
+    });
+}
+
+module.exports = {
+    anonymizeName,
+    formatIntentionPayload,
+    assignWallIntentionToReservation,
+    releaseWallIntentionAssignment,
+};

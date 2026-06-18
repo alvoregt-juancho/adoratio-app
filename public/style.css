@@ -823,6 +823,91 @@ select.dark-input { appearance: none; }
     .mini-btn.danger:hover { background: rgba(224, 122, 95, 0.12); }
 }
 
+@media (hover: hover) {
+    .mini-btn.danger:hover { background: rgba(224, 122, 95, 0.12); }
+}
+
+.pray-wall-option { margin-bottom: 4px; }
+
+.pray-wall-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pray-wall-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pray-wall-toggle-ui {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(219, 191, 124, 0.45);
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.pray-wall-toggle input:checked + .pray-wall-toggle-ui {
+    background: var(--gold-light);
+    border-color: var(--gold-light);
+}
+
+.pray-wall-toggle input:checked + .pray-wall-toggle-ui::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 6px;
+    height: 11px;
+    border: solid #1a1208;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.pray-wall-toggle-text {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    color: var(--paper);
+}
+
+.petition-detail-box {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: 1.1rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    color: var(--paper);
+    margin: 12px 0;
+}
+
+.petition-link-btn {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(219, 191, 124, 0.45);
+    background: transparent;
+    color: var(--gold-light);
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.my-item-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
 .admin-actions {
     display: flex;
     flex-wrap: wrap;
