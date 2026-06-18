@@ -37,7 +37,7 @@
             /* Eje sagrado: pico del arco ↔ centro custodia (calibrado en JS) */
             --hero-bg-x: 47.5%;
             --hero-bg-y: 20%;
-            --hero-notch-bleed: 54px;
+            --hero-safe-top: env(safe-area-inset-top, 0px);
             --hero-logo-left: 49%;
             --hero-logo-arch: 47.081%;
         }
@@ -109,6 +109,14 @@
             padding-bottom: calc(64px + env(safe-area-inset-bottom));
         }
 
+        body.view-home .app-viewport {
+            padding-top: 0;
+        }
+
+        body.view-home .scrollable-content {
+            padding-top: 0;
+        }
+
         .scrollable-content {
             flex: 1;
             overflow-y: scroll;
@@ -141,7 +149,7 @@
         }
 
         #mod-home {
-            padding: 0;
+            padding: 0 !important;
             margin: 0;
             max-width: none;
             overflow: visible;
@@ -162,6 +170,12 @@
             justify-content: center;
         }
 
+        #mod-home .hero-visual {
+            margin-top: 0;
+            padding-top: 0;
+            height: clamp(240px, 46svh, 380px);
+        }
+
         .cinematic-bg {
             position: absolute;
             left: 0;
@@ -174,18 +188,30 @@
             will-change: transform;
         }
 
-        #mod-home .hero-visual {
-            margin-top: calc(-1 * var(--hero-notch-bleed));
-            height: calc(clamp(240px, 46svh, 380px) + var(--hero-notch-bleed));
-            padding: 0;
-        }
-
         #mod-home .cinematic-bg {
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            height: auto;
+            height: 100%;
+        }
+
+        /* Foto pegada al borde superior del viewport (incl. notch) mientras el hero está visible */
+        body.view-home.home-hero-pinned #mod-home .cinematic-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: clamp(240px, 46svh, 380px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body.view-home.home-hero-pinned #mod-home .hero-visual {
+            position: relative;
+            z-index: 1;
+            background: transparent;
         }
 
         .hero-visual::after {
@@ -1059,14 +1085,38 @@
 
         body.view-home .theme-toggle {
             position: fixed;
-            top: 8px;
-            right: 12px;
-            background: transparent;
-            border-color: transparent;
+            top: max(8px, env(safe-area-inset-top, 0px));
+            right: max(12px, env(safe-area-inset-right, 0px));
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
             color: var(--gold-light);
             backdrop-filter: none;
             -webkit-backdrop-filter: none;
             pointer-events: auto;
+            z-index: 95;
+        }
+
+        body.view-home .theme-toggle:active,
+        body.view-home .theme-toggle:focus,
+        body.view-home .theme-toggle:focus-visible {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none;
+        }
+
+        body.view-home.theme-light .theme-toggle {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: var(--gold-light);
         }
 
         body.view-home .app-header > * {
@@ -2321,6 +2371,20 @@
             }
         }
 
+        function updateHeroSafeTop() {
+            const probe = document.createElement('div');
+            probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px)';
+            document.documentElement.appendChild(probe);
+            const inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+            probe.remove();
+            document.documentElement.style.setProperty('--hero-safe-top', inset + 'px');
+        }
+
+        function syncHomeHeroPin() {
+            const pinned = document.body.classList.contains('view-home') && scrollContainer.scrollTop < 12;
+            document.body.classList.toggle('home-hero-pinned', pinned);
+        }
+
         function alignHeroSacredAxis() {
             if (!document.body.classList.contains('view-home')) return;
             const hero = document.querySelector('#mod-home .hero-visual');
@@ -2369,6 +2433,7 @@
             scrollContainer.scrollTop = 0;
             document.body.classList.toggle('view-home', moduleName === 'home');
             syncThemeColor();
+            syncHomeHeroPin();
             if (moduleName === 'home') alignHeroSacredAxis();
             if (moduleName === 'turnos') loadSlots();
             if (moduleName === 'intenciones' && intencionesView === 'muro') cargarMuro();
@@ -2504,13 +2569,14 @@
         });
 
         scrollContainer.addEventListener('scroll', () => {
+            syncHomeHeroPin();
             const heroBg = document.getElementById('heroBg');
             if (!heroBg) return;
             const offset = scrollContainer.scrollTop;
             if (offset < window.innerHeight) {
                 heroBg.style.transform = 'scale(1.02) translateY(' + (offset * 0.22) + 'px)';
             }
-        });
+        }, { passive: true });
 
         async function loadAppSettings() {
             try {
@@ -2532,17 +2598,27 @@
             }
 
             applyTheme(localStorage.getItem('adorahora_theme') === 'light' ? 'light' : 'dark');
-            document.body.classList.add('view-home');
+            document.body.classList.add('view-home', 'home-hero-pinned');
             document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
             document.getElementById('contactPhoneLink').href = 'tel:+506' + COORDINATOR_PHONE;
             refreshHome();
+            updateHeroSafeTop();
             requestAnimationFrame(function () {
-                requestAnimationFrame(alignHeroSacredAxis);
+                requestAnimationFrame(function () {
+                    alignHeroSacredAxis();
+                    syncHomeHeroPin();
+                });
             });
-            window.addEventListener('resize', alignHeroSacredAxis);
+            window.addEventListener('resize', function () {
+                updateHeroSafeTop();
+                alignHeroSacredAxis();
+            });
             if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', alignHeroSacredAxis);
+                window.visualViewport.addEventListener('resize', function () {
+                    updateHeroSafeTop();
+                    alignHeroSacredAxis();
+                });
             }
         });
     </script>
