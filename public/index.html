@@ -1476,7 +1476,7 @@
                         <button class="gold-action-btn" onclick="switchTab('turnos')">elegir un turno</button>
 
                         <div id="urgentHomeSection">
-                            <h3 class="section-title" style="margin-top:0;">Horas críticas hoy</h3>
+                            <h3 class="section-title" style="margin-top:0;">Turnos prioritarios</h3>
                             <div id="urgentHomeList"></div>
                         </div>
                     </div>
@@ -2332,7 +2332,7 @@
                     const data = await res.json();
                     const urgent = (data.slots || []).filter(s => s.critical || s.reserved === 0);
                     if (!urgent.length) {
-                        urgentList.innerHTML = '<div class="slots-empty">No hay horas críticas hoy. ¡Gloria a Dios!</div>';
+                        urgentList.innerHTML = '<div class="slots-empty">No hay turnos prioritarios hoy. ¡Gloria a Dios!</div>';
                         return;
                     }
                     urgentList.innerHTML = urgent.slice(0, 3).map(s => {
@@ -2340,14 +2340,14 @@
                         return '<div class="premium-card card-urgente" data-slot=\'' + slotData + '\'>' +
                             '<div class="card-flex-row"><div><div class="time-signature">' +
                             formatSlotTime(s.startTime, s.endTime) + '</div>' +
-                            '<div class="status-subtext alert">Falta adorador urgente</div></div>' +
+                            '<div class="status-subtext alert">Espacio sin custodia</div></div>' +
                             '<div class="action-circle-icon">+</div></div></div>';
                     }).join('');
                     urgentList.querySelectorAll('[data-slot]').forEach(el => {
                         el.addEventListener('click', () => triggerBooking(JSON.parse(el.dataset.slot)));
                     });
                 } catch (_) {
-                    urgentList.innerHTML = '<div class="slots-empty">No se pudieron cargar las horas críticas.</div>';
+                    urgentList.innerHTML = '<div class="slots-empty">No se pudieron cargar los turnos prioritarios.</div>';
                 }
             }
         }
