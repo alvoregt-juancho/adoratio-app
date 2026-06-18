@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#060606">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>AdoraHora — Parroquia Cristo Rey</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,6 +34,12 @@
             --border-radius-premium: 24px;
             --transition-apple: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             --wood-dark: #12100d;
+            /* Eje sagrado: pico del arco ↔ centro custodia (calibrado en JS) */
+            --hero-bg-x: 47.5%;
+            --hero-bg-y: 20%;
+            --hero-notch-bleed: 54px;
+            --hero-logo-left: 50%;
+            --hero-logo-arch: 47.081%;
         }
 
         * {
@@ -51,7 +58,14 @@
             color: var(--text-primary);
             font-family: var(--font-sans);
             height: 100%;
+            margin: 0;
+            padding: 0;
             overflow: hidden;
+        }
+
+        html {
+            min-height: 100%;
+            min-height: 100dvh;
         }
 
         .app-viewport,
@@ -60,10 +74,15 @@
         }
 
         body.view-home,
-        body.view-home html,
-        body.view-home .app-viewport,
-        body.view-home .scrollable-content {
+        body.view-home html {
             background-color: #060606 !important;
+        }
+
+        body.view-home .app-viewport,
+        body.view-home .scrollable-content,
+        body.view-home #mod-home,
+        body.view-home .landing-hero {
+            background-color: #060606;
         }
 
         body.theme-light {
@@ -93,6 +112,7 @@
         .scrollable-content {
             flex: 1;
             overflow-y: scroll;
+            overflow-x: hidden;
             scroll-behavior: smooth;
         }
         .scrollable-content::-webkit-scrollbar { display: none; }
@@ -109,21 +129,27 @@
             display: block;
             animation: fadeInModule 0.5s var(--transition-apple);
         }
-        #mod-home {
-            padding: 0;
-            padding-top: 0;
-            max-width: none;
-        }
 
         @keyframes fadeInModule {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Hero cinematográfico con fundido suave (como landing original) */
         .landing-hero {
             width: 100%;
             background: var(--bg-canvas);
+        }
+
+        #mod-home {
+            padding: 0;
+            margin: 0;
+            max-width: none;
+            overflow: visible;
+        }
+
+        #mod-home .landing-hero {
+            margin: 0;
+            padding: 0;
         }
 
         .hero-visual {
@@ -136,23 +162,30 @@
             justify-content: center;
         }
 
-        #mod-home .hero-visual {
-            margin-top: calc(-1 * env(safe-area-inset-top, 0px));
-            height: calc(clamp(240px, 46svh, 380px) + env(safe-area-inset-top, 0px));
-        }
-
         .cinematic-bg {
             position: absolute;
-            inset: 0;
-            background: url('background.webp') 47.5% 20% / cover no-repeat;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            top: 0;
+            background: url('background.webp') var(--hero-bg-x) var(--hero-bg-y) / cover no-repeat;
             transform: scale(1.02);
-            transform-origin: 47.5% 28%;
+            transform-origin: var(--hero-bg-x) 28%;
             will-change: transform;
         }
 
+        #mod-home .hero-visual {
+            margin-top: calc(-1 * var(--hero-notch-bleed));
+            height: calc(clamp(240px, 46svh, 380px) + var(--hero-notch-bleed));
+            padding: 0;
+        }
+
         #mod-home .cinematic-bg {
-            top: calc(-1 * env(safe-area-inset-top, 0px));
-            height: calc(100% + env(safe-area-inset-top, 0px));
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: auto;
         }
 
         .hero-visual::after {
@@ -262,7 +295,7 @@
         }
 
         body.theme-light #mod-home .premium-card {
-            background: #F6F5F2;
+            background: color-mix(in srgb, #F6F5F2 85%, #111215);
             border-color: rgba(17, 18, 21, 0.08);
             color: #111215;
             box-shadow: 0 4px 16px rgba(17, 18, 21, 0.04);
@@ -282,6 +315,10 @@
         body.theme-light #mod-home .time-signature,
         body.theme-light #mod-home .card-time {
             color: #111215;
+        }
+
+        #mod-home .hero-content-panel .section-title {
+            color: #ECECEF !important;
         }
 
         body.theme-light #mod-home .status-subtext {
@@ -1004,11 +1041,32 @@
         }
 
         body.view-home .app-header {
-            background: transparent;
-            border-bottom: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 0;
+            min-height: 0;
+            padding: 0;
+            margin: 0;
+            overflow: visible;
+            background: transparent !important;
+            border: none;
             justify-content: flex-end;
             pointer-events: none;
-            padding: 8px 16px 0;
+            z-index: 90;
+        }
+
+        body.view-home .theme-toggle {
+            position: fixed;
+            top: 8px;
+            right: 12px;
+            background: transparent;
+            border-color: transparent;
+            color: var(--gold-light);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            pointer-events: auto;
         }
 
         body.view-home .app-header > * {
@@ -1022,13 +1080,12 @@
         .hero-logo-wrap {
             position: absolute;
             bottom: clamp(4px, 1.2svh, 12px);
-            left: 50%;
+            left: var(--hero-logo-left);
             z-index: 2;
             width: max-content;
             max-width: 92vw;
             padding: 0;
-            /* Pico del arco dorado alineado con eje de la custodia */
-            transform: translateX(-47.08%);
+            transform: translateX(calc(-1 * var(--hero-logo-arch)));
             line-height: 0;
         }
 
@@ -1078,14 +1135,6 @@
             cursor: pointer;
             flex-shrink: 0;
             transition: var(--transition-apple);
-        }
-
-        body.view-home .theme-toggle {
-            background: transparent;
-            border-color: transparent;
-            color: var(--gold-light);
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
         }
 
         .theme-icon {
@@ -2272,6 +2321,36 @@
             }
         }
 
+        function alignHeroSacredAxis() {
+            if (!document.body.classList.contains('view-home')) return;
+            const hero = document.querySelector('#mod-home .hero-visual');
+            if (!hero) return;
+
+            const vw = window.innerWidth;
+            const vh = hero.offsetHeight;
+            const hostImgX = 0.49003; /* centro luminoso custodia en background.webp */
+            const imgW = 1024;
+            const imgH = 572;
+            const scale = Math.max(vw / imgW, vh / imgH);
+            const scaledW = imgW * scale;
+            const axisX = vw * 0.5;
+
+            /* bg-x: coloca la custodia exactamente en el eje central del viewport */
+            let bgX = 50;
+            if (Math.abs(vw - scaledW) > 1) {
+                bgX = ((axisX - hostImgX * scaledW) / (vw - scaledW)) * 100;
+            }
+            bgX = Math.max(42, Math.min(58, bgX));
+
+            document.documentElement.style.setProperty('--hero-bg-x', bgX.toFixed(2) + '%');
+            document.documentElement.style.setProperty('--hero-logo-left', '50%');
+
+            const heroBg = document.getElementById('heroBg');
+            if (heroBg) {
+                heroBg.style.transformOrigin = bgX.toFixed(2) + '% 28%';
+            }
+        }
+
         function switchTab(moduleName, element) {
             document.querySelectorAll('.app-module').forEach(m => m.classList.remove('active'));
             document.querySelectorAll('.tab-item').forEach(t => {
@@ -2290,6 +2369,7 @@
             scrollContainer.scrollTop = 0;
             document.body.classList.toggle('view-home', moduleName === 'home');
             syncThemeColor();
+            if (moduleName === 'home') alignHeroSacredAxis();
             if (moduleName === 'turnos') loadSlots();
             if (moduleName === 'intenciones' && intencionesView === 'muro') cargarMuro();
         }
@@ -2457,6 +2537,13 @@
 
             document.getElementById('contactPhoneLink').href = 'tel:+506' + COORDINATOR_PHONE;
             refreshHome();
+            requestAnimationFrame(function () {
+                requestAnimationFrame(alignHeroSacredAxis);
+            });
+            window.addEventListener('resize', alignHeroSacredAxis);
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', alignHeroSacredAxis);
+            }
         });
     </script>
 </body>
