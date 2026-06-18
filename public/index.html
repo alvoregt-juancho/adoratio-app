@@ -6,7 +6,9 @@
     <meta name="theme-color" content="#060606">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>AdoraHora — Parroquia Cristo Rey</title>
+    <script>document.documentElement.classList.add('view-home');</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -73,8 +75,8 @@
             background-color: var(--bg-canvas);
         }
 
-        body.view-home,
-        body.view-home html {
+        html.view-home,
+        body.view-home {
             background-color: #060606 !important;
         }
 
@@ -111,6 +113,8 @@
 
         body.view-home .app-viewport {
             padding-top: 0;
+            position: relative;
+            z-index: 1;
         }
 
         body.view-home .scrollable-content {
@@ -196,16 +200,37 @@
             height: 100%;
         }
 
-        /* Foto pegada al borde superior del viewport (incl. notch) mientras el hero está visible */
-        body.view-home.home-hero-pinned #mod-home .cinematic-bg {
+        /* Capa fija fuera del scroll: la foto llega al borde físico (notch / safe area) */
+        .home-hero-fixed {
+            display: none;
             position: fixed;
-            top: 0;
+            top: calc(-1 * env(safe-area-inset-top, 0px));
             left: 0;
             right: 0;
             width: 100%;
-            height: clamp(240px, 46svh, 380px);
+            height: calc(clamp(240px, 46svh, 380px) + env(safe-area-inset-top, 0px));
+            background: url('background.webp') var(--hero-bg-x) var(--hero-bg-y) / cover no-repeat;
+            transform: scale(1.02);
+            transform-origin: var(--hero-bg-x) 28%;
             z-index: 0;
             pointer-events: none;
+            will-change: transform;
+        }
+
+        body.view-home .home-hero-fixed {
+            display: block;
+        }
+
+        body.view-home.home-hero-pinned .home-hero-fixed {
+            opacity: 1;
+        }
+
+        body.view-home:not(.home-hero-pinned) .home-hero-fixed {
+            opacity: 0;
+        }
+
+        body.view-home.home-hero-pinned #mod-home .cinematic-bg {
+            opacity: 0;
         }
 
         body.view-home.home-hero-pinned #mod-home .hero-visual {
@@ -1403,8 +1428,9 @@
         }
     </style>
 </head>
-<body>
+<body class="view-home home-hero-pinned">
 
+    <div id="homeHeroFixed" class="home-hero-fixed" aria-hidden="true"></div>
     <div id="toast" class="toast-system" role="status" aria-live="polite"></div>
 
     <header class="app-header">
@@ -2410,8 +2436,13 @@
             document.documentElement.style.setProperty('--hero-logo-left', '49%');
 
             const heroBg = document.getElementById('heroBg');
+            const heroFixed = document.getElementById('homeHeroFixed');
+            const origin = bgX.toFixed(2) + '% 28%';
             if (heroBg) {
-                heroBg.style.transformOrigin = bgX.toFixed(2) + '% 28%';
+                heroBg.style.transformOrigin = origin;
+            }
+            if (heroFixed) {
+                heroFixed.style.transformOrigin = origin;
             }
         }
 
@@ -2431,6 +2462,7 @@
             }
 
             scrollContainer.scrollTop = 0;
+            document.documentElement.classList.toggle('view-home', moduleName === 'home');
             document.body.classList.toggle('view-home', moduleName === 'home');
             syncThemeColor();
             syncHomeHeroPin();
@@ -2570,11 +2602,15 @@
 
         scrollContainer.addEventListener('scroll', () => {
             syncHomeHeroPin();
-            const heroBg = document.getElementById('heroBg');
-            if (!heroBg) return;
             const offset = scrollContainer.scrollTop;
+            const parallax = 'scale(1.02) translateY(' + (offset * 0.22) + 'px)';
+            const heroBg = document.getElementById('heroBg');
+            const heroFixed = document.getElementById('homeHeroFixed');
             if (offset < window.innerHeight) {
-                heroBg.style.transform = 'scale(1.02) translateY(' + (offset * 0.22) + 'px)';
+                if (heroBg) heroBg.style.transform = parallax;
+                if (heroFixed && document.body.classList.contains('home-hero-pinned')) {
+                    heroFixed.style.transform = parallax;
+                }
             }
         }, { passive: true });
 
@@ -2598,6 +2634,7 @@
             }
 
             applyTheme(localStorage.getItem('adorahora_theme') === 'light' ? 'light' : 'dark');
+            document.documentElement.classList.add('view-home');
             document.body.classList.add('view-home', 'home-hero-pinned');
             document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
