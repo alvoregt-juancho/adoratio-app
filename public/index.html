@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#060606">
+    <meta name="theme-color" content="#130F0B">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -17,7 +17,8 @@
            SISTEMA DE DISEÑO ULTRA-PREMIUM (ESTILO GQ EDITORIAL + APPLE)
            ========================================================================== */
         :root {
-            --bg-canvas: #060606;
+            --bg-canvas: #130F0B;
+            --bg-home-dark: #130F0B;
             --surface-card: #1B1912;
             --surface-muted: #242320;
             --text-primary: #ECECEF;
@@ -35,7 +36,17 @@
             --font-sans: 'Plus Jakarta Sans', sans-serif;
             --border-radius-premium: 24px;
             --transition-apple: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            --wood-dark: #12100d;
+            --wood-dark: #130F0B;
+            --hero-fade-gradient: linear-gradient(
+                180deg,
+                transparent 0%,
+                rgba(19, 15, 11, 0.08) 28%,
+                rgba(19, 15, 11, 0.38) 48%,
+                rgba(19, 15, 11, 0.72) 68%,
+                rgba(19, 15, 11, 0.92) 82%,
+                #130F0B 94%,
+                #130F0B 100%
+            );
             /* Eje sagrado: pico del arco ↔ centro custodia (calibrado en JS) */
             --hero-bg-x: 47.5%;
             --hero-bg-y: 20%;
@@ -77,14 +88,15 @@
 
         html.view-home,
         body.view-home {
-            background-color: #060606 !important;
+            background-color: #130F0B !important;
         }
 
         body.view-home .app-viewport,
         body.view-home .scrollable-content,
         body.view-home #mod-home,
-        body.view-home .landing-hero {
-            background-color: #060606;
+        body.view-home .landing-hero,
+        body.view-home #mod-home .landing-hero {
+            background-color: transparent;
         }
 
         body.theme-light {
@@ -200,21 +212,34 @@
             height: 100%;
         }
 
-        /* Capa fija fuera del scroll: la foto llega al borde físico (notch / safe area) */
+        /* Capa fija fuera del scroll: foto hasta el borde físico (notch) */
         .home-hero-fixed {
             display: none;
             position: fixed;
-            top: calc(-1 * env(safe-area-inset-top, 0px));
+            top: calc(-1 * var(--hero-safe-top));
             left: 0;
             right: 0;
             width: 100%;
-            height: calc(clamp(240px, 46svh, 380px) + env(safe-area-inset-top, 0px));
-            background: url('background.webp') var(--hero-bg-x) var(--hero-bg-y) / cover no-repeat;
+            height: calc(clamp(240px, 46svh, 380px) + var(--hero-safe-top));
+            background-color: #130F0B;
+            background-image: url('background.webp');
+            background-position: var(--hero-bg-x) var(--hero-bg-y);
+            background-size: cover;
+            background-repeat: no-repeat;
             transform: scale(1.02);
             transform-origin: var(--hero-bg-x) 28%;
             z-index: 0;
             pointer-events: none;
             will-change: transform;
+        }
+
+        .home-hero-fixed::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0 0;
+            height: 68%;
+            background: var(--hero-fade-gradient);
+            pointer-events: none;
         }
 
         body.view-home .home-hero-fixed {
@@ -226,6 +251,10 @@
         }
 
         body.view-home:not(.home-hero-pinned) .home-hero-fixed {
+            opacity: 0;
+        }
+
+        body.view-home.home-hero-pinned #mod-home .hero-visual::after {
             opacity: 0;
         }
 
@@ -243,15 +272,9 @@
             content: "";
             position: absolute;
             inset: auto 0 0 0;
-            height: 58%;
+            height: 68%;
             z-index: 1;
-            background: linear-gradient(
-                180deg,
-                transparent 0%,
-                rgba(18, 16, 13, 0.55) 42%,
-                var(--wood-dark) 78%,
-                var(--bg-canvas) 100%
-            );
+            background: var(--hero-fade-gradient);
             pointer-events: none;
         }
 
@@ -294,26 +317,19 @@
         }
 
         .hero-content-panel {
-            background: #060606;
+            background: #130F0B;
             padding: 8px 24px 24px;
             max-width: 480px;
             margin: 0 auto;
         }
 
-        /* Home siempre oscuro — fundido suave autorizado */
+        /* Home siempre oscuro — fundido suave hacia #130F0B */
         #mod-home .hero-visual::after {
-            background: linear-gradient(
-                180deg,
-                transparent 0%,
-                rgba(18, 16, 13, 0.55) 42%,
-                #12100d 78%,
-                #060606 100%
-            ) !important;
+            background: var(--hero-fade-gradient) !important;
         }
 
-        #mod-home .hero-content-panel,
-        #mod-home .landing-hero {
-            background: #060606;
+        #mod-home .hero-content-panel {
+            background: #130F0B;
         }
 
         #mod-home .premium-card {
@@ -488,7 +504,7 @@
             top: 2px;
             width: 6px;
             height: 11px;
-            border: solid #060606;
+            border: solid #130F0B;
             border-width: 0 2px 2px 0;
             transform: rotate(45deg);
         }
@@ -655,7 +671,7 @@
         .gold-action-btn.primary-fill {
             background: var(--sacred-gold);
             border-color: var(--sacred-gold);
-            color: #060606;
+            color: #130F0B;
         }
         .gold-action-btn:active { transform: scale(0.97); opacity: 0.92; }
 
@@ -871,13 +887,7 @@
         }
 
         body.theme-light #mod-home .hero-visual::after {
-            background: linear-gradient(
-                180deg,
-                transparent 0%,
-                rgba(18, 16, 13, 0.55) 42%,
-                #12100d 78%,
-                #060606 100%
-            ) !important;
+            background: var(--hero-fade-gradient) !important;
         }
 
         .module-lead {
@@ -2399,10 +2409,12 @@
 
         function updateHeroSafeTop() {
             const probe = document.createElement('div');
-            probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px)';
+            probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-top:constant(safe-area-inset-top);padding-top:env(safe-area-inset-top,0px)';
             document.documentElement.appendChild(probe);
-            const inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+            let inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
             probe.remove();
+            const vv = window.visualViewport;
+            if (vv && vv.offsetTop > 0) inset = Math.max(inset, vv.offsetTop);
             document.documentElement.style.setProperty('--hero-safe-top', inset + 'px');
         }
 
@@ -2475,9 +2487,9 @@
             const meta = document.querySelector('meta[name="theme-color"]');
             if (!meta) return;
             if (document.body.classList.contains('view-home')) {
-                meta.content = '#060606';
+                meta.content = '#130F0B';
             } else {
-                meta.content = document.body.classList.contains('theme-light') ? '#F6F5F2' : '#060606';
+                meta.content = document.body.classList.contains('theme-light') ? '#F6F5F2' : '#130F0B';
             }
         }
 
