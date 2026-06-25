@@ -1517,11 +1517,11 @@
                     </div>
 
                     <div class="horizontal-scroller" id="privacyScroller">
-                        <div class="scroller-pill active" data-privacy="private" onclick="selectPrivacy('private', this)">Personal</div>
-                        <div class="scroller-pill" data-privacy="wall" onclick="selectPrivacy('wall', this)">Anónimo</div>
+                        <div class="scroller-pill" data-privacy="private" onclick="selectPrivacy('private', this)">Solo altar</div>
+                        <div class="scroller-pill active" data-privacy="wall" onclick="selectPrivacy('wall', this)">En el muro</div>
                     </div>
 
-                    <div id="anonPreview" class="anon-preview">
+                    <div id="anonPreview" class="anon-preview visible">
                         En el muro aparecerás como: <strong id="anonName">Un hermano en la fe</strong>
                     </div>
 
@@ -1758,7 +1758,7 @@
 
         let selectedSlot = null;
         let selectedDate = todayISO();
-        let privacyMode = 'private';
+        let privacyMode = 'wall';
         let dailyModeActive = false;
         let selectedWeekDays = [];
         let selectedBiweeklyWeeks = null;
@@ -2217,7 +2217,12 @@
                 showToast(privacyMode === 'wall'
                     ? '🙏 Intención en el muro como «' + (displayName || 'Un hermano en la fe') + '»'
                     : '🙏 Intención colocada en el altar del Santísimo');
-                if (intencionesView === 'muro') cargarMuro();
+                if (privacyMode === 'wall') {
+                    const muroPill = document.querySelector('#intencionesViewScroller [data-view="muro"]');
+                    switchIntencionesView('muro', muroPill);
+                } else if (intencionesView === 'muro') {
+                    cargarMuro();
+                }
             } catch (e) {
                 showToast(e.message || 'No se pudo guardar la intención.');
             }
