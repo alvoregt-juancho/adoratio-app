@@ -1599,13 +1599,18 @@
                     <span class="input-hint">8 dígitos, solo números</span>
                 </div>
 
-                <div class="booking-group pray-wall-option">
-                    <label class="pray-wall-toggle">
-                        <input type="checkbox" id="uPrayForWall">
-                        <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
-                        <span class="pray-wall-toggle-text">Deseo orar por alguien del muro</span>
-                    </label>
-                    <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
+                <div class="booking-group">
+                    <p class="section-subtitle">Tiempo de compromiso</p>
+                    <div class="ios-segmented-control commitment-term-control">
+                        <input type="radio" id="term-1" name="commitmentMonths" value="1">
+                        <label for="term-1" class="touch-target-compact">1 mes</label>
+                        <input type="radio" id="term-3" name="commitmentMonths" value="3">
+                        <label for="term-3" class="touch-target-compact">3 meses</label>
+                        <input type="radio" id="term-6" name="commitmentMonths" value="6">
+                        <label for="term-6" class="touch-target-compact">6 meses</label>
+                        <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
+                        <label for="term-12" class="touch-target-compact">1 año</label>
+                    </div>
                 </div>
 
                 <div class="booking-group">
@@ -1645,18 +1650,13 @@
                     </div>
                 </div>
 
-                <div class="booking-group">
-                    <p class="section-subtitle">Tiempo de compromiso</p>
-                    <div class="ios-segmented-control commitment-term-control">
-                        <input type="radio" id="term-1" name="commitmentMonths" value="1">
-                        <label for="term-1" class="touch-target-compact">1 mes</label>
-                        <input type="radio" id="term-3" name="commitmentMonths" value="3">
-                        <label for="term-3" class="touch-target-compact">3 meses</label>
-                        <input type="radio" id="term-6" name="commitmentMonths" value="6">
-                        <label for="term-6" class="touch-target-compact">6 meses</label>
-                        <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
-                        <label for="term-12" class="touch-target-compact">1 año</label>
-                    </div>
+                <div class="booking-group pray-wall-option">
+                    <label class="pray-wall-toggle">
+                        <input type="checkbox" id="uPrayForWall">
+                        <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
+                        <span class="pray-wall-toggle-text">Deseo orar por intenciones de alguien</span>
+                    </label>
+                    <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
                 </div>
 
                 <button class="gold-action-btn primary-fill" id="confirmBookingBtn" onclick="confirmBooking()" style="margin-bottom: 0;">confirmar turno</button>
@@ -1715,6 +1715,7 @@
                 <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 8px;">Petición asignada</h3>
                 <p class="modal-subtitle" id="petitionModalMeta"></p>
                 <div class="petition-detail-box" id="petitionModalText"></div>
+                <button type="button" class="gold-action-btn primary-fill" id="petitionMarkPrayedBtn" onclick="markPetitionPrayed()" hidden style="margin-top:12px;">Marcar como orada</button>
                 <button class="gold-action-btn btn-ghost" onclick="closePetitionModal()" style="margin-top:12px;">cerrar</button>
             </div>
         </div>
@@ -1781,6 +1782,8 @@
         let selectedBiweeklyWeeks = null;
         let intencionesView = 'ofrecer';
         let nextTurnPetition = null;
+        let nextTurnReservation = null;
+        let activePetitionReservation = null;
         let myShiftsCache = [];
         let appSettings = {
             frequencies: ['WEEKLY', 'BIWEEKLY', 'DAILY'],
@@ -2236,25 +2239,53 @@
             return d.toLocaleDateString('es-CR', { day: 'numeric', month: 'short', year: 'numeric' });
         }
 
-        function showPetitionModal(intention, meta) {
+        function showPetitionModal(intention, meta, reservation) {
             if (!intention) return;
+            activePetitionReservation = reservation || null;
             document.getElementById('petitionModalMeta').textContent = meta || ('Petición de ' + (intention.displayName || 'Un hermano en la fe'));
             document.getElementById('petitionModalText').textContent = intention.text;
+            const markBtn = document.getElementById('petitionMarkPrayedBtn');
+            if (markBtn) markBtn.hidden = !(reservation && intention.id);
             document.getElementById('petitionModal').classList.add('active');
         }
 
         function closePetitionModal() {
             document.getElementById('petitionModal').classList.remove('active');
+            activePetitionReservation = null;
+        }
+
+        async function markPetitionPrayed() {
+            if (!activePetitionReservation) return;
+            const phone = localStorage.getItem('adorahora_phone');
+            if (!phone) {
+                showToast('Reserva un turno con tu celular para marcar intenciones.');
+                return;
+            }
+            try {
+                const res = await fetch('/api/reservations/' + activePetitionReservation.id + '/intention/prayed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'No se pudo marcar.');
+                showToast('🙏 Intención marcada como orada.');
+                closePetitionModal();
+                if (intencionesView === 'muro') cargarMuro();
+                refreshHome();
+            } catch (e) {
+                showToast(e.message || 'No se pudo marcar la intención.');
+            }
         }
 
         function openPetitionModalFromNext() {
-            if (nextTurnPetition) showPetitionModal(nextTurnPetition);
+            if (nextTurnPetition) showPetitionModal(nextTurnPetition, null, nextTurnReservation);
         }
 
         function openMyShiftPetition(index) {
             const item = myShiftsCache[index];
             if (item?.assignedIntention) {
-                showPetitionModal(item.assignedIntention, 'Guardia del ' + formatDateShort(item.date));
+                showPetitionModal(item.assignedIntention, 'Guardia del ' + formatDateShort(item.date), item);
             }
         }
 
@@ -2316,6 +2347,7 @@
             const urgentSection = document.getElementById('urgentHomeSection');
             const urgentList = document.getElementById('urgentHomeList');
             nextTurnPetition = nextReservation?.assignedIntention || null;
+            nextTurnReservation = nextReservation || null;
 
             if (nextReservation) {
                 nextCard.style.display = 'block';
@@ -2333,6 +2365,7 @@
                 nextCard.style.display = 'none';
                 if (petitionBtn) petitionBtn.hidden = true;
                 nextTurnPetition = null;
+                nextTurnReservation = null;
                 urgentSection.style.display = 'block';
                 try {
                     const res = await fetch('/api/slots?date=' + todayISO());

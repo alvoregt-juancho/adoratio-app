@@ -9,7 +9,7 @@ const { isValidFrequency, COMMITMENT_FREQUENCY, getEnabledFrequencies } = requir
 const { parseWeekDays, isValidWeekDays } = require('../utils/weekDays');
 const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
 const { commitmentEndDateFromMonths, COMMITMENT_TERM_MONTHS } = require('../utils/commitmentMatch');
-const { assignWallIntentionToReservation, formatIntentionPayload, releaseWallIntentionAssignment } = require('../utils/intentions');
+const { formatIntentionPayload, releaseWallIntentionAssignment, assignWallIntentionToReservation, markAssignedIntentionPrayed } = require('../utils/intentions');
 const { notifyCaptainsSubstituteNeeded } = require('../utils/captainScope');
 
 const router = express.Router();
@@ -232,6 +232,32 @@ router.delete('/:id', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al cancelar la reserva.' });
+    }
+});
+
+// POST /api/reservations/:id/intention/prayed — adorador marca intención asignada como orada
+router.post('/:id/intention/prayed', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const phone = normalizePhone(req.body?.phone);
+        const reservation = await prisma.reservation.findUnique({
+            where: { id },
+            include: { assignedPrayerIntention: true },
+        });
+        if (!reservation) return res.status(404).json({ error: 'Reserva no encontrada.' });
+        if (!phone || reservation.userPhone !== phone) {
+            return res.status(403).json({ error: 'No autorizado.' });
+        }
+        const intention = reservation.assignedPrayerIntention;
+        if (!intention) return res.status(404).json({ error: 'No tienes una intención asignada en esta guardia.' });
+        if (intention.status === 'prayed') {
+            return res.status(409).json({ error: 'Esta intención ya fue marcada como orada.' });
+        }
+        await markAssignedIntentionPrayed(id);
+        res.json({ message: 'Intención marcada como orada.' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al marcar la intención.' });
     }
 });
 

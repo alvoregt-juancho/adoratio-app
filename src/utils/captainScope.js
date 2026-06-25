@@ -18,6 +18,48 @@ function formatTimeLabel(hhmm) {
     return m ? `${hour12}:${String(m).padStart(2, '0')} ${suffix}` : `${hour12} ${suffix}`;
 }
 
+function timeRangesOverlap(startA, endA, startB, endB) {
+    const segments = (start, end) => {
+        if (end > start) return [[start, end]];
+        return [
+            [start, 24 * 60],
+            [0, end],
+        ];
+    };
+    const aSegs = segments(startA, endA);
+    const bSegs = segments(startB, endB);
+    return aSegs.some(([as, ae]) => bSegs.some(([bs, be]) => as < be && bs < ae));
+}
+
+function daysOverlap(dayA, dayB) {
+    if (dayA == null || dayB == null) return true;
+    return Number(dayA) === Number(dayB);
+}
+
+/** True when two active ranges for the same user share day + overlapping hours. */
+function captainRangesOverlap(a, b) {
+    if (!a || !b || Number(a.userId) !== Number(b.userId)) return false;
+    if (a.isActive === false || b.isActive === false) return false;
+    if (a.id != null && b.id != null && Number(a.id) === Number(b.id)) return false;
+    if (!daysOverlap(a.dayOfWeek, b.dayOfWeek)) return false;
+    return timeRangesOverlap(
+        timeToMinutes(a.startTime),
+        timeToMinutes(a.endTime),
+        timeToMinutes(b.startTime),
+        timeToMinutes(b.endTime)
+    );
+}
+
+async function findOverlappingCaptainRange(parsed, excludeId = null) {
+    const existing = await prisma.captainRange.findMany({
+        where: { userId: parsed.userId, isActive: true },
+    });
+    return existing.find(
+        (range) =>
+            (!excludeId || range.id !== excludeId) && captainRangesOverlap(range, parsed)
+    );
+}
+
 function slotMatchesCaptainScope(weekday, slotStartTime, ranges) {
     if (!ranges?.length || !slotStartTime) return false;
     const t = timeToMinutes(slotStartTime);
@@ -80,19 +122,33 @@ function serializeCaptainRange(range) {
         userId: range.userId,
         userName: range.user?.name ?? null,
         userEmail: range.user?.email ?? null,
+        adminRoleName: range.user?.adminRole?.name ?? null,
         dayOfWeek: range.dayOfWeek,
         dayLabel: range.dayOfWeek != null ? formatWeekDays(String(range.dayOfWeek)) : 'Todos',
         startTime: range.startTime,
         endTime: range.endTime,
         label: range.label || formatCaptainRangeLabel(range),
         isActive: range.isActive,
+        createdById: range.createdById ?? null,
+        updatedById: range.updatedById ?? null,
+        createdByName: range.createdBy?.name ?? null,
+        updatedByName: range.updatedBy?.name ?? null,
     };
 }
 
 async function loadActiveCaptainRanges(userId) {
     return prisma.captainRange.findMany({
         where: { userId, isActive: true },
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    adminRole: { select: { name: true } },
+                },
+            },
+        },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
 }
@@ -156,6 +212,62 @@ async function createCaptainNotification({
     });
 }
 
+async function createSubstitutionRequestsForCancel(reservation) {
+    if (!reservation?.slot) {
+        reservation = await prisma.reservation.findUnique({
+            where: { id: reservation.id || reservation },
+            include: { slot: true },
+        });
+    }
+    if (!reservation?.slot) return [];
+
+    const weekdays = participationWeekdays(reservation);
+    const dates = [];
+    if (reservation.date) {
+        dates.push(reservation.date);
+    } else if (weekdays.length) {
+        weekdays.forEach((wd) => {
+            const today = new Date();
+            const js = wd === 7 ? 0 : wd;
+            const diff = (js - today.getDay() + 7) % 7;
+            const d = new Date(today);
+            d.setDate(today.getDate() + diff);
+            dates.push(d.toISOString().slice(0, 10));
+        });
+    }
+
+    const created = [];
+    const name = reservation.userName || 'Un adorador';
+    for (const dateStr of [...new Set(dates)]) {
+        const captains = await findCaptainUsersForOccurrence(dateStr, reservation.slot.startTime);
+        for (const { user } of captains) {
+            const existing = await prisma.substitutionRequest.findFirst({
+                where: {
+                    reservationId: reservation.id,
+                    occurrenceDate: dateStr,
+                    captainUserId: user.id,
+                    status: 'pending',
+                },
+            });
+            if (existing) {
+                created.push(existing);
+                continue;
+            }
+            const row = await prisma.substitutionRequest.create({
+                data: {
+                    reservationId: reservation.id,
+                    occurrenceDate: dateStr,
+                    requestedByName: name,
+                    captainUserId: user.id,
+                    status: 'pending',
+                },
+            });
+            created.push(row);
+        }
+    }
+    return created;
+}
+
 async function notifyCaptainsSubstituteNeeded(reservation) {
     if (!reservation?.slot) {
         reservation = await prisma.reservation.findUnique({
@@ -198,6 +310,8 @@ async function notifyCaptainsSubstituteNeeded(reservation) {
             });
         }
     }
+
+    await createSubstitutionRequestsForCancel(reservation);
 }
 
 async function syncCaptainOpenSlotAlerts(captainUserId, ranges) {
@@ -251,6 +365,10 @@ async function syncCaptainOpenSlotAlerts(captainUserId, ranges) {
 
 module.exports = {
     timeToMinutes,
+    timeRangesOverlap,
+    daysOverlap,
+    captainRangesOverlap,
+    findOverlappingCaptainRange,
     formatTimeLabel,
     slotMatchesCaptainScope,
     occurrenceMatchesCaptainScope,
@@ -262,6 +380,7 @@ module.exports = {
     loadActiveCaptainRanges,
     findCaptainUsersForOccurrence,
     createCaptainNotification,
+    createSubstitutionRequestsForCancel,
     notifyCaptainsSubstituteNeeded,
     syncCaptainOpenSlotAlerts,
 };

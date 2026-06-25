@@ -10,8 +10,9 @@
         "tab-resumen": "Panel principal: métricas del día, timeline de guardias y actividad reciente.",
         "tab-reservas": "Adoradores con guardia en el período elegido. Incluye compromisos recurrentes (semanal, diario, etc.).",
         "tab-muro": "Intenciones de oración enviadas por feligreses. Marca las oradas cuando se cumplan.",
-        "tab-turnos": "Gestión de horarios: calendario visual, lista de capitanes/sustitutos y configuración de turnos.",
-        "tab-capitan": "Panel del capitán: turnos abiertos, alertas y mensajes a adoradores de tu bloque.",
+        "tab-turnos": "Gestión de horarios: calendario visual, lista de compromisos/sustitutos y configuración de turnos.",
+        "tab-capitanes": "Asigna capitanes con cuenta a bloques por día de la semana y franja horaria.",
+        "tab-capitan": "Panel del capitán: turnos abiertos, alertas, sustituciones y acciones en tu bloque.",
         "tab-qrs": "Un solo QR de capilla para validar asistencia. Imprímelo en la entrada.",
         "tab-perfiles": "Define qué puede ver y hacer cada rol en el back-office (permisos RBAC).",
         "tab-admins": "Usuarios con acceso al panel y el perfil RBAC asignado a cada uno.",
@@ -26,16 +27,18 @@
         "section-muro": "Intenciones publicadas en el muro de oración de la capilla.",
         "muro-filter": "Filtra intenciones activas, ya oradas o muestra todas.",
         "turnos-calendario": "Cuadrícula semanal o mensual con adoradores por franja y alertas de huecos.",
-        "turnos-lista": "Lista de compromisos, capitanes y sustitutos filtrable por día y hora.",
+        "turnos-lista": "Lista de compromisos, contactos de capitanes/sustitutos filtrable por día y hora.",
         "turnos-directorio": "Directorio completo de adoradores con filtros por nombre, teléfono y día.",
         "turnos-config": "Configura frecuencias permitidas, horarios de turno y cupos por franja.",
         "cal-needs": "Cantidad de franjas horarias sin cobertura suficiente en el período.",
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
         "roster-export": "Exporta la sección visible (turnos, capitanes o sustitutos) a CSV.",
-        "new-captain": "Registra un capitán de contacto (directorio) responsable de un día u hora.",
-        "new-captain-range": "Asigna un usuario con cuenta al bloque horario que administrará.",
-        "section-capitan": "Vista filtrada a tus franjas: huecos, sustitutos pendientes y alertas urgentes.",
+        "new-captain": "Registra un contacto de capitán en el directorio (solo teléfono/WhatsApp, sin acceso al panel).",
+        "new-captain-range": "Asigna un usuario con cuenta y perfil Capitán al bloque horario que administrará.",
+        "section-capitanes-admin": "Gestión central de capitanes: usuario, día de la semana y franja horaria recurrente.",
+        "section-capitan": "Vista filtrada a tus franjas: huecos, sustitutos pendientes, asistencia y alertas urgentes.",
         "captain-message": "Copia teléfonos de adoradores regulares de tu bloque para SMS o WhatsApp.",
+        "captain-notify-block": "Prepara mensaje WhatsApp para adoradores de tu bloque (cupos libres o recordatorio).",
         "new-substitute": "Registra un sustituto disponible para cubrir ausencias.",
         "slot-settings": "Opciones globales: qué frecuencias de compromiso y duraciones están permitidas.",
         "add-slot": "Crea una nueva franja horaria (inicio, fin y cupo máximo de adoradores).",
@@ -48,7 +51,119 @@
         "audit-demo": "Zona temporal: borra datos operativos y carga demo (solo Super Admin).",
         "audit-refresh": "Actualiza el listado de auditoría con el filtro de acción actual.",
         "hints-toggle": "Activa u oculta los consejos al pasar el mouse. La preferencia se guarda en este navegador.",
+        "tab-cuenta": "Tu perfil, contraseña y guía personalizada según los permisos de tu rol.",
     };
+
+    /** Secciones del instructivo — cada ítem requiere el permiso indicado. */
+    const BACKOFFICE_GUIDE = [
+        {
+            tab: "resumen",
+            tabPerm: "DASHBOARD_VIEW",
+            title: "Centro de Mando",
+            introKey: "tab-resumen",
+            items: [
+                { perm: "DASHBOARD_VIEW", label: "Ver métricas del día", hintKey: "section-resumen" },
+                { perm: "DASHBOARD_VIEW", label: "Timeline de guardias y huecos", hintKey: "timeline-panel" },
+            ],
+        },
+        {
+            tab: "reservas",
+            tabPerm: "RESERVATIONS_VIEW",
+            title: "Reservas",
+            introKey: "tab-reservas",
+            items: [
+                { perm: "RESERVATIONS_VIEW", label: "Listar adoradores por semana o mes", hintKey: "res-view-week" },
+                { perm: "RESERVATIONS_EXPORT", label: "Exportar participantes a CSV", hintKey: "export-csv" },
+                { perm: "RESERVATIONS_CHECKIN", label: "Marcar asistencia manual", hintKey: "tab-reservas" },
+                { perm: "RESERVATIONS_CHECKIN", label: "Editar o cancelar compromisos", hintKey: "section-reservas" },
+            ],
+        },
+        {
+            tab: "muro",
+            tabPerm: "RESERVATIONS_VIEW",
+            title: "Muro de intenciones",
+            introKey: "tab-muro",
+            items: [
+                { perm: "RESERVATIONS_VIEW", label: "Ver intenciones publicadas", hintKey: "section-muro" },
+                { perm: "RESERVATIONS_CHECKIN", label: "Marcar intenciones como oradas", hintKey: "muro-filter" },
+            ],
+        },
+        {
+            tab: "turnos",
+            tabPerm: "SLOTS_VIEW",
+            title: "Turnos",
+            introKey: "tab-turnos",
+            items: [
+                { perm: "SLOTS_VIEW", label: "Calendario semanal o mensual", hintKey: "turnos-calendario" },
+                { perm: "SLOTS_VIEW", label: "Lista de compromisos y contactos", hintKey: "turnos-lista" },
+                { perm: "SLOTS_VIEW", label: "Directorio de adoradores", hintKey: "turnos-directorio" },
+                { perm: "SLOTS_EDIT", label: "Configurar frecuencias y cupos", hintKey: "turnos-config" },
+                { perm: "SLOTS_CREATE", label: "Crear franjas horarias", hintKey: "add-slot" },
+            ],
+        },
+        {
+            tab: "capitanes",
+            tabPerm: "CAPTAIN_ASSIGN",
+            title: "Capitanes de bloque",
+            introKey: "tab-capitanes",
+            items: [
+                { perm: "CAPTAIN_ASSIGN", label: "Asignar usuarios a días y franjas", hintKey: "new-captain-range" },
+                { perm: "CAPTAIN_ASSIGN", label: "Gestionar bloques recurrentes", hintKey: "section-capitanes-admin" },
+            ],
+        },
+        {
+            tab: "capitan",
+            tabPerm: "CAPTAIN_VIEW",
+            title: "Mi bloque (capitán)",
+            introKey: "tab-capitan",
+            items: [
+                { perm: "CAPTAIN_VIEW", label: "Ver turnos y alertas de tu franja", hintKey: "section-capitan" },
+                { perm: "CAPTAIN_VIEW", label: "Notificar adoradores del bloque", hintKey: "captain-notify-block" },
+                { perm: "RESERVATIONS_CHECKIN", label: "Marcar asistencia en tu bloque", hintKey: "section-capitan" },
+                { perm: "RESERVATIONS_CHECKIN", label: "Aprobar solicitudes de sustitución", hintKey: "section-capitan" },
+            ],
+        },
+        {
+            tab: "qrs",
+            tabPerm: "QRS_VIEW",
+            title: "QR de capilla",
+            introKey: "tab-qrs",
+            items: [
+                { perm: "QRS_VIEW", label: "Ver e imprimir QR de la capilla", hintKey: "section-qrs" },
+                { perm: "QRS_EDIT", label: "Reemplazar código QR", hintKey: "replace-chapel-qr" },
+            ],
+        },
+        {
+            tab: "perfiles",
+            tabPerm: "ROLES_VIEW",
+            title: "Perfiles RBAC",
+            introKey: "tab-perfiles",
+            items: [
+                { perm: "ROLES_VIEW", label: "Consultar permisos por perfil", hintKey: "section-perfiles" },
+                { perm: "ROLES_MANAGE", label: "Crear y editar perfiles", hintKey: "new-role" },
+            ],
+        },
+        {
+            tab: "admins",
+            tabPerm: "USERS_VIEW",
+            title: "Administradores",
+            introKey: "tab-admins",
+            items: [
+                { perm: "USERS_VIEW", label: "Ver usuarios del panel", hintKey: "tab-admins" },
+                { perm: "USERS_MANAGE", label: "Crear administradores y asignar perfil", hintKey: "new-admin" },
+            ],
+        },
+        {
+            tab: "auditoria",
+            tabPerm: "AUDIT_VIEW",
+            title: "Auditoría",
+            introKey: "tab-auditoria",
+            items: [
+                { perm: "AUDIT_VIEW", label: "Revisar historial de acciones", hintKey: "tab-auditoria" },
+                { perm: "AUDIT_VIEW", label: "Filtrar y paginar registros", hintKey: "audit-refresh" },
+            ],
+        },
+    ];
 
     let hintTooltipEl = null;
     let hintHideTimer = null;
@@ -78,7 +193,7 @@
         document.body.classList.toggle("hints-enabled", on);
         const btn = document.getElementById("hintsToggleBtn");
         if (btn) {
-            btn.textContent = on ? "Ocultar guía" : "Mostrar guía";
+            btn.textContent = on ? "Ocultar guía rápida" : "Mostrar guía rápida";
             btn.setAttribute("aria-pressed", on ? "true" : "false");
         }
         if (!on) hideOnboardHint(true);
@@ -322,8 +437,157 @@
         if (!u) return;
         const badgeClass = u.isSuperAdmin ? "admin-badge super" : "admin-badge";
         const roleLabel = u.adminRoleName || u.role;
-        document.getElementById("whoami").innerHTML =
+        const el = document.getElementById("whoami");
+        if (!el) return;
+        el.innerHTML =
             escapeHtml(u.name) + ' <span class="' + badgeClass + '">' + escapeHtml(roleLabel) + "</span>";
+    }
+
+    function openAccountTab() {
+        const tab = document.querySelector('.tab[data-tab="cuenta"]');
+        if (tab) tab.click();
+    }
+
+    function renderAccountGuide() {
+        const container = document.getElementById("accountGuideContent");
+        if (!container || !session.user) return;
+
+        const sections = BACKOFFICE_GUIDE.map(function (section) {
+            if (!hasPerm(section.tabPerm)) return null;
+            const items = (section.items || []).filter(function (item) {
+                return hasPerm(item.perm);
+            });
+            if (!items.length) return null;
+            const intro = ONBOARDING_HINTS[section.introKey] || "";
+            const tabBtn = document.querySelector('.tab[data-tab="' + section.tab + '"]:not(.perm-denied)');
+            const goBtn = tabBtn
+                ? '<button type="button" class="mini-btn account-guide-go" data-guide-tab="' + section.tab + '">Ir a ' + escapeHtml(section.title) + "</button>"
+                : "";
+            return '<article class="account-guide-section">' +
+                "<h4>" + escapeHtml(section.title) + "</h4>" +
+                (intro ? "<p class='muted'>" + escapeHtml(intro) + "</p>" : "") +
+                "<ul>" + items.map(function (item) {
+                    const hint = item.hintKey && ONBOARDING_HINTS[item.hintKey]
+                        ? ' <span class="muted account-guide-hint">— ' + escapeHtml(ONBOARDING_HINTS[item.hintKey]) + "</span>"
+                        : "";
+                    return "<li>" + escapeHtml(item.label) + hint + "</li>";
+                }).join("") + "</ul>" +
+                goBtn +
+                "</article>";
+        }).filter(Boolean);
+
+        if (!sections.length) {
+            container.innerHTML = '<div class="empty-state">Tu perfil no incluye módulos del back-office visibles.</div>';
+            return;
+        }
+
+        const roleName = session.user.adminRoleName || session.user.role || "Sin perfil";
+        container.innerHTML =
+            '<p class="account-guide-role">Perfil activo: <strong>' + escapeHtml(roleName) + "</strong></p>" +
+            sections.join("");
+
+        container.querySelectorAll("[data-guide-tab]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const name = btn.getAttribute("data-guide-tab");
+                const tab = document.querySelector('.tab[data-tab="' + name + '"]:not(.perm-denied)');
+                if (tab) tab.click();
+            });
+        });
+    }
+
+    async function loadAccountProfile() {
+        const roleEl = document.getElementById("accountRoleLabel");
+        try {
+            const res = await api("/api/admin/profile");
+            const data = await res.json();
+            if (!res.ok) {
+                if (roleEl) roleEl.textContent = session.user?.adminRoleName || "—";
+                renderAccountGuide();
+                return;
+            }
+            const u = data.user || {};
+            document.getElementById("accountName").value = u.name || "";
+            document.getElementById("accountEmail").value = u.email || "";
+            document.getElementById("accountPhone").value = u.phoneNumber || "";
+            if (roleEl) roleEl.textContent = u.adminRoleName || "—";
+            renderAccountGuide();
+        } catch (e) {
+            renderAccountGuide();
+        }
+    }
+
+    async function saveAccountProfile() {
+        const name = document.getElementById("accountName").value.trim();
+        const email = document.getElementById("accountEmail").value.trim();
+        const phone = document.getElementById("accountPhone").value.trim();
+        if (!name || !email) return toast("Nombre y correo son requeridos.", "error");
+
+        const btn = document.getElementById("saveAccountBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/profile", {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    phoneNumber: phone || null,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) return toast(data.error || "Error al guardar.", "error");
+
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem(TOKEN_KEY, token);
+            }
+            if (data.user) {
+                session.user = Object.assign({}, session.user, data.user);
+            }
+            updateWhoami();
+            toast("Perfil actualizado.", "success");
+            await refreshSession();
+            loadAccountProfile();
+        } catch (e) {
+            toast("Error de conexión.", "error");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function saveAccountPassword() {
+        const currentPassword = document.getElementById("accountCurrentPass").value;
+        const newPassword = document.getElementById("accountNewPass").value;
+        const confirm = document.getElementById("accountConfirmPass").value;
+
+        if (!currentPassword || !newPassword) {
+            return toast("Completa contraseña actual y nueva.", "error");
+        }
+        if (newPassword !== confirm) {
+            return toast("La confirmación no coincide.", "error");
+        }
+        if (newPassword.length < 6) {
+            return toast("La nueva contraseña debe tener al menos 6 caracteres.", "error");
+        }
+
+        const btn = document.getElementById("saveAccountPassBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/profile/password", {
+                method: "PUT",
+                body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword }),
+            });
+            const data = await res.json();
+            if (!res.ok) return toast(data.error || "Error al cambiar contraseña.", "error");
+
+            document.getElementById("accountCurrentPass").value = "";
+            document.getElementById("accountNewPass").value = "";
+            document.getElementById("accountConfirmPass").value = "";
+            toast("Contraseña actualizada.", "success");
+        } catch (e) {
+            toast("Error de conexión.", "error");
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async function refreshSession() {
@@ -334,6 +598,7 @@
         session.permissionNodes = data.permissionNodes || [];
         updateWhoami();
         applyZeroTrustUI();
+        renderAccountGuide();
     }
 
     // ── AUTH ──
@@ -385,6 +650,7 @@
         applyZeroTrustUI();
         syncHintsUi();
         document.getElementById("commandDate").textContent = todayStr();
+        renderAccountGuide();
         if (session.user && session.user.isScopedCaptain) {
             const capTab = document.querySelector('.tab[data-tab="capitan"]:not(.perm-denied)');
             if (capTab) capTab.click();
@@ -673,11 +939,20 @@
             "checkin.manual": "Marcó asistencia manual",
             "checkin.scan": "Check-in por QR",
             "reservation.update": "Editó una reserva",
-            "reservation.cancel": "Eliminó una reserva",
+            "reservation.cancel": "Canceló reserva",
             "intention.update": "Editó una intención",
             "intention.delete": "Eliminó una intención del muro",
             "reservation.create": "Nueva reserva",
-            "reservation.cancel": "Canceló reserva",
+            "captain.assign": "Asignó capitán a bloque",
+            "captain.update": "Actualizó asignación de capitán",
+            "captain.unassign": "Quitó asignación de capitán",
+            "sub_approved": "Aprobó sustitución",
+            "sub_rejected": "Rechazó sustitución",
+            "roster.create": "Creó contacto en lista",
+            "roster.update": "Actualizó contacto en lista",
+            "roster.deactivate": "Desactivó contacto en lista",
+            "profile.update": "Actualizó su perfil",
+            "profile.password_change": "Cambió su contraseña",
             "settings.update": "Actualizó configuración",
             "demo.reset": "Reseteó datos de demostración",
         };
@@ -954,6 +1229,7 @@
             loadAdoradores();
             loadMetrics();
             loadActivity();
+            if (hasPerm("CAPTAIN_VIEW")) loadCaptainDashboard();
         } else {
             toast(data.error || "Error al eliminar.", "error");
         }
@@ -1023,8 +1299,13 @@
     async function manualCheckin(id) {
         const res = await api("/api/admin/reservations/" + id + "/checkin", { method: "POST" });
         const data = await res.json();
-        if (res.ok) { toast("Asistencia registrada.", "success"); loadReservations(); loadMetrics(); loadActivity(); }
-        else toast(data.error || "Error.", "error");
+        if (res.ok) {
+            toast("Asistencia registrada.", "success");
+            loadReservations();
+            loadMetrics();
+            loadActivity();
+            if (hasPerm("CAPTAIN_VIEW")) loadCaptainDashboard();
+        } else toast(data.error || "Error.", "error");
     }
 
     // ── MURO DE INTENCIONES ──
@@ -1687,7 +1968,6 @@
             populateRosterTimeFilter(data.slotTimes || []);
             populateRosterMemberTimeGrid(data.slotTimes || [], []);
             renderRosterTables();
-            if (hasPerm("CAPTAIN_ASSIGN")) loadCaptainRanges();
         } catch (e) {
             toast("Error de conexión.", "error");
         }
@@ -1695,7 +1975,7 @@
 
     function openRosterMemberSheet(role, member) {
         const isCaptain = role === "captain";
-        document.getElementById("rosterMemberSheetTitle").textContent = isCaptain ? "Capitán" : "Sustituto";
+        document.getElementById("rosterMemberSheetTitle").textContent = isCaptain ? "Contacto capitán" : "Sustituto";
         document.getElementById("rosterMemberRole").value = role;
         document.getElementById("rosterMemberId").value = member ? member.id : "";
         const delBtn = document.getElementById("deleteRosterMemberBtn");
@@ -1848,19 +2128,22 @@
         if (countEl) countEl.textContent = ranges.length;
         const canEdit = hasPerm("CAPTAIN_ASSIGN");
         table.innerHTML =
-            "<thead><tr><th>Usuario</th><th>Franja</th><th>Día</th><th>Horario</th>" +
+            "<thead><tr><th>Usuario</th><th>Perfil</th><th>Bloque</th><th>Día</th><th>Horario</th><th>Estado</th>" +
             (canEdit ? "<th></th>" : "") + "</tr></thead><tbody>" +
             ranges.map(function (r) {
                 const actions = canEdit
                     ? "<td><button class='mini-btn' data-edit-captain-range='" + r.id + "'>Editar</button></td>"
                     : "";
+                const status = r.isActive === false ? "Inactivo" : "Activo";
                 return "<tr><td>" + escapeHtml(r.userName || "") + "<br><span class='muted'>" + escapeHtml(r.userEmail || "") + "</span></td>" +
+                    "<td>" + escapeHtml(r.adminRoleName || "—") + "</td>" +
                     "<td>" + escapeHtml(r.label || "") + "</td>" +
                     "<td>" + escapeHtml(r.dayLabel || "") + "</td>" +
                     "<td>" + escapeHtml(r.startTime) + " – " + escapeHtml(r.endTime) + "</td>" +
+                    "<td>" + escapeHtml(status) + "</td>" +
                     actions + "</tr>";
             }).join("") +
-            (ranges.length ? "" : "<tr><td colspan='5' class='empty-state'>Sin asignaciones.</td></tr>") +
+            (ranges.length ? "" : "<tr><td colspan='7' class='empty-state'>Sin asignaciones. Crea un usuario con perfil Capitán y asigna su primer bloque.</td></tr>") +
             "</tbody>";
         document.querySelectorAll("[data-edit-captain-range]").forEach(function (btn) {
             btn.addEventListener("click", function () {
@@ -1877,7 +2160,7 @@
         document.getElementById("captainRangeId").value = range ? range.id : "";
         const userSel = document.getElementById("captainRangeUser");
         userSel.innerHTML = captainAssignableUsers.map(function (u) {
-            return '<option value="' + u.id + '">' + escapeHtml(u.name) + " (" + escapeHtml(u.email) + ")</option>";
+            return '<option value="' + u.id + '">' + escapeHtml(u.name) + " (" + escapeHtml(u.email) + ") — " + escapeHtml(u.adminRoleName || "") + "</option>";
         }).join("");
         if (range) userSel.value = String(range.userId);
         document.getElementById("captainRangeDay").value = range && range.dayOfWeek != null ? String(range.dayOfWeek) : "";
@@ -1930,20 +2213,26 @@
         const grid = document.getElementById("captainCalendarGrid");
         try {
             const qs = new URLSearchParams({ start: captainCalAnchor, view: "week" });
-            const res = await api("/api/admin/captain/dashboard?" + qs.toString());
-            const data = await res.json();
-            if (!res.ok) {
+            const [dashRes, subsRes, intRes] = await Promise.all([
+                api("/api/admin/captain/dashboard?" + qs.toString()),
+                api("/api/admin/captain/substitutions?status=pending"),
+                api("/api/admin/captain/intentions?status=active"),
+            ]);
+            const data = await dashRes.json();
+            if (!dashRes.ok) {
                 if (grid) grid.innerHTML = '<div class="empty-state">' + escapeHtml(data.error || "Error al cargar.") + "</div>";
                 return;
             }
             captainDashboardCache = data;
-            renderCaptainDashboard(data);
+            const subsData = subsRes.ok ? await subsRes.json() : { substitutions: [] };
+            const intData = intRes.ok ? await intRes.json() : { intentions: [] };
+            renderCaptainDashboard(data, subsData.substitutions || [], intData.intentions || []);
         } catch (e) {
             if (grid) grid.innerHTML = '<div class="empty-state">Error de conexión.</div>';
         }
     }
 
-    function renderCaptainDashboard(data) {
+    function renderCaptainDashboard(data, substitutions, intentions) {
         const summaryEl = document.getElementById("captainRangesSummary");
         const metricsEl = document.getElementById("captainMetrics");
         const notifEl = document.getElementById("captainNotificationsList");
@@ -1964,7 +2253,61 @@
                 '<div class="metric-card"><span class="metric-value">' + (s.openSlots || 0) + '</span><span class="metric-label">Cupos libres</span></div>' +
                 '<div class="metric-card"><span class="metric-value">' + (s.gapAlerts || 0) + '</span><span class="metric-label">Huecos críticos</span></div>' +
                 '<div class="metric-card"><span class="metric-value">' + (s.adorers || 0) + '</span><span class="metric-label">Adoradores</span></div>' +
+                '<div class="metric-card metric-card--alert"><span class="metric-value">' + (s.pendingSubstitutions || 0) + '</span><span class="metric-label">Sustituciones</span></div>' +
                 '<div class="metric-card metric-card--alert"><span class="metric-value">' + (s.unreadNotifications || 0) + '</span><span class="metric-label">Alertas</span></div>';
+        }
+
+        const subsEl = document.getElementById("captainSubstitutionsList");
+        const subsCount = document.getElementById("captainSubsCount");
+        const subs = substitutions || [];
+        if (subsCount) subsCount.textContent = subs.length;
+        if (subsEl) {
+            subsEl.innerHTML = subs.length
+                ? subs.map(function (sub) {
+                    const res = sub.reservation || {};
+                    return '<div class="captain-sub-row" data-sub-id="' + sub.id + '">' +
+                        '<div class="captain-sub-meta"><strong>' + escapeHtml(sub.requestedByName || res.userName || "Adorador") + '</strong>' +
+                        ' · ' + escapeHtml(sub.occurrenceDate) + ' · ' + escapeHtml(res.slot || "") +
+                        '<br><input type="text" class="touch-input-field dark-input captain-sub-name" placeholder="Nombre sustituto" style="margin-top:4px;max-width:180px;">' +
+                        '<input type="text" class="touch-input-field dark-input captain-sub-phone" placeholder="Celular 8 dígitos" style="margin-top:4px;max-width:140px;margin-left:4px;">' +
+                        "</div>" +
+                        '<div class="captain-sub-actions">' +
+                        '<button class="mini-btn" data-approve-sub="' + sub.id + '">Aprobar</button>' +
+                        '<button class="mini-btn" data-reject-sub="' + sub.id + '">Rechazar</button>' +
+                        "</div></div>";
+                }).join("")
+                : '<div class="empty-state">Sin solicitudes pendientes.</div>';
+            subsEl.querySelectorAll("[data-approve-sub]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    const row = btn.closest("[data-sub-id]");
+                    const nameEl = row ? row.querySelector(".captain-sub-name") : null;
+                    const phoneEl = row ? row.querySelector(".captain-sub-phone") : null;
+                    approveSubstitution(
+                        Number(btn.getAttribute("data-approve-sub")),
+                        nameEl ? nameEl.value.trim() : "",
+                        phoneEl ? phoneEl.value.trim() : ""
+                    );
+                });
+            });
+            subsEl.querySelectorAll("[data-reject-sub]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    rejectSubstitution(Number(btn.getAttribute("data-reject-sub")));
+                });
+            });
+        }
+
+        const intEl = document.getElementById("captainIntentionsList");
+        const ints = intentions || [];
+        if (intEl) {
+            intEl.innerHTML = ints.length
+                ? ints.map(function (i) {
+                    const res = i.reservation;
+                    const meta = res ? escapeHtml(res.userName || "") + " · " + escapeHtml(res.slot || "") : "";
+                    return '<div class="captain-intention-item"><strong>' + escapeHtml(i.displayName || "Anónima") + "</strong>" +
+                        (meta ? ' <span class="muted">' + meta + "</span>" : "") +
+                        "<p>" + escapeHtml(i.text) + "</p></div>";
+                }).join("")
+                : '<div class="empty-state">Sin intenciones activas en tu bloque.</div>';
         }
 
         const notifs = data.notifications || [];
@@ -1994,19 +2337,50 @@
 
         if (grid) {
             const days = data.days || [];
+            const canAct = hasPerm("RESERVATIONS_CHECKIN");
             grid.innerHTML = days.length
                 ? days.map(function (day) {
                     const slots = (day.slots || []).map(function (slot) {
                         const gap = slot.gapAlert ? ' <span class="gap-badge">Hueco</span>' : "";
                         const open = slot.available > 0 ? ' <span class="open-badge">' + slot.available + " libre</span>" : "";
-                        const names = (slot.commitments || []).map(function (c) { return escapeHtml(c.userName); }).join(", ") || '<span class="muted">Sin adoradores</span>';
-                        return '<div class="captain-slot-row' + (slot.gapAlert ? " captain-slot-row--gap" : "") + '">' +
+                        const commitments = slot.commitments || [];
+                        const rows = commitments.length
+                            ? commitments.map(function (c) {
+                                const checked = c.checkedInAt || c.status === "completed";
+                                const actions = canAct
+                                    ? '<span class="captain-slot-actions">' +
+                                    (checked ? '<span class="muted">Asistió</span>' : '<button class="mini-btn" data-captain-checkin="' + c.id + '">Asistió</button>') +
+                                    '<button class="mini-btn" data-captain-edit="' + c.id + '">Editar</button>' +
+                                    '<button class="mini-btn" data-captain-cancel="' + c.id + '">Cancelar</button></span>'
+                                    : "";
+                                return '<div class="captain-slot-row">' +
+                                    "<span class='captain-slot-names'>" + escapeHtml(c.userName) + "</span>" + actions + "</div>";
+                            }).join("")
+                            : '<div class="captain-slot-row"><span class="muted">Sin adoradores</span></div>';
+                        return '<div class="captain-slot-block">' +
                             "<span class='captain-slot-time'>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + open + gap + "</span>" +
-                            "<span class='captain-slot-names'>" + names + "</span></div>";
+                            rows + "</div>";
                     }).join("");
                     return '<div class="captain-day-block"><h4>' + escapeHtml(day.label) + " <span class='muted'>" + escapeHtml(day.date) + "</span></h4>" + slots + "</div>";
                 }).join("")
                 : '<div class="empty-state">No hay turnos en tu bloque para esta semana.</div>';
+            grid.querySelectorAll("[data-captain-checkin]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    manualCheckin(Number(btn.getAttribute("data-captain-checkin")));
+                });
+            });
+            grid.querySelectorAll("[data-captain-edit]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    openReservationEditor(Number(btn.getAttribute("data-captain-edit")));
+                });
+            });
+            grid.querySelectorAll("[data-captain-cancel]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    if (confirm("¿Cancelar esta reserva?")) {
+                        deleteReservationById(Number(btn.getAttribute("data-captain-cancel")));
+                    }
+                });
+            });
         }
     }
 
@@ -2035,6 +2409,58 @@
             }
         } catch (e) {
             toast("Error al copiar teléfonos.", "error");
+        }
+    }
+
+    async function captainNotifyBlock() {
+        try {
+            const res = await api("/api/admin/captain/notify-block", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            if (!res.ok) return toast(data.error || "Error al preparar mensaje.", "error");
+            const links = data.whatsappLinks || [];
+            if (!links.length) return toast("No hay adoradores con teléfono en tu bloque.", "error");
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(data.phones.join(", "));
+            }
+            window.open(links[0].url, "_blank", "noopener");
+            toast("Mensaje listo · " + links.length + " contacto(s). Teléfonos copiados.", "success");
+        } catch (e) {
+            toast("Error al notificar bloque.", "error");
+        }
+    }
+
+    async function approveSubstitution(id, substituteName, substitutePhone) {
+        const res = await api("/api/admin/captain/substitutions/" + id + "/approve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ substituteName: substituteName || null, substitutePhone: substitutePhone || null }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Sustitución aprobada.", "success");
+            loadCaptainDashboard();
+        } else {
+            toast(data.error || "Error al aprobar.", "error");
+        }
+    }
+
+    async function rejectSubstitution(id) {
+        if (!confirm("¿Rechazar esta solicitud de sustitución?")) return;
+        const res = await api("/api/admin/captain/substitutions/" + id + "/reject", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Solicitud rechazada.", "success");
+            loadCaptainDashboard();
+        } else {
+            toast(data.error || "Error al rechazar.", "error");
         }
     }
 
@@ -2511,10 +2937,12 @@
                         else loadCalendar();
                     },
                     capitan: loadCaptainDashboard,
+                    capitanes: function () { loadCaptainAssignableUsers().then(loadCaptainRanges); },
                     qrs: loadQrs,
                     perfiles: loadRoles,
                     admins: function () { loadRoles().then(loadAdmins); },
                     auditoria: loadAudit,
+                    cuenta: loadAccountProfile,
                 };
                 if (loaders[name]) loaders[name]();
             });
@@ -2531,6 +2959,9 @@
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") login(); });
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("openAccountBtn").addEventListener("click", openAccountTab);
+    document.getElementById("saveAccountBtn").addEventListener("click", saveAccountProfile);
+    document.getElementById("saveAccountPassBtn").addEventListener("click", saveAccountPassword);
     document.getElementById("resClearFilters").addEventListener("click", clearResFilters);
     document.getElementById("resPrev").addEventListener("click", function () {
         shiftScopeAnchor(resScopeState, -1);
@@ -2588,9 +3019,17 @@
     document.getElementById("newCaptainRangeBtn").addEventListener("click", function () {
         openCaptainRangeEditor(null);
     });
+    const gotoAdminsBtn = document.getElementById("gotoAdminsFromCaptains");
+    if (gotoAdminsBtn) {
+        gotoAdminsBtn.addEventListener("click", function () {
+            const tab = document.querySelector('.tab[data-tab="admins"]:not(.perm-denied)');
+            if (tab) tab.click();
+        });
+    }
     document.getElementById("saveCaptainRangeBtn").addEventListener("click", saveCaptainRange);
     document.getElementById("deleteCaptainRangeBtn").addEventListener("click", deleteCaptainRange);
     document.getElementById("captainMessageBtn").addEventListener("click", copyCaptainAdorerPhones);
+    document.getElementById("captainNotifyBlockBtn").addEventListener("click", captainNotifyBlock);
     document.getElementById("captainNotifReadAll").addEventListener("click", captainMarkAllNotificationsRead);
     document.getElementById("captainCalPrev").addEventListener("click", function () { shiftCaptainCal(-1); });
     document.getElementById("captainCalNext").addEventListener("click", function () { shiftCaptainCal(1); });

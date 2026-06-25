@@ -983,6 +983,7 @@ select.dark-input { appearance: none; }
     flex-wrap: wrap;
     border-bottom: 1px solid rgba(219, 191, 124, 0.14);
     margin-bottom: 24px;
+    width: 100%;
 }
 .tab {
     background: transparent;

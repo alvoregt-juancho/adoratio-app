@@ -36,8 +36,12 @@
                     <span id="whoami" class="muted"></span>
                 </div>
             </div>
-            <button class="ghost-btn hints-toggle-btn" id="hintsToggleBtn" type="button" aria-pressed="true">Ocultar guía</button>
-            <button class="ghost-btn" id="logoutBtn">Salir</button>
+            <div class="admin-topbar-actions">
+                <button type="button" class="ghost-btn whoami-btn" id="openAccountBtn" title="Mi cuenta y guía">
+                    <span id="whoami" class="muted"></span>
+                </button>
+                <button class="ghost-btn" id="logoutBtn">Salir</button>
+            </div>
         </header>
 
         <nav class="admin-tabs" id="adminTabs">
@@ -45,11 +49,13 @@
             <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-reservas">Reservas</button>
             <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-muro">Muro</button>
             <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW" data-hint-key="tab-turnos">Turnos</button>
+            <button class="tab" data-tab="capitanes" data-perm="CAPTAIN_ASSIGN" data-hint-key="tab-capitanes">Capitanes</button>
             <button class="tab" data-tab="capitan" data-perm="CAPTAIN_VIEW" data-hint-key="tab-capitan">Mi bloque</button>
             <button class="tab" data-tab="qrs" data-perm="QRS_VIEW" data-hint-key="tab-qrs">QR Capilla</button>
             <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW" data-hint-key="tab-perfiles">Perfiles</button>
             <button class="tab" data-tab="admins" data-perm="USERS_VIEW" data-hint-key="tab-admins">Administradores</button>
             <button class="tab" data-tab="auditoria" data-perm="AUDIT_VIEW" data-hint-key="tab-auditoria">Auditoría</button>
+            <button class="tab tab--account" data-tab="cuenta" data-hint-key="tab-cuenta">Mi cuenta</button>
         </nav>
 
         <!-- Centro de Mando -->
@@ -214,13 +220,14 @@
 
                 <div class="roster-section" id="rosterCaptainsSection">
                     <div class="roster-section-header">
-                        <h3>Capitanes <span class="roster-count" id="rosterCaptainsCount">0</span></h3>
+                        <h3>Contactos capitanes <span class="roster-count" id="rosterCaptainsCount">0</span></h3>
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="captains">Mensaje capitanes</button>
-                            <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Capitán</button>
+                            <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Contacto</button>
                             <button type="button" class="ghost-btn roster-export" data-export="captains" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
                         </div>
                     </div>
+                    <p class="roster-intro muted">Directorio de contacto (llamar/WhatsApp). No da acceso al panel — para asignar un capitán con cuenta, usa la pestaña <strong>Capitanes</strong>.</p>
                     <div class="table-wrap"><table class="data-table roster-table" id="rosterCaptainsTable"></table></div>
                 </div>
 
@@ -234,17 +241,6 @@
                         </div>
                     </div>
                     <div class="table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
-                </div>
-
-                <div class="roster-section" id="captainAssignSection" data-perm="CAPTAIN_ASSIGN">
-                    <div class="roster-section-header">
-                        <h3>Asignación de capitanes (cuentas) <span class="roster-count" id="captainRangesCount">0</span></h3>
-                        <div class="roster-section-actions">
-                            <button type="button" class="ghost-btn" id="newCaptainRangeBtn" data-hint-key="new-captain-range">+ Asignar bloque</button>
-                        </div>
-                    </div>
-                    <p class="roster-intro muted">Vincula un usuario del panel a un día y franja horaria. El capitán solo verá y gestionará turnos dentro de ese bloque.</p>
-                    <div class="table-wrap"><table class="data-table roster-table" id="captainRangesTable"></table></div>
                 </div>
             </div>
 
@@ -290,6 +286,38 @@
             </div>
         </section>
 
+        <!-- Gestión de capitanes (admin) -->
+        <section class="tab-panel" id="tab-capitanes" data-perm="CAPTAIN_ASSIGN">
+            <div class="captain-admin-panel" data-hint-key="section-capitanes-admin">
+                <div class="command-header">
+                    <div>
+                        <h2>Capitanes de bloque</h2>
+                        <p>Asigna usuarios con perfil Capitán a días de la semana y franjas horarias recurrentes.</p>
+                    </div>
+                    <button type="button" class="ghost-btn" id="newCaptainRangeBtn" data-hint-key="new-captain-range">+ Asignar bloque</button>
+                </div>
+                <div class="captain-guide panel-card">
+                    <div class="panel-card-header"><h3>Flujo guiado</h3></div>
+                    <div class="panel-card-body captain-guide-steps">
+                        <ol>
+                            <li>Crea un usuario en <button type="button" class="linkish-btn" id="gotoAdminsFromCaptains">Administradores</button> con perfil <strong>Capitán</strong>.</li>
+                            <li>Asigna uno o más bloques: día de la semana (o todos) + hora inicio/fin.</li>
+                            <li>El capitán inicia sesión y ve solo su bloque en <strong>Mi bloque</strong>.</li>
+                        </ol>
+                        <p class="muted captain-demo-creds">Demo: <code>capitan@adoratio.com</code> / <code>capitan2026</code></p>
+                    </div>
+                </div>
+                <div class="panel-card">
+                    <div class="panel-card-header">
+                        <h3>Asignaciones activas <span class="roster-count" id="captainRangesCount">0</span></h3>
+                    </div>
+                    <div class="panel-card-body">
+                        <div class="table-wrap"><table class="data-table roster-table" id="captainRangesTable"></table></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Panel del capitán -->
         <section class="tab-panel" id="tab-capitan" data-perm="CAPTAIN_VIEW">
             <div class="captain-dashboard" data-hint-key="section-capitan">
@@ -299,11 +327,20 @@
                         <p id="captainRangesSummary" class="muted">Cargando franjas asignadas…</p>
                     </div>
                     <div class="captain-header-actions">
-                        <button type="button" class="ghost-btn" id="captainMessageBtn" data-hint-key="captain-message">Mensaje adoradores</button>
+                        <button type="button" class="ghost-btn" id="captainNotifyBlockBtn" data-hint-key="captain-notify-block">Notificar bloque</button>
+                        <button type="button" class="ghost-btn" id="captainMessageBtn" data-hint-key="captain-message">Copiar teléfonos</button>
                         <button type="button" class="ghost-btn" id="captainNotifReadAll">Marcar alertas leídas</button>
                     </div>
                 </div>
                 <div class="metrics-grid captain-metrics" id="captainMetrics"></div>
+                <div class="panel-card captain-substitutions-panel" id="captainSubstitutionsPanel">
+                    <div class="panel-card-header">
+                        <h3>Sustituciones pendientes <span class="roster-count" id="captainSubsCount">0</span></h3>
+                    </div>
+                    <div class="panel-card-body" id="captainSubstitutionsList">
+                        <div class="empty-state">Sin solicitudes pendientes.</div>
+                    </div>
+                </div>
                 <div class="panel-card captain-notifications-panel">
                     <div class="panel-card-header">
                         <h3>Alertas <span class="roster-count" id="captainNotifCount">0</span></h3>
@@ -324,6 +361,14 @@
                     </div>
                     <div class="panel-card-body" id="captainCalendarGrid">
                         <div class="empty-state">Cargando calendario…</div>
+                    </div>
+                </div>
+                <div class="panel-card captain-intentions-panel">
+                    <div class="panel-card-header">
+                        <h3>Intenciones en mi bloque</h3>
+                    </div>
+                    <div class="panel-card-body" id="captainIntentionsList">
+                        <div class="empty-state">Cargando intenciones…</div>
                     </div>
                 </div>
             </div>
@@ -398,6 +443,55 @@
                 <button class="ghost-btn" id="auditPrev">← Anterior</button>
                 <span class="muted" id="auditPageInfo"></span>
                 <button class="ghost-btn" id="auditNext">Siguiente →</button>
+            </div>
+        </section>
+
+        <!-- Mi cuenta: configuración + guía según permisos -->
+        <section class="tab-panel" id="tab-cuenta">
+            <div class="account-layout">
+                <div class="account-settings-grid">
+                    <div class="panel-card account-settings-card">
+                        <div class="panel-card-header">
+                            <h3>Configuración de cuenta</h3>
+                        </div>
+                        <div class="panel-card-body account-form">
+                            <label class="micro-label" for="accountName">Nombre</label>
+                            <input type="text" id="accountName" class="touch-input-field dark-input" autocomplete="name">
+                            <label class="micro-label" for="accountEmail">Correo</label>
+                            <input type="email" id="accountEmail" class="touch-input-field dark-input" autocomplete="username">
+                            <label class="micro-label" for="accountPhone">Celular (opcional)</label>
+                            <input type="tel" id="accountPhone" class="touch-input-field dark-input" placeholder="8 dígitos" maxlength="8" autocomplete="tel">
+                            <p class="muted account-role-line">Perfil: <strong id="accountRoleLabel">—</strong></p>
+                            <button type="button" class="sheet-primary-btn" id="saveAccountBtn">Guardar cambios</button>
+                        </div>
+                    </div>
+                    <div class="panel-card account-settings-card">
+                        <div class="panel-card-header">
+                            <h3>Cambiar contraseña</h3>
+                        </div>
+                        <div class="panel-card-body account-form">
+                            <label class="micro-label" for="accountCurrentPass">Contraseña actual</label>
+                            <input type="password" id="accountCurrentPass" class="touch-input-field dark-input" autocomplete="current-password">
+                            <label class="micro-label" for="accountNewPass">Nueva contraseña</label>
+                            <input type="password" id="accountNewPass" class="touch-input-field dark-input" autocomplete="new-password">
+                            <label class="micro-label" for="accountConfirmPass">Confirmar nueva</label>
+                            <input type="password" id="accountConfirmPass" class="touch-input-field dark-input" autocomplete="new-password">
+                            <button type="button" class="ghost-btn" id="saveAccountPassBtn">Actualizar contraseña</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-card account-guide-panel">
+                    <div class="panel-card-header account-guide-header">
+                        <div>
+                            <h3>Tu guía del back-office</h3>
+                            <p class="muted">Solo se muestran las secciones y acciones incluidas en tu perfil.</p>
+                        </div>
+                        <button type="button" class="ghost-btn hints-toggle-btn" id="hintsToggleBtn" aria-pressed="true">Ocultar guía rápida</button>
+                    </div>
+                    <div class="panel-card-body" id="accountGuideContent">
+                        <div class="empty-state">Cargando guía…</div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>

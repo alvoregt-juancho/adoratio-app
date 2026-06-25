@@ -1362,3 +1362,178 @@ body.admin.hints-enabled [data-hint-key] {
     font-weight: 600;
 }
 
+.captain-guide-steps ol {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.captain-guide-steps li + li {
+    margin-top: 0.35rem;
+}
+
+.captain-demo-creds code {
+    font-size: 0.85em;
+}
+
+.linkish-btn {
+    background: none;
+    border: none;
+    color: var(--accent, #c9a227);
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+    font: inherit;
+}
+
+.captain-slot-row {
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.captain-slot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.captain-slot-names {
+    flex: 1 1 180px;
+}
+
+.captain-sub-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.captain-sub-row:last-child {
+    border-bottom: none;
+}
+
+.captain-sub-meta {
+    flex: 1 1 200px;
+    font-size: 0.88rem;
+}
+
+.captain-sub-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.captain-intention-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.captain-intention-item:last-child {
+    border-bottom: none;
+}
+
+.captain-intention-item p {
+    margin: 4px 0 0;
+    font-size: 0.88rem;
+}
+
+.admin-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.whoami-btn {
+    max-width: min(320px, 42vw);
+    text-align: right;
+    line-height: 1.35;
+}
+
+.whoami-btn .admin-badge {
+    display: inline-block;
+    margin-left: 4px;
+}
+
+.tab--account {
+    margin-left: auto;
+}
+
+.account-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 960px;
+}
+
+.account-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.account-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.account-form .micro-label {
+    margin-top: 4px;
+}
+
+.account-role-line {
+    margin: 4px 0 0;
+    font-size: 0.88rem;
+}
+
+.account-guide-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.account-guide-role {
+    margin: 0 0 12px;
+    font-size: 0.9rem;
+}
+
+.account-guide-section {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.account-guide-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.account-guide-section h4 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+}
+
+.account-guide-section ul {
+    margin: 8px 0;
+    padding-left: 1.2rem;
+}
+
+.account-guide-section li {
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+}
+
+.account-guide-hint {
+    display: block;
+    font-size: 0.82rem;
+    margin-top: 2px;
+}
+
+.account-guide-go {
+    margin-top: 6px;
+}
+

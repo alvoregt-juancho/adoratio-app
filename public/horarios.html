@@ -49,13 +49,18 @@
                 <span id="resPhoneHint" class="input-hint">8 dígitos, solo números</span>
             </div>
 
-            <div class="booking-input-group pray-wall-option">
-                <label class="pray-wall-toggle">
-                    <input type="checkbox" id="resPrayForWall">
-                    <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
-                    <span class="pray-wall-toggle-text">Deseo orar por alguien del muro</span>
-                </label>
-                <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
+            <div class="booking-input-group">
+                <p class="section-subtitle">Tiempo de compromiso</p>
+                <div class="ios-segmented-control commitment-term-control">
+                    <input type="radio" id="term-1" name="commitmentMonths" value="1">
+                    <label for="term-1" class="touch-target-compact">1 mes</label>
+                    <input type="radio" id="term-3" name="commitmentMonths" value="3">
+                    <label for="term-3" class="touch-target-compact">3 meses</label>
+                    <input type="radio" id="term-6" name="commitmentMonths" value="6">
+                    <label for="term-6" class="touch-target-compact">6 meses</label>
+                    <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
+                    <label for="term-12" class="touch-target-compact">1 año</label>
+                </div>
             </div>
 
             <div class="booking-input-group">
@@ -105,18 +110,13 @@
                 </div>
             </div>
 
-            <div class="booking-input-group">
-                <p class="section-subtitle">Tiempo de compromiso</p>
-                <div class="ios-segmented-control commitment-term-control">
-                    <input type="radio" id="term-1" name="commitmentMonths" value="1">
-                    <label for="term-1" class="touch-target-compact">1 mes</label>
-                    <input type="radio" id="term-3" name="commitmentMonths" value="3">
-                    <label for="term-3" class="touch-target-compact">3 meses</label>
-                    <input type="radio" id="term-6" name="commitmentMonths" value="6">
-                    <label for="term-6" class="touch-target-compact">6 meses</label>
-                    <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
-                    <label for="term-12" class="touch-target-compact">1 año</label>
-                </div>
+            <div class="booking-input-group pray-wall-option">
+                <label class="pray-wall-toggle">
+                    <input type="checkbox" id="resPrayForWall">
+                    <span class="pray-wall-toggle-ui" aria-hidden="true"></span>
+                    <span class="pray-wall-toggle-text">Deseo orar por intenciones de alguien</span>
+                </label>
+                <p class="input-hint">Opcional — se te asignará una petición para interceder durante tu guardia</p>
             </div>
 
             <button type="button" class="btn-primary" id="confirmReserveBtn">Confirmar Turno</button>

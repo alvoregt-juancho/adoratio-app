@@ -33,9 +33,12 @@ model User {
   audits        AuditLog[]  @relation("AuditActor")
   targetedAudits AuditLog[] @relation("AuditTarget")
   createdRoles  AdminRole[] @relation("RoleCreator")
-  captainRanges       CaptainRange[]
-  captainNotifications CaptainNotification[] @relation("CaptainNotifications")
-  attendanceLogs      AttendanceLog[]
+  captainRanges            CaptainRange[]
+  captainRangesCreated     CaptainRange[]        @relation("CaptainRangeCreator")
+  captainRangesUpdated     CaptainRange[]        @relation("CaptainRangeUpdater")
+  captainNotifications     CaptainNotification[] @relation("CaptainNotifications")
+  substitutionReviews      SubstitutionRequest[] @relation("SubstitutionReviews")
+  attendanceLogs           AttendanceLog[]
 
   @@map("users")
 }
@@ -100,8 +103,9 @@ model Reservation {
   checkedInViaQR PhysicalQR? @relation(fields: [checkedInViaQrId], references: [id])
   scanLogs              ScanLog[]
   audits                AuditLog[]
-  prayerIntentions      PrayerIntention[]
-  assignedPrayerIntention PrayerIntention? @relation("AssignedPrayer")
+  prayerIntentions        PrayerIntention[]
+  assignedPrayerIntention PrayerIntention?      @relation("AssignedPrayer")
+  substitutionRequests    SubstitutionRequest[]
 
   @@map("reservations")
 }
@@ -230,14 +234,41 @@ model CaptainRange {
   endTime     String   @map("end_time")   // "HH:MM"
   label       String?
   isActive    Boolean  @default(true) @map("is_active")
+  createdById Int?     @map("created_by_id")
+  updatedById Int?     @map("updated_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdBy     User?                 @relation("CaptainRangeCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?                 @relation("CaptainRangeUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   notifications CaptainNotification[]
 
   @@index([userId, isActive])
   @@map("captain_ranges")
+}
+
+// status: "pending" | "approved" | "rejected"
+model SubstitutionRequest {
+  id              Int       @id @default(autoincrement())
+  reservationId   Int       @map("reservation_id")
+  occurrenceDate  String    @map("occurrence_date")
+  requestedByName String?   @map("requested_by_name")
+  substituteName  String?   @map("substitute_name")
+  substitutePhone String?   @map("substitute_phone")
+  status          String    @default("pending")
+  captainUserId   Int?      @map("captain_user_id")
+  notes           String?
+  reviewedAt      DateTime? @map("reviewed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  captainUser User?       @relation("SubstitutionReviews", fields: [captainUserId], references: [id], onDelete: SetNull)
+
+  @@index([captainUserId, status])
+  @@index([reservationId, occurrenceDate])
+  @@map("substitution_requests")
 }
 
 // type: "open_slot" | "substitute_needed" | "gap_alert" | "urgent_open"

@@ -24,7 +24,10 @@ function muroAuthorLabel(displayName) {
 router.get('/', async (req, res) => {
     try {
         const rows = await prisma.prayerIntention.findMany({
-            where: { status: 'active' },
+            where: {
+                status: 'active',
+                assignedToReservationId: null,
+            },
             orderBy: { createdAt: 'desc' },
             take: 100,
             select: {

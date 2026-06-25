@@ -22,6 +22,23 @@ function formatIntentionPayload(intention) {
     };
 }
 
+async function markIntentionPrayedById(intentionId) {
+    const existing = await prisma.prayerIntention.findUnique({ where: { id: intentionId } });
+    if (!existing || existing.status === 'prayed') return existing;
+    return prisma.prayerIntention.update({
+        where: { id: intentionId },
+        data: { status: 'prayed' },
+    });
+}
+
+async function markAssignedIntentionPrayed(reservationId) {
+    const intention = await prisma.prayerIntention.findFirst({
+        where: { assignedToReservationId: reservationId, status: 'active' },
+    });
+    if (!intention) return null;
+    return markIntentionPrayedById(intention.id);
+}
+
 async function assignWallIntentionToReservation(reservationId) {
     return prisma.$transaction(async (tx) => {
         const available = await tx.prayerIntention.findFirst({
@@ -50,6 +67,8 @@ async function releaseWallIntentionAssignment(reservationId) {
 module.exports = {
     anonymizeName,
     formatIntentionPayload,
+    markIntentionPrayedById,
+    markAssignedIntentionPrayed,
     assignWallIntentionToReservation,
     releaseWallIntentionAssignment,
 };

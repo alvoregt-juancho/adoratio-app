@@ -18,7 +18,7 @@ const {
 const { writeAudit } = require('../utils/audit');
 const { normalizeReservationNames, parseParticipantNames } = require('../utils/name');
 const { normalizePhone, isValidPhone } = require('../utils/phone');
-const { releaseWallIntentionAssignment } = require('../utils/intentions');
+const { releaseWallIntentionAssignment, markIntentionPrayedById, markAssignedIntentionPrayed } = require('../utils/intentions');
 const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
@@ -48,11 +48,13 @@ const {
     notifyCaptainsSubstituteNeeded,
 } = require('../utils/captainScope');
 const captainRoutes = require('./captain');
+const profileRoutes = require('./profile');
 
 const router = express.Router();
 
 router.use(requireAuth, attachPrivileges, requireAdminAccess, attachCaptainContext);
 router.use(rbacRoutes);
+router.use('/profile', profileRoutes);
 router.use('/captain', captainRoutes);
 
 // ── MÉTRICAS / DASHBOARD ──────────────────────────────────────────────
@@ -374,6 +376,7 @@ router.post('/reservations/:id/checkin', requirePermission(PRIV.RESERVATIONS_CHE
             where: { id },
             data: { checkedInAt: new Date(), status: 'completed' },
         });
+        await markAssignedIntentionPrayed(id);
         await writeAudit({
             action: 'checkin.manual',
             entity: 'reservation',
@@ -539,10 +542,7 @@ router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKI
         const existing = await prisma.prayerIntention.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: 'Intención no encontrada.' });
 
-        const updated = await prisma.prayerIntention.update({
-            where: { id },
-            data: { status: 'prayed' },
-        });
+        const updated = await markIntentionPrayedById(id);
 
         await writeAudit({
             action: 'intention.prayed',

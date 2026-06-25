@@ -9,6 +9,7 @@ const {
     endOfDay,
 } = require('../utils/checkinMatch');
 const { getChapelQr } = require('../utils/chapelQr');
+const { markAssignedIntentionPrayed } = require('../utils/intentions');
 const qrUtil = require('../utils/qr');
 
 const router = express.Router();
@@ -129,6 +130,8 @@ router.post('/scan', async (req, res) => {
                 meta: JSON.stringify({ qrCode, date }),
             },
         });
+
+        await markAssignedIntentionPrayed(activeReservation.id);
 
         return res.json({
             success: true,

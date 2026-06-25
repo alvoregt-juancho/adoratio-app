@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { requirePermission, PRIV } = require('../middleware/auth');
+const { hasPermission } = require('../constants/permissions');
 const { writeAudit } = require('../utils/audit');
 const { todayStr } = require('../utils/dates');
 const { weekdayFromDate, filterSlotsForDate } = require('../utils/schedule');
@@ -14,11 +15,27 @@ const {
     serializeCaptainRange,
     formatCaptainRangeLabel,
     filterCalendarDaysForCaptain,
+    filterReservationsForCaptain,
     syncCaptainOpenSlotAlerts,
     slotMatchesCaptainScope,
+    findOverlappingCaptainRange,
+    occurrenceMatchesCaptainScope,
 } = require('../utils/captainScope');
 
 const router = express.Router();
+
+const rangeInclude = {
+    user: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            adminRole: { select: { name: true, privileges: true } },
+        },
+    },
+    createdBy: { select: { id: true, name: true } },
+    updatedBy: { select: { id: true, name: true } },
+};
 
 function parseRangeBody(body) {
     const userId = Number(body.userId);
@@ -35,7 +52,10 @@ function parseRangeBody(body) {
     if (dayOfWeek != null && (dayOfWeek < 1 || dayOfWeek > 7)) {
         return { error: 'Día inválido (1=Lun … 7=Dom).' };
     }
-    return { userId, dayOfWeek, startTime, endTime, label };
+    if (startTime === endTime) {
+        return { error: 'La hora de fin debe ser distinta a la de inicio.' };
+    }
+    return { userId, dayOfWeek, startTime, endTime, label, isActive: true };
 }
 
 // ── Contexto del capitán actual ───────────────────────────────────────
@@ -67,7 +87,7 @@ router.get('/ranges', async (req, res) => {
 
         const ranges = await prisma.captainRange.findMany({
             where,
-            include: { user: { select: { id: true, name: true, email: true } } },
+            include: rangeInclude,
             orderBy: [{ user: { name: 'asc' } }, { dayOfWeek: 'asc' }, { startTime: 'asc' }],
         });
 
@@ -86,8 +106,23 @@ router.post('/ranges', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, res) 
         const parsed = parseRangeBody(req.body || {});
         if (parsed.error) return res.status(400).json({ error: parsed.error });
 
-        const user = await prisma.user.findUnique({ where: { id: parsed.userId } });
+        const user = await prisma.user.findUnique({
+            where: { id: parsed.userId },
+            include: { adminRole: true },
+        });
         if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+        if (!user.adminRole || !hasPermission(user.adminRole.privileges, PRIV.CAPTAIN_VIEW)) {
+            return res.status(400).json({
+                error: 'El usuario debe tener un perfil con permiso de capitán (CAPTAIN_VIEW).',
+            });
+        }
+
+        const overlap = await findOverlappingCaptainRange(parsed);
+        if (overlap) {
+            return res.status(409).json({
+                error: 'Ya existe una franja solapada para este capitán en el mismo día y horario.',
+            });
+        }
 
         const range = await prisma.captainRange.create({
             data: {
@@ -96,8 +131,10 @@ router.post('/ranges', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, res) 
                 startTime: parsed.startTime,
                 endTime: parsed.endTime,
                 label: parsed.label || formatCaptainRangeLabel(parsed),
+                createdById: req.user.id,
+                updatedById: req.user.id,
             },
-            include: { user: { select: { id: true, name: true, email: true } } },
+            include: rangeInclude,
         });
 
         await writeAudit({
@@ -128,6 +165,24 @@ router.put('/ranges/:id', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, re
         const parsed = parseRangeBody({ ...existing, ...req.body });
         if (parsed.error) return res.status(400).json({ error: parsed.error });
 
+        const user = await prisma.user.findUnique({
+            where: { id: parsed.userId },
+            include: { adminRole: true },
+        });
+        if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+        if (!user.adminRole || !hasPermission(user.adminRole.privileges, PRIV.CAPTAIN_VIEW)) {
+            return res.status(400).json({
+                error: 'El usuario debe tener un perfil con permiso de capitán (CAPTAIN_VIEW).',
+            });
+        }
+
+        const overlap = await findOverlappingCaptainRange(parsed, id);
+        if (overlap) {
+            return res.status(409).json({
+                error: 'Ya existe una franja solapada para este capitán en el mismo día y horario.',
+            });
+        }
+
         const range = await prisma.captainRange.update({
             where: { id },
             data: {
@@ -136,8 +191,9 @@ router.put('/ranges/:id', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, re
                 startTime: parsed.startTime,
                 endTime: parsed.endTime,
                 label: parsed.label || formatCaptainRangeLabel(parsed),
+                updatedById: req.user.id,
             },
-            include: { user: { select: { id: true, name: true, email: true } } },
+            include: rangeInclude,
         });
 
         await writeAudit({
@@ -163,7 +219,7 @@ router.delete('/ranges/:id', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req,
 
         await prisma.captainRange.update({
             where: { id },
-            data: { isActive: false },
+            data: { isActive: false, updatedById: req.user.id },
         });
 
         await writeAudit({
@@ -188,7 +244,13 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
         if (!ranges.length) {
             return res.json({
                 ranges: [],
-                summary: { openSlots: 0, gapAlerts: 0, adorers: 0, unreadNotifications: 0 },
+                summary: {
+                    openSlots: 0,
+                    gapAlerts: 0,
+                    adorers: 0,
+                    unreadNotifications: 0,
+                    pendingSubstitutions: 0,
+                },
                 days: [],
                 notifications: [],
                 adorers: [],
@@ -201,7 +263,7 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
         const view = req.query.view === 'month' ? 'month' : 'week';
         const calRange = dateRangeForView(view, anchor);
 
-        const [allSlots, reservations, notifications] = await Promise.all([
+        const [allSlots, reservations, notifications, pendingSubs] = await Promise.all([
             prisma.slot.findMany({ where: { isActive: true }, orderBy: { startTime: 'asc' } }),
             prisma.reservation.findMany({
                 where: { status: { in: ['confirmed', 'completed'] } },
@@ -211,6 +273,9 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
                 where: { captainUserId: req.user.id },
                 orderBy: [{ isRead: 'asc' }, { isUrgent: 'desc' }, { createdAt: 'desc' }],
                 take: 50,
+            }),
+            prisma.substitutionRequest.count({
+                where: { captainUserId: req.user.id, status: 'pending' },
             }),
         ]);
 
@@ -233,6 +298,8 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
                             id: r.id,
                             userName: r.userName,
                             userPhone: r.userPhone,
+                            status: r.status,
+                            checkedInAt: r.checkedInAt,
                         }));
 
                     commitments.forEach((c) => {
@@ -282,6 +349,7 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
                 gapAlerts,
                 adorers: adorerPhones.size,
                 unreadNotifications: unread,
+                pendingSubstitutions: pendingSubs,
             },
             days: scopedDays,
             notifications: notifications.map((n) => ({
@@ -292,6 +360,7 @@ router.get('/dashboard', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) 
                 occurrenceDate: n.occurrenceDate,
                 isRead: n.isRead,
                 isUrgent: n.isUrgent,
+                reservationId: n.reservationId,
                 createdAt: n.createdAt,
             })),
             adorers: [...adorerPhones.entries()].map(([phone, userName]) => ({ phone, userName })),
@@ -354,13 +423,249 @@ router.get('/adoradores-phones', requirePermission(PRIV.CAPTAIN_VIEW), async (re
             where: { status: { in: ['confirmed', 'completed'] } },
             include: { slot: true },
         });
-        const { filterReservationsForCaptain } = require('../utils/captainScope');
         const scoped = filterReservationsForCaptain(reservations, ranges);
         const phones = [...new Set(scoped.map((r) => r.userPhone).filter(Boolean))];
         res.json({ phones, total: phones.length });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al obtener teléfonos.' });
+    }
+});
+
+router.post('/notify-block', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) => {
+    try {
+        const ranges = req.captainRanges || [];
+        if (!ranges.length) {
+            return res.status(400).json({ error: 'No tienes bloques asignados.' });
+        }
+
+        const customMessage = req.body?.message ? String(req.body.message).trim() : '';
+        const reservations = await prisma.reservation.findMany({
+            where: { status: { in: ['confirmed', 'completed'] } },
+            include: { slot: true },
+        });
+        const scoped = filterReservationsForCaptain(reservations, ranges);
+        const adorers = [...new Map(
+            scoped.map((r) => [r.userPhone, { phone: r.userPhone, name: r.userName }])
+        ).values()].filter((a) => a.phone);
+
+        const openAlerts = await prisma.captainNotification.findMany({
+            where: {
+                captainUserId: req.user.id,
+                isRead: false,
+                type: { in: ['open_slot', 'urgent_open'] },
+            },
+            take: 5,
+        });
+
+        const defaultMsg =
+            openAlerts.length > 0
+                ? `Hola, soy capitán de adoración. ${openAlerts[0].message}`
+                : 'Hola, soy capitán de adoración. Recordatorio de guardia en nuestro bloque horario.';
+        const message = customMessage || defaultMsg;
+
+        const whatsappLinks = adorers.map((a) => ({
+            phone: a.phone,
+            name: a.name,
+            url: `https://wa.me/506${a.phone}?text=${encodeURIComponent(message)}`,
+        }));
+
+        res.json({
+            message,
+            phones: adorers.map((a) => a.phone),
+            whatsappLinks,
+            smtpAvailable: !!process.env.SMTP_HOST,
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al preparar notificación.' });
+    }
+});
+
+router.get('/intentions', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) => {
+    try {
+        const ranges = req.captainRanges || [];
+        const status = req.query.status || 'active';
+
+        const intentions = await prisma.prayerIntention.findMany({
+            where: status === 'all' ? {} : { status },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+            include: {
+                assignedToReservation: {
+                    include: { slot: true },
+                },
+            },
+        });
+
+        const scoped = intentions.filter((intention) => {
+            const reservation = intention.assignedToReservation;
+            if (!reservation?.slot) return false;
+            if (reservation.date) {
+                return occurrenceMatchesCaptainScope(
+                    reservation.date,
+                    reservation.slot.startTime,
+                    ranges
+                );
+            }
+            return filterReservationsForCaptain([reservation], ranges).length > 0;
+        });
+
+        res.json({
+            intentions: scoped.map((i) => ({
+                id: i.id,
+                text: i.text,
+                displayName: i.displayName,
+                status: i.status,
+                createdAt: i.createdAt,
+                reservation: i.assignedToReservation
+                    ? {
+                        id: i.assignedToReservation.id,
+                        userName: i.assignedToReservation.userName,
+                        date: i.assignedToReservation.date,
+                        slot:
+                            i.assignedToReservation.slot.startTime +
+                            '–' +
+                            i.assignedToReservation.slot.endTime,
+                    }
+                    : null,
+            })),
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener intenciones del bloque.' });
+    }
+});
+
+// ── Sustituciones formales ────────────────────────────────────────────
+router.get('/substitutions', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) => {
+    try {
+        const status = req.query.status || 'pending';
+        const where = { captainUserId: req.user.id };
+        if (status !== 'all') where.status = status;
+
+        const rows = await prisma.substitutionRequest.findMany({
+            where,
+            include: {
+                reservation: { include: { slot: true } },
+            },
+            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+            take: 100,
+        });
+
+        res.json({
+            substitutions: rows.map((row) => ({
+                id: row.id,
+                status: row.status,
+                occurrenceDate: row.occurrenceDate,
+                requestedByName: row.requestedByName,
+                substituteName: row.substituteName,
+                substitutePhone: row.substitutePhone,
+                notes: row.notes,
+                reviewedAt: row.reviewedAt,
+                createdAt: row.createdAt,
+                reservation: row.reservation
+                    ? {
+                        id: row.reservation.id,
+                        userName: row.reservation.userName,
+                        userPhone: row.reservation.userPhone,
+                        slot:
+                            row.reservation.slot.startTime + '–' + row.reservation.slot.endTime,
+                    }
+                    : null,
+            })),
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al listar sustituciones.' });
+    }
+});
+
+router.post('/substitutions/:id/approve', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const row = await prisma.substitutionRequest.findFirst({
+            where: { id, captainUserId: req.user.id },
+            include: { reservation: { include: { slot: true } } },
+        });
+        if (!row) return res.status(404).json({ error: 'Solicitud no encontrada.' });
+        if (row.status !== 'pending') {
+            return res.status(400).json({ error: 'Esta solicitud ya fue revisada.' });
+        }
+
+        const substituteName = req.body?.substituteName
+            ? String(req.body.substituteName).trim()
+            : row.substituteName;
+        const substitutePhone = req.body?.substitutePhone
+            ? String(req.body.substitutePhone).trim()
+            : row.substitutePhone;
+        const notes = req.body?.notes ? String(req.body.notes).trim() : row.notes;
+
+        const updated = await prisma.substitutionRequest.update({
+            where: { id },
+            data: {
+                status: 'approved',
+                substituteName,
+                substitutePhone,
+                notes,
+                reviewedAt: new Date(),
+            },
+            include: { reservation: { include: { slot: true } } },
+        });
+
+        await writeAudit({
+            action: 'sub_approved',
+            entity: 'substitution_request',
+            entityId: id,
+            reservationId: row.reservationId,
+            targetUserId: req.user.id,
+            meta: {
+                occurrenceDate: row.occurrenceDate,
+                substituteName,
+                substitutePhone,
+                requestedByName: row.requestedByName,
+            },
+            req,
+        });
+
+        res.json({ message: 'Sustitución aprobada.', substitution: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al aprobar sustitución.' });
+    }
+});
+
+router.post('/substitutions/:id/reject', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const row = await prisma.substitutionRequest.findFirst({
+            where: { id, captainUserId: req.user.id },
+        });
+        if (!row) return res.status(404).json({ error: 'Solicitud no encontrada.' });
+        if (row.status !== 'pending') {
+            return res.status(400).json({ error: 'Esta solicitud ya fue revisada.' });
+        }
+
+        const notes = req.body?.notes ? String(req.body.notes).trim() : null;
+        const updated = await prisma.substitutionRequest.update({
+            where: { id },
+            data: { status: 'rejected', notes, reviewedAt: new Date() },
+        });
+
+        await writeAudit({
+            action: 'sub_rejected',
+            entity: 'substitution_request',
+            entityId: id,
+            reservationId: row.reservationId,
+            targetUserId: req.user.id,
+            meta: { occurrenceDate: row.occurrenceDate, notes },
+            req,
+        });
+
+        res.json({ message: 'Solicitud rechazada.', substitution: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al rechazar sustitución.' });
     }
 });
 
@@ -373,12 +678,14 @@ router.get('/assignable-users', requirePermission(PRIV.CAPTAIN_ASSIGN), async (r
             take: 200,
         });
         res.json({
-            users: users.map((u) => ({
-                id: u.id,
-                name: u.name,
-                email: u.email,
-                adminRoleName: u.adminRole?.name ?? null,
-            })),
+            users: users
+                .filter((u) => u.adminRole && hasPermission(u.adminRole.privileges, PRIV.CAPTAIN_VIEW))
+                .map((u) => ({
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    adminRoleName: u.adminRole?.name ?? null,
+                })),
         });
     } catch (e) {
         console.error(e);
