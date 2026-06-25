@@ -8,6 +8,7 @@ const { getSettings } = require('../utils/settings');
 const { isValidFrequency, COMMITMENT_FREQUENCY, getEnabledFrequencies } = require('../constants/commitment');
 const { parseWeekDays, isValidWeekDays } = require('../utils/weekDays');
 const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
+const { commitmentEndDateFromMonths, COMMITMENT_TERM_MONTHS } = require('../utils/commitmentMatch');
 const { assignWallIntentionToReservation, formatIntentionPayload, releaseWallIntentionAssignment } = require('../utils/intentions');
 const { notifyCaptainsSubstituteNeeded } = require('../utils/captainScope');
 
@@ -25,6 +26,7 @@ router.post('/', async (req, res) => {
         const biweeklyWeeksRaw = req.body?.biweeklyWeeks;
         const durationMinutes = Number(req.body?.durationMinutes ?? 60);
         const startTimeOffset = Number(req.body?.startTimeOffset ?? 0);
+        const commitmentMonths = Number(req.body?.commitmentMonths);
 
         if (!slotId || !first || !userPhone) {
             return res.status(400).json({ error: 'Turno, nombre y celular son requeridos.' });
@@ -47,6 +49,10 @@ router.post('/', async (req, res) => {
         if (durationMinutes === 60 && startTimeOffset === 30) {
             return res.status(400).json({ error: 'Las guardias de 1 hora solo pueden iniciar en :00.' });
         }
+        if (!COMMITMENT_TERM_MONTHS.includes(commitmentMonths)) {
+            return res.status(400).json({ error: 'Selecciona el tiempo de compromiso (1, 3, 6 o 12 meses).' });
+        }
+        const commitmentEndDate = commitmentEndDateFromMonths(date, commitmentMonths);
 
         const settings = await getSettings();
         const enabledFreqs = getEnabledFrequencies(settings);
@@ -118,6 +124,7 @@ router.post('/', async (req, res) => {
                 biweeklyWeeks,
                 durationMinutes,
                 startTimeOffset,
+                commitmentEndDate,
                 status: 'confirmed',
             },
             include: { slot: true },

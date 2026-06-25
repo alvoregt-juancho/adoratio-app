@@ -1267,6 +1267,11 @@
 
         .ios-segmented-control.small { border-radius: 16px; }
 
+        .ios-segmented-control.commitment-term-control .touch-target-compact {
+            font-size: 0.72rem;
+            padding: 12px 6px;
+        }
+
         .ios-segmented-control input[type="radio"] { display: none; }
 
         .ios-segmented-control .touch-target-compact {
@@ -1611,11 +1616,8 @@
                         <label for="freq-biweekly" class="touch-target-compact">Quincenal</label>
                     </div>
                     <p id="biweeklyWeeksSummary" class="freq-days-summary" hidden></p>
-                    <button type="button" id="btn-toggle-advanced-freq" class="btn-ghost-gold">+ Más opciones de frecuencia</button>
-                    <div id="advanced-freq-container" class="hidden-smooth">
-                        <button type="button" id="btn-open-daily-days" class="btn-daily-freq">Diario — seleccionar días</button>
-                        <p id="dailyDaysSummary" class="freq-days-summary" hidden></p>
-                    </div>
+                    <button type="button" id="btn-open-daily-days" class="btn-daily-freq">Diario — seleccionar días</button>
+                    <p id="dailyDaysSummary" class="freq-days-summary" hidden></p>
                 </div>
 
                 <div class="booking-group hidden-smooth" id="non-standard-time-container">
@@ -1639,6 +1641,20 @@
                                 <label for="start-30" class="touch-target-compact">:30</label>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="booking-group">
+                    <p class="section-subtitle">Tiempo de compromiso</p>
+                    <div class="ios-segmented-control commitment-term-control">
+                        <input type="radio" id="term-1" name="commitmentMonths" value="1">
+                        <label for="term-1" class="touch-target-compact">1 mes</label>
+                        <input type="radio" id="term-3" name="commitmentMonths" value="3">
+                        <label for="term-3" class="touch-target-compact">3 meses</label>
+                        <input type="radio" id="term-6" name="commitmentMonths" value="6">
+                        <label for="term-6" class="touch-target-compact">6 meses</label>
+                        <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
+                        <label for="term-12" class="touch-target-compact">1 año</label>
                     </div>
                 </div>
 
@@ -1815,7 +1831,8 @@
             const data = {
                 frequency: selectedFrequency || 'WEEKLY',
                 startTimeOffset: startOffsetEl ? parseInt(startOffsetEl.value, 10) : 0,
-                durationMinutes: durationEl ? parseInt(durationEl.value, 10) : 60
+                durationMinutes: durationEl ? parseInt(durationEl.value, 10) : 60,
+                commitmentMonths: parseInt(document.querySelector('input[name="commitmentMonths"]:checked')?.value || '12', 10)
             };
             if (dailyModeActive) data.weekDays = selectedWeekDays.join(',');
             if (data.frequency === 'BIWEEKLY' && selectedBiweeklyWeeks) data.biweeklyWeeks = selectedBiweeklyWeeks;
@@ -1851,10 +1868,8 @@
                 if (label) label.style.display = enabled ? '' : 'none';
             });
             const dailyEnabled = freqs.includes('DAILY');
-            ['btn-open-daily-days', 'btn-toggle-advanced-freq'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = dailyEnabled ? '' : 'none';
-            });
+            const dailyBtn = document.getElementById('btn-open-daily-days');
+            if (dailyBtn) dailyBtn.style.display = dailyEnabled ? '' : 'none';
             const timeContainer = document.getElementById('non-standard-time-container');
             const showTime = appSettings.allowOffsetStartTimes || appSettings.allowThirtyMinuteDurations;
             if (timeContainer) timeContainer.classList.toggle('visible', showTime);
@@ -1910,10 +1925,6 @@
         function resetBookingFrequency() {
             clearDailyMode();
             clearBiweeklySelection();
-            const adv = document.getElementById('advanced-freq-container');
-            const btn = document.getElementById('btn-toggle-advanced-freq');
-            if (adv) adv.classList.remove('visible');
-            if (btn) btn.textContent = '+ Más opciones de frecuencia';
             const freqs = appSettings.frequencies || ['WEEKLY', 'BIWEEKLY', 'DAILY'];
             const weekly = document.getElementById('freq-weekly');
             const biweekly = document.getElementById('freq-biweekly');
@@ -1924,8 +1935,10 @@
         function resetBookingTimeControls() {
             const dur60 = document.getElementById('dur-60');
             const start00 = document.getElementById('start-00');
+            const term12 = document.getElementById('term-12');
             if (dur60) dur60.checked = true;
             if (start00) start00.checked = true;
+            if (term12) term12.checked = true;
             syncDurationStartRules();
         }
 
@@ -2000,12 +2013,6 @@
         }
 
         function initBookingControls() {
-            document.getElementById('btn-toggle-advanced-freq')?.addEventListener('click', function () {
-                const container = document.getElementById('advanced-freq-container');
-                const visible = container.classList.contains('visible');
-                container.classList.toggle('visible', !visible);
-                this.textContent = visible ? '+ Más opciones de frecuencia' : '- Ocultar opciones de frecuencia';
-            });
             document.getElementById('btn-open-daily-days')?.addEventListener('click', openDaySelectModal);
             document.getElementById('selectAllDaysBtn')?.addEventListener('click', () => {
                 document.querySelectorAll('#weekdayGrid input').forEach(i => { i.checked = true; });
@@ -2562,7 +2569,8 @@
                     date: selectedDate,
                     frequency: commitment.frequency,
                     startTimeOffset: commitment.startTimeOffset,
-                    durationMinutes: commitment.durationMinutes
+                    durationMinutes: commitment.durationMinutes,
+                    commitmentMonths: commitment.commitmentMonths
                 };
                 if (commitment.weekDays) payload.weekDays = commitment.weekDays;
                 if (commitment.biweeklyWeeks) payload.biweeklyWeeks = commitment.biweeklyWeeks;

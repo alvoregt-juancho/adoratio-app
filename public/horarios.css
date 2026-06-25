@@ -785,6 +785,11 @@ body.page-horarios[data-theme="dark"] {
     max-width: 360px;
 }
 
+.page-horarios .ios-segmented-control.commitment-term-control .touch-target-compact {
+    font-size: 0.72rem;
+    padding: 12px 6px;
+}
+
 .page-horarios .btn-daily-freq {
     width: 100%;
     min-height: 48px;

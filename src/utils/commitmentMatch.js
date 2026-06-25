@@ -12,6 +12,7 @@ function weekOfMonth(dateStr) {
 function commitmentAppliesOn(reservation, dateStr) {
     if (!reservation || reservation.status === 'cancelled') return false;
     if (dateStr < reservation.date) return false;
+    if (reservation.commitmentEndDate && dateStr > reservation.commitmentEndDate) return false;
 
     const frequency = reservation.frequency || COMMITMENT_FREQUENCY.WEEKLY;
     const anchorWeekday = weekdayFromDate(reservation.date);
@@ -92,6 +93,20 @@ function addDays(dateStr, n) {
     const { y, m, d } = parseDateParts(dateStr);
     const next = new Date(y, m - 1, d + n);
     return formatDateStr(next.getFullYear(), next.getMonth() + 1, next.getDate());
+}
+
+/** Suma meses calendario a una fecha YYYY-MM-DD. */
+function addMonths(dateStr, months) {
+    const { y, m, d } = parseDateParts(dateStr);
+    const end = new Date(y, m - 1 + Number(months), d);
+    return formatDateStr(end.getFullYear(), end.getMonth() + 1, end.getDate());
+}
+
+const COMMITMENT_TERM_MONTHS = [1, 3, 6, 12];
+
+function commitmentEndDateFromMonths(startDate, months) {
+    if (!COMMITMENT_TERM_MONTHS.includes(Number(months))) return null;
+    return addMonths(startDate, Number(months));
 }
 
 function daysInMonth(y, m) {
@@ -202,6 +217,9 @@ module.exports = {
     weekOfMonth,
     startOfWeekSunday,
     addDays,
+    addMonths,
+    commitmentEndDateFromMonths,
+    COMMITMENT_TERM_MONTHS,
     dateRangeForView,
     weekdayShortLabel,
     formatDateStr,

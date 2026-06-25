@@ -71,16 +71,10 @@
 
                 <p id="biweeklyWeeksSummary" class="freq-days-summary" hidden></p>
 
-                <button type="button" id="btn-toggle-advanced-freq" class="btn-ghost-gold">
-                    + Más opciones de frecuencia
+                <button type="button" id="btn-open-daily-days" class="btn-daily-freq">
+                    Diario — seleccionar días
                 </button>
-
-                <div id="advanced-freq-container" class="hidden-smooth">
-                    <button type="button" id="btn-open-daily-days" class="btn-daily-freq">
-                        Diario — seleccionar días
-                    </button>
-                    <p id="dailyDaysSummary" class="freq-days-summary" hidden></p>
-                </div>
+                <p id="dailyDaysSummary" class="freq-days-summary" hidden></p>
             </div>
 
             <div class="booking-input-group hidden-smooth" id="non-standard-time-container">
@@ -108,6 +102,20 @@
                             <label for="start-30" class="touch-target-compact">:30</label>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="booking-input-group">
+                <p class="section-subtitle">Tiempo de compromiso</p>
+                <div class="ios-segmented-control commitment-term-control">
+                    <input type="radio" id="term-1" name="commitmentMonths" value="1">
+                    <label for="term-1" class="touch-target-compact">1 mes</label>
+                    <input type="radio" id="term-3" name="commitmentMonths" value="3">
+                    <label for="term-3" class="touch-target-compact">3 meses</label>
+                    <input type="radio" id="term-6" name="commitmentMonths" value="6">
+                    <label for="term-6" class="touch-target-compact">6 meses</label>
+                    <input type="radio" id="term-12" name="commitmentMonths" value="12" checked>
+                    <label for="term-12" class="touch-target-compact">1 año</label>
                 </div>
             </div>
 

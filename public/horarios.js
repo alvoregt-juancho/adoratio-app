@@ -203,10 +203,6 @@
     function resetBookingFrequency() {
         clearDailyMode();
         clearBiweeklySelection();
-        const advancedFreqContainer = document.getElementById("advanced-freq-container");
-        const btnToggleFreq = document.getElementById("btn-toggle-advanced-freq");
-        if (advancedFreqContainer) advancedFreqContainer.classList.remove("visible");
-        if (btnToggleFreq) btnToggleFreq.textContent = "+ Más opciones de frecuencia";
         resetPrimaryFrequency();
     }
 
@@ -434,6 +430,7 @@
             frequency: selectedFrequency || "WEEKLY",
             startTimeOffset: startOffset,
             durationMinutes: duration,
+            commitmentMonths: parseInt(document.querySelector('input[name="commitmentMonths"]:checked')?.value || "12", 10),
         };
 
         if (dailyModeActive) {
@@ -450,8 +447,10 @@
     function resetBookingTimeControls() {
         const dur60 = document.getElementById("dur-60");
         const start00 = document.getElementById("start-00");
+        const term12 = document.getElementById("term-12");
         if (dur60) dur60.checked = true;
         if (start00) start00.checked = true;
+        if (term12) term12.checked = true;
         syncDurationStartRules();
     }
 
@@ -502,9 +501,6 @@
         const dailyEnabled = freqs.includes("DAILY");
         if (advSelect) advSelect.style.display = dailyEnabled ? "" : "none";
 
-        const toggleBtn = document.getElementById("btn-toggle-advanced-freq");
-        if (toggleBtn) toggleBtn.style.display = dailyEnabled ? "" : "none";
-
         const timeContainer = document.getElementById("non-standard-time-container");
         const showTime = appSettings.allowOffsetStartTimes || appSettings.allowThirtyMinuteDurations;
         if (timeContainer) {
@@ -536,23 +532,8 @@
     }
 
     function initBookingControls() {
-        const btnToggleFreq = document.getElementById("btn-toggle-advanced-freq");
-        const advancedFreqContainer = document.getElementById("advanced-freq-container");
         const btnOpenDaily = document.getElementById("btn-open-daily-days");
         const primaryRadioButtons = document.querySelectorAll('input[name="commitmentFreq"]');
-
-        if (btnToggleFreq && advancedFreqContainer) {
-            btnToggleFreq.addEventListener("click", function () {
-                const isVisible = advancedFreqContainer.classList.contains("visible");
-                if (!isVisible) {
-                    advancedFreqContainer.classList.add("visible");
-                    btnToggleFreq.textContent = "- Ocultar opciones de frecuencia";
-                } else {
-                    advancedFreqContainer.classList.remove("visible");
-                    btnToggleFreq.textContent = "+ Más opciones de frecuencia";
-                }
-            });
-        }
 
         if (btnOpenDaily) {
             btnOpenDaily.addEventListener("click", function () {
@@ -688,6 +669,7 @@
                 frequency: commitment.frequency,
                 startTimeOffset: commitment.startTimeOffset,
                 durationMinutes: commitment.durationMinutes,
+                commitmentMonths: commitment.commitmentMonths,
             };
             if (commitment.weekDays) payload.weekDays = commitment.weekDays;
             if (commitment.biweeklyWeeks) payload.biweeklyWeeks = commitment.biweeklyWeeks;
