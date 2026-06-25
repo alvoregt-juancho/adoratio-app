@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#130F0B">
+    <meta name="robots" content="noindex, nofollow">
+    <title>adorahora.com</title>
+    <script>document.documentElement.classList.add('view-home');</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #130F0B;
+            --text-primary: #ECECEF;
+            --text-muted: #9A9AA2;
+            --sacred-gold: #D4B06A;
+            --gold-border: rgba(212, 176, 106, 0.32);
+            --border-subtle: rgba(255, 255, 255, 0.07);
+            --font-serif: 'Cormorant Garamond', serif;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --hero-bg-x: 47.5%;
+            --hero-bg-y: 20%;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        html, body {
+            height: 100%;
+            background: var(--bg-canvas);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            overflow: hidden;
+        }
+        .kiosk-viewport {
+            position: relative;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+        .kiosk-hero {
+            position: absolute;
+            inset: 0;
+            background: #130F0B url('background.webp') var(--hero-bg-x) var(--hero-bg-y) / cover no-repeat;
+            z-index: 0;
+        }
+        .kiosk-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                180deg,
+                rgba(19, 15, 11, 0.15) 0%,
+                rgba(19, 15, 11, 0.55) 45%,
+                rgba(19, 15, 11, 0.92) 78%,
+                #130F0B 100%
+            );
+        }
+        .kiosk-content {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: max(24px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+            min-height: 100dvh;
+        }
+        .kiosk-logo {
+            width: min(220px, 58vw);
+            margin-bottom: 28px;
+            opacity: 0.95;
+        }
+        .kiosk-card {
+            width: min(420px, 100%);
+            background: rgba(27, 25, 18, 0.82);
+            border: 1px solid var(--gold-border);
+            border-radius: 24px;
+            padding: 28px 24px 24px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+        }
+        .kiosk-eyebrow {
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--sacred-gold);
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .kiosk-title {
+            font-family: var(--font-serif);
+            font-size: clamp(1.6rem, 5vw, 2rem);
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 24px;
+            line-height: 1.2;
+        }
+        .kiosk-label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .kiosk-phone {
+            width: 100%;
+            font-size: clamp(1.8rem, 7vw, 2.4rem);
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-align: center;
+            padding: 16px 12px;
+            border-radius: 16px;
+            border: 1px solid var(--border-subtle);
+            background: rgba(0, 0, 0, 0.35);
+            color: var(--text-primary);
+            outline: none;
+        }
+        .kiosk-phone:focus {
+            border-color: var(--sacred-gold);
+            box-shadow: 0 0 0 3px rgba(212, 176, 106, 0.15);
+        }
+        .kiosk-submit {
+            width: 100%;
+            margin-top: 18px;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #DBBF7C, #B6924D);
+            color: #130F0B;
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .kiosk-submit:disabled { opacity: 0.6; cursor: wait; }
+        .kiosk-submit:active { transform: scale(0.98); }
+        .kiosk-secondary {
+            width: 100%;
+            margin-top: 12px;
+            padding: 14px 20px;
+            border-radius: 999px;
+            border: 1px solid var(--gold-border);
+            background: transparent;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .kiosk-hint {
+            margin-top: 14px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-align: center;
+            line-height: 1.45;
+        }
+        .kiosk-error {
+            margin-top: 12px;
+            color: #e88;
+            font-size: 0.85rem;
+            text-align: center;
+            min-height: 1.2em;
+        }
+        /* Modal */
+        .kiosk-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(10, 8, 6, 0.72);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .kiosk-modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .kiosk-modal {
+            width: min(440px, 100%);
+            background: #1B1912;
+            border: 1px solid var(--gold-border);
+            border-radius: 24px;
+            padding: 32px 28px;
+            text-align: center;
+            transform: translateY(12px) scale(0.98);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .kiosk-modal-overlay.active .kiosk-modal {
+            transform: translateY(0) scale(1);
+        }
+        .kiosk-modal-greeting {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            margin-bottom: 20px;
+            color: var(--sacred-gold);
+        }
+        .kiosk-modal-scripture {
+            font-family: var(--font-serif);
+            font-size: 1.15rem;
+            font-style: italic;
+            line-height: 1.55;
+            color: var(--text-primary);
+            opacity: 0.92;
+        }
+    </style>
+</head>
+<body class="view-home">
+    <div class="kiosk-viewport">
+        <div class="kiosk-hero" aria-hidden="true"></div>
+        <main class="kiosk-content">
+            <img src="logo-adorahora-dark.png" alt="" class="kiosk-logo" width="220" height="73">
+            <div class="kiosk-card">
+                <p class="kiosk-eyebrow">Capilla Cristo Rey</p>
+                <h1 class="kiosk-title">Registro de asistencia</h1>
+                <form id="kioskForm" autocomplete="off">
+                    <label class="kiosk-label" for="kioskPhone">Ingrese su número de celular</label>
+                    <input
+                        type="tel"
+                        id="kioskPhone"
+                        class="kiosk-phone"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        maxlength="8"
+                        placeholder="00000000"
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit" class="kiosk-submit" id="kioskSubmit">Confirmar Asistencia</button>
+                    <button type="button" class="kiosk-secondary" id="kioskSignupBtn">Registrarse como adorador</button>
+                    <p class="kiosk-hint">Ingresa los 8 dígitos de tu celular registrado en la capilla.</p>
+                    <p class="kiosk-error" id="kioskError" role="alert"></p>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <div class="kiosk-modal-overlay" id="kioskModal" aria-hidden="true">
+        <div class="kiosk-modal" role="dialog" aria-modal="true">
+            <p class="kiosk-modal-greeting" id="kioskModalGreeting"></p>
+            <blockquote class="kiosk-modal-scripture" id="kioskModalScripture"></blockquote>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        "use strict";
+
+        var KIOSK_RETURN = encodeURIComponent(window.location.pathname);
+        var MASK_URL = "https://adorahora.com";
+        var modalTimer = null;
+
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, "", MASK_URL);
+            }
+        } catch (e) { /* ignore */ }
+
+        var phoneInput = document.getElementById("kioskPhone");
+        var form = document.getElementById("kioskForm");
+        var submitBtn = document.getElementById("kioskSubmit");
+        var errorEl = document.getElementById("kioskError");
+        var modal = document.getElementById("kioskModal");
+        var modalGreeting = document.getElementById("kioskModalGreeting");
+        var modalScripture = document.getElementById("kioskModalScripture");
+
+        function normalizePhone(v) {
+            return String(v || "").replace(/\D/g, "");
+        }
+
+        phoneInput.addEventListener("input", function () {
+            phoneInput.value = normalizePhone(phoneInput.value).slice(0, 8);
+            errorEl.textContent = "";
+        });
+
+        function closeModal() {
+            modal.classList.remove("active");
+            modal.setAttribute("aria-hidden", "true");
+            phoneInput.value = "";
+            errorEl.textContent = "";
+            phoneInput.focus();
+        }
+
+        function showModal(greeting, scripture) {
+            modalGreeting.textContent = greeting;
+            modalScripture.textContent = scripture;
+            modal.classList.add("active");
+            modal.setAttribute("aria-hidden", "false");
+            clearTimeout(modalTimer);
+            modalTimer = setTimeout(closeModal, 4000);
+        }
+
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            var phone = normalizePhone(phoneInput.value);
+            if (phone.length !== 8) {
+                errorEl.textContent = "El celular debe tener 8 dígitos.";
+                return;
+            }
+            submitBtn.disabled = true;
+            errorEl.textContent = "";
+            try {
+                var res = await fetch("/api/kiosk/check-in", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ phone_number: phone }),
+                });
+                var data = await res.json();
+                if (!res.ok) {
+                    errorEl.textContent = data.error || "No se pudo registrar.";
+                    return;
+                }
+                var name = data.first_name || "Hermano";
+                var greeting = data.action === "check_out"
+                    ? "¡Hasta luego, " + name + "!"
+                    : "¡Bienvenido, " + name + "!";
+                showModal(greeting, data.scripture || "");
+            } catch (err) {
+                errorEl.textContent = "Error de conexión. Intente de nuevo.";
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        document.getElementById("kioskSignupBtn").addEventListener("click", function () {
+            window.location.href = "index.html?kiosk=1&return=" + KIOSK_RETURN;
+        });
+
+        phoneInput.focus();
+    })();
+    </script>
+</body>
+</html>

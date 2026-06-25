@@ -9,6 +9,7 @@ const { isValidFrequency, COMMITMENT_FREQUENCY, getEnabledFrequencies } = requir
 const { parseWeekDays, isValidWeekDays } = require('../utils/weekDays');
 const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
 const { assignWallIntentionToReservation, formatIntentionPayload, releaseWallIntentionAssignment } = require('../utils/intentions');
+const { notifyCaptainsSubstituteNeeded } = require('../utils/captainScope');
 
 const router = express.Router();
 
@@ -207,11 +208,16 @@ router.delete('/:id', async (req, res) => {
         if (reservation.status === 'completed' || reservation.checkedInAt) {
             return res.status(409).json({ error: 'No se puede cancelar una asistencia ya registrada.' });
         }
+        const fullReservation = await prisma.reservation.findUnique({
+            where: { id },
+            include: { slot: true },
+        });
         await prisma.reservation.update({
             where: { id },
             data: { status: 'cancelled', cancelledAt: new Date() },
         });
         await releaseWallIntentionAssignment(id);
+        await notifyCaptainsSubstituteNeeded(fullReservation);
         await prisma.auditLog.create({
             data: { action: 'reservation.cancel', entity: 'reservation', entityId: id, reservationId: id },
         });

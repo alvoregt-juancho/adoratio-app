@@ -16,8 +16,9 @@ const {
     formatChapelQrPayload,
 } = require('../utils/chapelQr');
 const { writeAudit } = require('../utils/audit');
-const { normalizeReservationNames } = require('../utils/name');
+const { normalizeReservationNames, parseParticipantNames } = require('../utils/name');
 const { normalizePhone, isValidPhone } = require('../utils/phone');
+const { releaseWallIntentionAssignment } = require('../utils/intentions');
 const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
@@ -40,11 +41,19 @@ const {
     sortRosterRows,
     sortMembersByName,
 } = require('../utils/roster');
+const { attachCaptainContext, requireCaptainScopeForReservation } = require('../middleware/captainContext');
+const {
+    filterReservationsForCaptain,
+    filterCalendarDaysForCaptain,
+    notifyCaptainsSubstituteNeeded,
+} = require('../utils/captainScope');
+const captainRoutes = require('./captain');
 
 const router = express.Router();
 
-router.use(requireAuth, attachPrivileges, requireAdminAccess);
+router.use(requireAuth, attachPrivileges, requireAdminAccess, attachCaptainContext);
 router.use(rbacRoutes);
+router.use('/captain', captainRoutes);
 
 // ── MÉTRICAS / DASHBOARD ──────────────────────────────────────────────
 function formatReservationBrief(r) {
@@ -299,7 +308,7 @@ function filterBySlotTime(list, slotTime) {
     );
 }
 
-async function fetchReservationsForAdmin(query) {
+async function fetchReservationsForAdmin(query, req) {
     const scope = resolveReservationScope(query, todayStr());
     const baseWhere = buildReservationQueryFilters(query);
 
@@ -320,6 +329,9 @@ async function fetchReservationsForAdmin(query) {
             scope.end,
         );
         list = filterBySlotTime(list, query.slotTime);
+        if (req?.isScopedCaptain) {
+            list = filterReservationsForCaptain(list, req.captainRanges);
+        }
         return { reservations: list, total: list.length, scope };
     }
 
@@ -335,12 +347,15 @@ async function fetchReservationsForAdmin(query) {
 
     let list = reservations.map(normalizeReservationNames);
     list = filterBySlotTime(list, query.slotTime);
+    if (req?.isScopedCaptain) {
+        list = filterReservationsForCaptain(list, req.captainRanges);
+    }
     return { reservations: list, total: list.length, scope: null };
 }
 
 router.get('/reservations', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
     try {
-        const result = await fetchReservationsForAdmin(req.query);
+        const result = await fetchReservationsForAdmin(req.query, req);
         res.json(result);
     } catch (e) {
         console.error(e);
@@ -351,8 +366,10 @@ router.get('/reservations', requirePermission(PRIV.RESERVATIONS_VIEW), async (re
 router.post('/reservations/:id/checkin', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const reservation = await prisma.reservation.findUnique({ where: { id } });
+        const reservation = await prisma.reservation.findUnique({ where: { id }, include: { slot: true } });
         if (!reservation) return res.status(404).json({ error: 'Reserva no encontrada.' });
+        const scopeErr = requireCaptainScopeForReservation(reservation, req);
+        if (scopeErr) return res.status(403).json({ error: scopeErr });
         const updated = await prisma.reservation.update({
             where: { id },
             data: { checkedInAt: new Date(), status: 'completed' },
@@ -368,6 +385,105 @@ router.post('/reservations/:id/checkin', requirePermission(PRIV.RESERVATIONS_CHE
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al marcar asistencia.' });
+    }
+});
+
+router.get('/reservations/:id', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const reservation = await prisma.reservation.findUnique({
+            where: { id },
+            include: { slot: true },
+        });
+        if (!reservation) return res.status(404).json({ error: 'Reserva no encontrada.' });
+        res.json({ reservation: normalizeReservationNames(reservation) });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener la reserva.' });
+    }
+});
+
+router.put('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.reservation.findUnique({ where: { id }, include: { slot: true } });
+        if (!existing) return res.status(404).json({ error: 'Reserva no encontrada.' });
+        const scopeErr = requireCaptainScopeForReservation(existing, req);
+        if (scopeErr) return res.status(403).json({ error: scopeErr });
+
+        const { first, last, full } = parseParticipantNames(req.body);
+        const userPhone = req.body?.userPhone !== undefined ? normalizePhone(req.body.userPhone) : existing.userPhone;
+        const status = req.body?.status;
+        const slotId = req.body?.slotId !== undefined ? Number(req.body.slotId) : existing.slotId;
+
+        if (req.body?.userPhone !== undefined && !isValidPhone(userPhone)) {
+            return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+        }
+        if (!first) {
+            return res.status(400).json({ error: 'El nombre es requerido.' });
+        }
+        const allowedStatus = ['confirmed', 'completed', 'cancelled', 'no_show'];
+        if (status !== undefined && !allowedStatus.includes(status)) {
+            return res.status(400).json({ error: 'Estado inválido.' });
+        }
+        if (req.body?.slotId !== undefined) {
+            const slot = await prisma.slot.findUnique({ where: { id: slotId } });
+            if (!slot || !slot.isActive) {
+                return res.status(400).json({ error: 'Turno no válido.' });
+            }
+        }
+
+        const data = {
+            userFirstName: first,
+            userLastName: last,
+            userName: full,
+            userPhone,
+            slotId,
+        };
+        if (status !== undefined) data.status = status;
+
+        const updated = await prisma.reservation.update({ where: { id }, data, include: { slot: true } });
+        await writeAudit({
+            action: 'reservation.update',
+            entity: 'reservation',
+            entityId: id,
+            reservationId: id,
+            meta: { userName: updated.userName, status: updated.status },
+            req,
+        });
+        res.json({ message: 'Reserva actualizada.', reservation: normalizeReservationNames(updated) });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al actualizar la reserva.' });
+    }
+});
+
+router.delete('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.reservation.findUnique({ where: { id }, include: { slot: true } });
+        if (!existing) return res.status(404).json({ error: 'Reserva no encontrada.' });
+        const scopeErr = requireCaptainScopeForReservation(existing, req);
+        if (scopeErr) return res.status(403).json({ error: scopeErr });
+
+        await releaseWallIntentionAssignment(id);
+        const updated = await prisma.reservation.update({
+            where: { id },
+            data: { status: 'cancelled', cancelledAt: new Date() },
+        });
+        await notifyCaptainsSubstituteNeeded({ ...existing, status: 'cancelled' });
+        await writeAudit({
+            action: 'reservation.cancel',
+            entity: 'reservation',
+            entityId: id,
+            reservationId: id,
+            meta: { userName: existing.userName },
+            req,
+        });
+        res.json({ message: 'Reserva eliminada (cancelada).', reservation: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al eliminar la reserva.' });
     }
 });
 
@@ -442,6 +558,80 @@ router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKI
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al actualizar la intención.' });
+    }
+});
+
+router.put('/intentions/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.prayerIntention.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Intención no encontrada.' });
+
+        const { text, displayName, userPhone, status } = req.body || {};
+        const data = {};
+
+        if (text !== undefined) {
+            const trimmed = String(text).trim();
+            if (!trimmed) return res.status(400).json({ error: 'La intención no puede estar vacía.' });
+            data.text = trimmed;
+        }
+        if (displayName !== undefined) {
+            data.displayName = String(displayName).trim() || null;
+        }
+        if (userPhone !== undefined) {
+            const phone = userPhone ? normalizePhone(userPhone) : null;
+            if (phone && !isValidPhone(phone)) {
+                return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+            }
+            data.userPhone = phone;
+        }
+        if (status !== undefined) {
+            if (!['active', 'prayed'].includes(status)) {
+                return res.status(400).json({ error: 'Estado inválido.' });
+            }
+            data.status = status;
+        }
+
+        const updated = await prisma.prayerIntention.update({ where: { id }, data });
+        await writeAudit({
+            action: 'intention.update',
+            entity: 'prayer_intention',
+            entityId: id,
+            meta: { text: updated.text.slice(0, 80), status: updated.status },
+            req,
+        });
+        res.json({ message: 'Intención actualizada.', intention: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al actualizar la intención.' });
+    }
+});
+
+router.delete('/intentions/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.prayerIntention.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Intención no encontrada.' });
+
+        if (existing.assignedToReservationId) {
+            await prisma.prayerIntention.update({
+                where: { id },
+                data: { assignedToReservationId: null },
+            });
+        }
+
+        await prisma.prayerIntention.delete({ where: { id } });
+        await writeAudit({
+            action: 'intention.delete',
+            entity: 'prayer_intention',
+            entityId: id,
+            meta: { text: existing.text.slice(0, 80) },
+            req,
+        });
+        res.json({ message: 'Intención eliminada.' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al eliminar la intención.' });
     }
 });
 
@@ -784,12 +974,18 @@ router.get('/calendar', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => 
             };
         });
 
+        let daysOut = days;
+        if (req.isScopedCaptain) {
+            daysOut = filterCalendarDaysForCaptain(days, req.captainRanges);
+        }
+
         res.json({
             view,
             label: range.label,
             start: range.start,
             end: range.end,
-            days,
+            days: daysOut,
+            scopedCaptain: !!req.isScopedCaptain,
         });
     } catch (e) {
         console.error(e);
@@ -894,6 +1090,12 @@ router.get('/roster', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
         commitments = sortRosterRows(
             commitments.filter((row) => commitmentRowMatchesFilter(row, weekdayFilter, slotTimeFilter))
         );
+        if (req.isScopedCaptain) {
+            commitments = commitments.filter((row) => {
+                const { slotMatchesCaptainScope } = require('../utils/captainScope');
+                return slotMatchesCaptainScope(row.weekday, row.slotTime, req.captainRanges);
+            });
+        }
 
         const captains = sortMembersByName(
             members

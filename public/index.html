@@ -2355,7 +2355,7 @@
         function initDayScroller() {
             const scroller = document.getElementById('dayScroller');
             scroller.innerHTML = '';
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 7; i++) {
                 const pill = document.createElement('div');
                 pill.className = 'scroller-pill' + (i === 0 ? ' active' : '');
                 pill.dataset.offset = String(i);
@@ -2669,6 +2669,23 @@
                     updateHeroSafeTop();
                     alignHeroSacredAxis();
                 });
+            }
+
+            var kioskParams = new URLSearchParams(window.location.search);
+            if (kioskParams.get('kiosk') === '1') {
+                var kioskReturn = kioskParams.get('return') || '/chapel-registro-7f3c2a1b.html';
+                switchTab('turnos');
+                var kioskIdleTimer;
+                function resetKioskIdle() {
+                    clearTimeout(kioskIdleTimer);
+                    kioskIdleTimer = setTimeout(function () {
+                        window.location.href = kioskReturn;
+                    }, 60000);
+                }
+                ['click', 'touchstart', 'keydown', 'scroll', 'input', 'pointerdown'].forEach(function (ev) {
+                    document.addEventListener(ev, resetKioskIdle, { passive: true });
+                });
+                resetKioskIdle();
             }
         });
     </script>

@@ -544,6 +544,15 @@ body.admin {
     margin-bottom: 16px;
 }
 
+.micro-label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    margin-bottom: 6px;
+}
+
 .role-editor-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1256,3 +1265,100 @@ body.admin.hints-enabled [data-hint-key] {
         display: none;
     }
 }
+
+/* ── Panel del capitán ── */
+.captain-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.captain-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.captain-metrics .metric-card--alert .metric-value {
+    color: #f5a623;
+}
+
+.captain-notifications-panel {
+    margin-bottom: 16px;
+}
+
+.captain-notif {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 8px;
+}
+
+.captain-notif--urgent {
+    border-color: rgba(245, 166, 35, 0.55);
+    background: rgba(245, 166, 35, 0.08);
+}
+
+.captain-notif--read {
+    opacity: 0.65;
+}
+
+.captain-notif p {
+    margin: 4px 0 8px;
+    font-size: 0.85rem;
+}
+
+.captain-day-block {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.captain-day-block h4 {
+    margin: 0 0 8px;
+    font-size: 0.9rem;
+}
+
+.captain-slot-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 6px 0;
+    font-size: 0.82rem;
+}
+
+.captain-slot-row--gap {
+    background: rgba(220, 80, 80, 0.08);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.captain-slot-time {
+    min-width: 120px;
+    font-weight: 600;
+}
+
+.open-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(80, 180, 120, 0.2);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.gap-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(220, 80, 80, 0.25);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+

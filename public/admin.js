@@ -11,6 +11,7 @@
         "tab-reservas": "Adoradores con guardia en el período elegido. Incluye compromisos recurrentes (semanal, diario, etc.).",
         "tab-muro": "Intenciones de oración enviadas por feligreses. Marca las oradas cuando se cumplan.",
         "tab-turnos": "Gestión de horarios: calendario visual, lista de capitanes/sustitutos y configuración de turnos.",
+        "tab-capitan": "Panel del capitán: turnos abiertos, alertas y mensajes a adoradores de tu bloque.",
         "tab-qrs": "Un solo QR de capilla para validar asistencia. Imprímelo en la entrada.",
         "tab-perfiles": "Define qué puede ver y hacer cada rol en el back-office (permisos RBAC).",
         "tab-admins": "Usuarios con acceso al panel y el perfil RBAC asignado a cada uno.",
@@ -31,7 +32,10 @@
         "cal-needs": "Cantidad de franjas horarias sin cobertura suficiente en el período.",
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
         "roster-export": "Exporta la sección visible (turnos, capitanes o sustitutos) a CSV.",
-        "new-captain": "Registra un capitán responsable de un día u hora específicos.",
+        "new-captain": "Registra un capitán de contacto (directorio) responsable de un día u hora.",
+        "new-captain-range": "Asigna un usuario con cuenta al bloque horario que administrará.",
+        "section-capitan": "Vista filtrada a tus franjas: huecos, sustitutos pendientes y alertas urgentes.",
+        "captain-message": "Copia teléfonos de adoradores regulares de tu bloque para SMS o WhatsApp.",
         "new-substitute": "Registra un sustituto disponible para cubrir ausencias.",
         "slot-settings": "Opciones globales: qué frecuencias de compromiso y duraciones están permitidas.",
         "add-slot": "Crea una nueva franja horaria (inicio, fin y cupo máximo de adoradores).",
@@ -209,6 +213,8 @@
         USERS_VIEW:            1 << 18,
         USERS_MANAGE:          1 << 19,
         AUDIT_VIEW:            1 << 20,
+        CAPTAIN_VIEW:          1 << 21,
+        CAPTAIN_ASSIGN:        1 << 22,
     };
 
     let token = localStorage.getItem(TOKEN_KEY);
@@ -224,6 +230,10 @@
     let calendarCache = null;
     let adoradoresCache = [];
     let rosterCache = { commitments: [], captains: [], substitutes: [], slotTimes: [] };
+    let captainRangesCache = [];
+    let captainAssignableUsers = [];
+    let captainDashboardCache = null;
+    let captainCalAnchor = todayStr();
     const dirColFilters = {
         firstName: "",
         lastName: "",
@@ -342,7 +352,7 @@
             if (!res.ok) {
                 return toast(data.error || "No se pudo iniciar sesión.", "error");
             }
-            if (!data.user?.privileges || !(data.user.privileges & PRIV.DASHBOARD_VIEW)) {
+            if (!data.user?.privileges || !(data.user.privileges & (PRIV.DASHBOARD_VIEW | PRIV.CAPTAIN_VIEW))) {
                 return toast("Tu cuenta no tiene acceso al panel de administración.", "error");
             }
             token = data.token;
@@ -375,6 +385,12 @@
         applyZeroTrustUI();
         syncHintsUi();
         document.getElementById("commandDate").textContent = todayStr();
+        if (session.user && session.user.isScopedCaptain) {
+            const capTab = document.querySelector('.tab[data-tab="capitan"]:not(.perm-denied)');
+            if (capTab) capTab.click();
+            else loadCaptainDashboard();
+            return;
+        }
         loadMetrics();
         loadTimeline();
         loadActivity();
@@ -656,6 +672,10 @@
             "qr.chapel.replace": "Reemplazó QR de capilla",
             "checkin.manual": "Marcó asistencia manual",
             "checkin.scan": "Check-in por QR",
+            "reservation.update": "Editó una reserva",
+            "reservation.cancel": "Eliminó una reserva",
+            "intention.update": "Editó una intención",
+            "intention.delete": "Eliminó una intención del muro",
             "reservation.create": "Nueva reserva",
             "reservation.cancel": "Canceló reserva",
             "settings.update": "Actualizó configuración",
@@ -729,10 +749,10 @@
         initReservationsTable();
         const filtered = filterReservations(reservationsCache);
         const canCheckin = hasPerm("RESERVATIONS_CHECKIN");
+        const canManage = hasPerm("RESERVATIONS_CHECKIN");
         const tbody = document.getElementById("resTableBody");
 
         tbody.innerHTML = filtered.length ? filtered.map(function (r, idx) {
-            const showBtn = canCheckin && r.status === "confirmed" && r.date === todayStr();
             const freq = FREQUENCY_SHORT[r.frequency] || r.frequency || "";
             const turnoLabel = r.slot.startTime + "–" + r.slot.endTime +
                 (freq ? ' <span class="muted">(' + escapeHtml(freq) + ")</span>" : "");
@@ -742,13 +762,23 @@
                 "<td>" + escapeHtml(r.userLastName || "—") + "</td>" +
                 "<td>" + escapeHtml(r.userPhone) + "</td>" +
                 "<td><span class='status-pill status-" + r.status + "'>" + statusLabel(r.status) + "</span></td>" +
-                "<td>" + (showBtn ? "<button class='mini-btn' data-checkin='" + (r.reservationId || r.id) + "'>Asistió</button>" : "") + "</td></tr>";
+                "<td>" + reservationActionsCell(r, canCheckin, canManage) + "</td></tr>";
         }).join("") : "<tr><td colspan='8' class='muted'>Sin participantes con estos filtros.</td></tr>";
 
         updateResCount(filtered.length);
 
         tbody.querySelectorAll("[data-checkin]").forEach(function (b) {
             b.addEventListener("click", function () { manualCheckin(b.getAttribute("data-checkin")); });
+        });
+        tbody.querySelectorAll("[data-edit-reservation]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                openReservationEditor(Number(b.getAttribute("data-edit-reservation")));
+            });
+        });
+        tbody.querySelectorAll("[data-delete-reservation]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                deleteReservationById(Number(b.getAttribute("data-delete-reservation")));
+            });
         });
     }
 
@@ -825,6 +855,168 @@
         renderReservationsTable();
     }
 
+    function reservationActionsCell(r, canCheckin, canManage) {
+        let html = "<div class='admin-actions'>";
+        if (canCheckin && r.status === "confirmed" && r.date === todayStr()) {
+            html += "<button class='mini-btn' data-checkin='" + (r.reservationId || r.id) + "'>Asistió</button>";
+        }
+        if (canManage) {
+            html += "<button class='mini-btn' data-edit-reservation='" + (r.reservationId || r.id) + "'>Editar</button>";
+            html += "<button class='mini-btn danger' data-delete-reservation='" + (r.reservationId || r.id) + "'>Eliminar</button>";
+        }
+        html += "</div>";
+        return html;
+    }
+
+    async function ensureSlotsForReservationEdit() {
+        if (slotsCache.length) return slotsCache;
+        const res = await api("/api/admin/slots");
+        const data = await res.json();
+        slotsCache = (data.slots || []).filter(function (s) { return s.isActive; });
+        return slotsCache;
+    }
+
+    async function openReservationEditor(reservationId) {
+        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        const res = await api("/api/admin/reservations/" + reservationId);
+        const data = await res.json();
+        if (!res.ok) return toast(data.error || "No se pudo cargar la reserva.", "error");
+
+        const r = data.reservation;
+        const slots = await ensureSlotsForReservationEdit();
+        const slotSelect = document.getElementById("reservationEditSlot");
+        slotSelect.innerHTML = slots.map(function (s) {
+            const label = s.startTime + "–" + s.endTime + (s.label ? " (" + s.label + ")" : "");
+            return "<option value='" + s.id + "'" + (s.id === r.slotId ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+        }).join("");
+
+        document.getElementById("reservationEditId").value = r.id;
+        document.getElementById("reservationEditFirst").value = r.userFirstName || "";
+        document.getElementById("reservationEditLast").value = r.userLastName || "";
+        document.getElementById("reservationEditPhone").value = r.userPhone || "";
+        document.getElementById("reservationEditStatus").value = r.status;
+        document.getElementById("reservationEditMeta").textContent =
+            "Compromiso desde " + r.date + " · " + (FREQUENCY_SHORT[r.frequency] || r.frequency || "—");
+        document.getElementById("reservationSheet").classList.add("active");
+    }
+
+    async function saveReservationEdit() {
+        const id = Number(document.getElementById("reservationEditId").value);
+        const body = {
+            userFirstName: document.getElementById("reservationEditFirst").value.trim(),
+            userLastName: document.getElementById("reservationEditLast").value.trim(),
+            userPhone: document.getElementById("reservationEditPhone").value.trim(),
+            slotId: Number(document.getElementById("reservationEditSlot").value),
+            status: document.getElementById("reservationEditStatus").value,
+        };
+        const res = await api("/api/admin/reservations/" + id, { method: "PUT", body: JSON.stringify(body) });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Adorador actualizado.", "success");
+            document.getElementById("reservationSheet").classList.remove("active");
+            loadReservations();
+            loadRoster();
+            loadMetrics();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al guardar.", "error");
+        }
+    }
+
+    async function deleteReservationEdit() {
+        const id = Number(document.getElementById("reservationEditId").value);
+        if (!confirm("¿Eliminar este compromiso de adoración?")) return;
+        const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Reserva eliminada.", "success");
+            document.getElementById("reservationSheet").classList.remove("active");
+            loadReservations();
+            loadRoster();
+            loadMetrics();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al eliminar.", "error");
+        }
+    }
+
+    async function deleteReservationById(id) {
+        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        if (!confirm("¿Eliminar este compromiso de adoración?")) return;
+        const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Reserva eliminada.", "success");
+            loadReservations();
+            loadRoster();
+            loadMetrics();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al eliminar.", "error");
+        }
+    }
+
+    function openIntentionEditor(id) {
+        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        const item = intentionsCache.find(function (i) { return i.id === id; });
+        if (!item) return;
+        document.getElementById("intentionEditId").value = item.id;
+        document.getElementById("intentionEditText").value = item.text || "";
+        document.getElementById("intentionEditName").value = item.displayName || "";
+        document.getElementById("intentionEditPhone").value = item.userPhone || "";
+        document.getElementById("intentionEditStatus").value = item.status || "active";
+        document.getElementById("intentionSheet").classList.add("active");
+    }
+
+    async function saveIntentionEdit() {
+        const id = Number(document.getElementById("intentionEditId").value);
+        const body = {
+            text: document.getElementById("intentionEditText").value.trim(),
+            displayName: document.getElementById("intentionEditName").value.trim(),
+            userPhone: document.getElementById("intentionEditPhone").value.trim(),
+            status: document.getElementById("intentionEditStatus").value,
+        };
+        const res = await api("/api/admin/intentions/" + id, { method: "PUT", body: JSON.stringify(body) });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Intención actualizada.", "success");
+            document.getElementById("intentionSheet").classList.remove("active");
+            loadIntentions();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al guardar.", "error");
+        }
+    }
+
+    async function deleteIntentionById(id) {
+        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        if (!confirm("¿Eliminar esta intención del muro?")) return;
+        const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Intención eliminada.", "success");
+            loadIntentions();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al eliminar.", "error");
+        }
+    }
+
+    async function deleteIntentionEdit() {
+        const id = Number(document.getElementById("intentionEditId").value);
+        if (!confirm("¿Eliminar esta intención del muro?")) return;
+        const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Intención eliminada.", "success");
+            document.getElementById("intentionSheet").classList.remove("active");
+            loadIntentions();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al eliminar.", "error");
+        }
+    }
+
     async function manualCheckin(id) {
         const res = await api("/api/admin/reservations/" + id + "/checkin", { method: "POST" });
         const data = await res.json();
@@ -856,6 +1048,7 @@
     function renderMuroTable() {
         const table = document.getElementById("muroTable");
         const canNotify = hasPerm("RESERVATIONS_CHECKIN");
+        const canManage = hasPerm("RESERVATIONS_CHECKIN");
         const tbody = intentionsCache;
 
         table.innerHTML =
@@ -866,9 +1059,13 @@
                 const waUrl = whatsAppNotifyUrl(i.userPhone);
                 const waBtn = waUrl
                     ? "<a href='" + waUrl + "' target='_blank' rel='noopener' class='btn-whatsapp'>Notificar oración</a>"
-                    : "<span class='muted'>—</span>";
+                    : "";
                 const markBtn = canNotify && i.status === "active"
-                    ? " <button class='mini-btn' data-prayed='" + i.id + "'>Marcar orada</button>"
+                    ? "<button class='mini-btn' data-prayed='" + i.id + "'>Marcar orada</button>"
+                    : "";
+                const manageBtns = canManage
+                    ? "<button class='mini-btn' data-edit-intention='" + i.id + "'>Editar</button>" +
+                      "<button class='mini-btn danger' data-delete-intention='" + i.id + "'>Eliminar</button>"
                     : "";
                 return "<tr>" +
                     "<td class='muro-intention-text'>" + escapeHtml(i.text) + "</td>" +
@@ -877,7 +1074,7 @@
                     "<td>" + formatIntentionDate(i.createdAt) + "</td>" +
                     "<td><span class='status-pill status-" + (i.status === "prayed" ? "completed" : "confirmed") + "'>" +
                     (i.status === "prayed" ? "Orada" : "Activa") + "</span></td>" +
-                    "<td><div class='admin-actions'>" + waBtn + markBtn + "</div></td></tr>";
+                    "<td><div class='admin-actions'>" + waBtn + markBtn + manageBtns + "</div></td></tr>";
             }).join("") : "<tr><td colspan='6' class='muted'>Sin intenciones con este filtro.</td></tr>") +
             "</tbody>";
 
@@ -886,6 +1083,16 @@
 
         table.querySelectorAll("[data-prayed]").forEach(function (b) {
             b.addEventListener("click", function () { markIntentionPrayed(b.getAttribute("data-prayed")); });
+        });
+        table.querySelectorAll("[data-edit-intention]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                openIntentionEditor(Number(b.getAttribute("data-edit-intention")));
+            });
+        });
+        table.querySelectorAll("[data-delete-intention]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                deleteIntentionById(Number(b.getAttribute("data-delete-intention")));
+            });
         });
     }
 
@@ -1314,16 +1521,22 @@
 
         const cTable = document.getElementById("rosterCommitmentsTable");
         cTable.innerHTML =
-            "<thead><tr><th>Turno</th><th>Duración</th><th>Frecuencia</th><th>Propietario</th><th>Teléfono</th><th>Notas</th></tr></thead><tbody>" +
+            "<thead><tr><th>Turno</th><th>Duración</th><th>Frecuencia</th><th>Propietario</th><th>Teléfono</th><th>Notas</th>" +
+            (canEdit ? "<th></th>" : "") + "</tr></thead><tbody>" +
             (commitments.length ? commitments.map(function (c) {
                 const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "—";
+                const actions = canEdit
+                    ? "<td><div class='admin-actions'>" +
+                    "<button class='mini-btn' data-edit-reservation='" + c.reservationId + "'>Editar</button>" +
+                    "<button class='mini-btn danger' data-delete-reservation='" + c.reservationId + "'>Eliminar</button></div></td>"
+                    : "";
                 return "<tr><td>" + escapeHtml(c.turno) + "</td>" +
                     "<td>" + escapeHtml(c.durationLabel) + "</td>" +
                     "<td>" + escapeHtml(c.frequencyLabel) + "</td>" +
                     "<td>" + escapeHtml(name) + "</td>" +
                     "<td>" + escapeHtml(c.phone) + "</td>" +
-                    "<td class='muted'>" + escapeHtml(c.internalNotes || "—") + "</td></tr>";
-            }).join("") : "<tr><td colspan='6' class='muted'>Sin compromisos con estos filtros.</td></tr>") +
+                    "<td class='muted'>" + escapeHtml(c.internalNotes || "—") + "</td>" + actions + "</tr>";
+            }).join("") : "<tr><td colspan='" + (canEdit ? 7 : 6) + "' class='muted'>Sin compromisos con estos filtros.</td></tr>") +
             "</tbody>";
 
         function memberRows(list, role) {
@@ -1363,6 +1576,16 @@
         document.querySelectorAll("[data-delete-roster]").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 deleteRosterMember(Number(btn.getAttribute("data-delete-roster")));
+            });
+        });
+        cTable.querySelectorAll("[data-edit-reservation]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                openReservationEditor(Number(btn.getAttribute("data-edit-reservation")));
+            });
+        });
+        cTable.querySelectorAll("[data-delete-reservation]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                deleteReservationById(Number(btn.getAttribute("data-delete-reservation")));
             });
         });
 
@@ -1410,6 +1633,7 @@
             populateRosterTimeFilter(data.slotTimes || []);
             populateRosterMemberTimeGrid(data.slotTimes || [], []);
             renderRosterTables();
+            if (hasPerm("CAPTAIN_ASSIGN")) loadCaptainRanges();
         } catch (e) {
             toast("Error de conexión.", "error");
         }
@@ -1534,6 +1758,237 @@
         } catch (e) {
             toast("No se pudo exportar.", "error");
         }
+    }
+
+    // ── CAPITANES (cuentas + franjas) ──
+    async function loadCaptainAssignableUsers() {
+        if (!hasPerm("CAPTAIN_ASSIGN")) return;
+        try {
+            const res = await api("/api/admin/captain/assignable-users");
+            const data = await res.json();
+            if (res.ok) captainAssignableUsers = data.users || [];
+        } catch (e) {
+            captainAssignableUsers = [];
+        }
+    }
+
+    async function loadCaptainRanges() {
+        if (!hasPerm("CAPTAIN_ASSIGN") && !hasPerm("CAPTAIN_VIEW")) return;
+        try {
+            const qs = hasPerm("CAPTAIN_ASSIGN") ? "" : "?mine=1";
+            const res = await api("/api/admin/captain/ranges" + qs);
+            const data = await res.json();
+            if (!res.ok) return;
+            captainRangesCache = data.ranges || [];
+            renderCaptainRangesTable();
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    function renderCaptainRangesTable() {
+        const table = document.getElementById("captainRangesTable");
+        const countEl = document.getElementById("captainRangesCount");
+        if (!table) return;
+        const ranges = captainRangesCache || [];
+        if (countEl) countEl.textContent = ranges.length;
+        const canEdit = hasPerm("CAPTAIN_ASSIGN");
+        table.innerHTML =
+            "<thead><tr><th>Usuario</th><th>Franja</th><th>Día</th><th>Horario</th>" +
+            (canEdit ? "<th></th>" : "") + "</tr></thead><tbody>" +
+            ranges.map(function (r) {
+                const actions = canEdit
+                    ? "<td><button class='mini-btn' data-edit-captain-range='" + r.id + "'>Editar</button></td>"
+                    : "";
+                return "<tr><td>" + escapeHtml(r.userName || "") + "<br><span class='muted'>" + escapeHtml(r.userEmail || "") + "</span></td>" +
+                    "<td>" + escapeHtml(r.label || "") + "</td>" +
+                    "<td>" + escapeHtml(r.dayLabel || "") + "</td>" +
+                    "<td>" + escapeHtml(r.startTime) + " – " + escapeHtml(r.endTime) + "</td>" +
+                    actions + "</tr>";
+            }).join("") +
+            (ranges.length ? "" : "<tr><td colspan='5' class='empty-state'>Sin asignaciones.</td></tr>") +
+            "</tbody>";
+        document.querySelectorAll("[data-edit-captain-range]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                openCaptainRangeEditor(Number(btn.getAttribute("data-edit-captain-range")));
+            });
+        });
+    }
+
+    async function openCaptainRangeEditor(id) {
+        if (!hasPerm("CAPTAIN_ASSIGN")) return;
+        await loadCaptainAssignableUsers();
+        const range = id ? captainRangesCache.find(function (r) { return r.id === id; }) : null;
+        document.getElementById("captainRangeSheetTitle").textContent = range ? "Editar asignación" : "Asignar capitán";
+        document.getElementById("captainRangeId").value = range ? range.id : "";
+        const userSel = document.getElementById("captainRangeUser");
+        userSel.innerHTML = captainAssignableUsers.map(function (u) {
+            return '<option value="' + u.id + '">' + escapeHtml(u.name) + " (" + escapeHtml(u.email) + ")</option>";
+        }).join("");
+        if (range) userSel.value = String(range.userId);
+        document.getElementById("captainRangeDay").value = range && range.dayOfWeek != null ? String(range.dayOfWeek) : "";
+        document.getElementById("captainRangeStart").value = range ? range.startTime : "";
+        document.getElementById("captainRangeEnd").value = range ? range.endTime : "";
+        document.getElementById("captainRangeLabel").value = range && range.label ? range.label : "";
+        const delBtn = document.getElementById("deleteCaptainRangeBtn");
+        delBtn.style.display = range ? "" : "none";
+        document.getElementById("captainRangeSheet").classList.add("active");
+    }
+
+    async function saveCaptainRange() {
+        if (!hasPerm("CAPTAIN_ASSIGN")) return;
+        const id = document.getElementById("captainRangeId").value;
+        const body = {
+            userId: Number(document.getElementById("captainRangeUser").value),
+            dayOfWeek: document.getElementById("captainRangeDay").value || null,
+            startTime: document.getElementById("captainRangeStart").value.trim(),
+            endTime: document.getElementById("captainRangeEnd").value.trim(),
+            label: document.getElementById("captainRangeLabel").value.trim() || null,
+        };
+        const url = id ? "/api/admin/captain/ranges/" + id : "/api/admin/captain/ranges";
+        const res = await api(url, { method: id ? "PUT" : "POST", body: JSON.stringify(body) });
+        const data = await res.json();
+        if (res.ok) {
+            toast(data.message || "Guardado.", "success");
+            document.getElementById("captainRangeSheet").classList.remove("active");
+            loadCaptainRanges();
+        } else {
+            toast(data.error || "Error al guardar.", "error");
+        }
+    }
+
+    async function deleteCaptainRange() {
+        const id = document.getElementById("captainRangeId").value;
+        if (!id || !confirm("¿Eliminar esta asignación de capitán?")) return;
+        const res = await api("/api/admin/captain/ranges/" + id, { method: "DELETE" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Asignación eliminada.", "success");
+            document.getElementById("captainRangeSheet").classList.remove("active");
+            loadCaptainRanges();
+        } else {
+            toast(data.error || "Error al eliminar.", "error");
+        }
+    }
+
+    async function loadCaptainDashboard() {
+        if (!hasPerm("CAPTAIN_VIEW")) return;
+        const grid = document.getElementById("captainCalendarGrid");
+        try {
+            const qs = new URLSearchParams({ start: captainCalAnchor, view: "week" });
+            const res = await api("/api/admin/captain/dashboard?" + qs.toString());
+            const data = await res.json();
+            if (!res.ok) {
+                if (grid) grid.innerHTML = '<div class="empty-state">' + escapeHtml(data.error || "Error al cargar.") + "</div>";
+                return;
+            }
+            captainDashboardCache = data;
+            renderCaptainDashboard(data);
+        } catch (e) {
+            if (grid) grid.innerHTML = '<div class="empty-state">Error de conexión.</div>';
+        }
+    }
+
+    function renderCaptainDashboard(data) {
+        const summaryEl = document.getElementById("captainRangesSummary");
+        const metricsEl = document.getElementById("captainMetrics");
+        const notifEl = document.getElementById("captainNotificationsList");
+        const notifCount = document.getElementById("captainNotifCount");
+        const calLabel = document.getElementById("captainCalLabel");
+        const grid = document.getElementById("captainCalendarGrid");
+
+        const ranges = data.ranges || [];
+        if (summaryEl) {
+            summaryEl.textContent = ranges.length
+                ? ranges.map(function (r) { return r.label; }).join(" · ")
+                : "No tienes franjas asignadas. Contacta al administrador.";
+        }
+
+        const s = data.summary || {};
+        if (metricsEl) {
+            metricsEl.innerHTML =
+                '<div class="metric-card"><span class="metric-value">' + (s.openSlots || 0) + '</span><span class="metric-label">Cupos libres</span></div>' +
+                '<div class="metric-card"><span class="metric-value">' + (s.gapAlerts || 0) + '</span><span class="metric-label">Huecos críticos</span></div>' +
+                '<div class="metric-card"><span class="metric-value">' + (s.adorers || 0) + '</span><span class="metric-label">Adoradores</span></div>' +
+                '<div class="metric-card metric-card--alert"><span class="metric-value">' + (s.unreadNotifications || 0) + '</span><span class="metric-label">Alertas</span></div>';
+        }
+
+        const notifs = data.notifications || [];
+        const unread = notifs.filter(function (n) { return !n.isRead; });
+        if (notifCount) notifCount.textContent = unread.length;
+        if (notifEl) {
+            notifEl.innerHTML = notifs.length
+                ? notifs.map(function (n) {
+                    const cls = "captain-notif" + (n.isUrgent ? " captain-notif--urgent" : "") + (n.isRead ? " captain-notif--read" : "");
+                    return '<div class="' + cls + '" data-notif-id="' + n.id + '">' +
+                        "<strong>" + escapeHtml(n.title) + "</strong>" +
+                        "<p>" + escapeHtml(n.message) + "</p>" +
+                        (n.isRead ? "" : "<button class='mini-btn' data-mark-notif='" + n.id + "'>Marcar leída</button>") +
+                        "</div>";
+                }).join("")
+                : '<div class="empty-state">Sin alertas pendientes.</div>';
+            notifEl.querySelectorAll("[data-mark-notif]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    markCaptainNotificationRead(Number(btn.getAttribute("data-mark-notif")));
+                });
+            });
+        }
+
+        if (calLabel && data.days && data.days.length) {
+            calLabel.textContent = data.days[0].label + " – " + data.days[data.days.length - 1].date;
+        }
+
+        if (grid) {
+            const days = data.days || [];
+            grid.innerHTML = days.length
+                ? days.map(function (day) {
+                    const slots = (day.slots || []).map(function (slot) {
+                        const gap = slot.gapAlert ? ' <span class="gap-badge">Hueco</span>' : "";
+                        const open = slot.available > 0 ? ' <span class="open-badge">' + slot.available + " libre</span>" : "";
+                        const names = (slot.commitments || []).map(function (c) { return escapeHtml(c.userName); }).join(", ") || '<span class="muted">Sin adoradores</span>';
+                        return '<div class="captain-slot-row' + (slot.gapAlert ? " captain-slot-row--gap" : "") + '">' +
+                            "<span class='captain-slot-time'>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + open + gap + "</span>" +
+                            "<span class='captain-slot-names'>" + names + "</span></div>";
+                    }).join("");
+                    return '<div class="captain-day-block"><h4>' + escapeHtml(day.label) + " <span class='muted'>" + escapeHtml(day.date) + "</span></h4>" + slots + "</div>";
+                }).join("")
+                : '<div class="empty-state">No hay turnos en tu bloque para esta semana.</div>';
+        }
+    }
+
+    async function markCaptainNotificationRead(id) {
+        const res = await api("/api/admin/captain/notifications/" + id + "/read", { method: "PATCH" });
+        if (res.ok) loadCaptainDashboard();
+    }
+
+    async function captainMarkAllNotificationsRead() {
+        const res = await api("/api/admin/captain/notifications/read-all", { method: "POST" });
+        if (res.ok) loadCaptainDashboard();
+    }
+
+    async function copyCaptainAdorerPhones() {
+        try {
+            const res = await api("/api/admin/captain/adoradores-phones");
+            const data = await res.json();
+            const phones = data.phones || [];
+            if (!phones.length) return toast("No hay teléfonos en tu bloque.", "error");
+            const text = phones.join(", ");
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                toast(phones.length + " teléfono(s) copiado(s).", "success");
+            } else {
+                toast(text, "info");
+            }
+        } catch (e) {
+            toast("Error al copiar teléfonos.", "error");
+        }
+    }
+
+    function shiftCaptainCal(delta) {
+        const d = new Date(captainCalAnchor + "T12:00:00");
+        d.setDate(d.getDate() + delta * 7);
+        captainCalAnchor = d.toISOString().slice(0, 10);
+        loadCaptainDashboard();
     }
 
     async function loadChapelQr() {
@@ -2001,6 +2456,7 @@
                         else if (view === "config") { loadSettingsForm(); loadSlots(); }
                         else loadCalendar();
                     },
+                    capitan: loadCaptainDashboard,
                     qrs: loadQrs,
                     perfiles: loadRoles,
                     admins: function () { loadRoles().then(loadAdmins); },
@@ -2014,6 +2470,10 @@
     // ── Eventos ──
     document.getElementById("metricDetailClose").addEventListener("click", closeMetricDetail);
 
+    document.getElementById("saveReservationBtn").addEventListener("click", saveReservationEdit);
+    document.getElementById("deleteReservationBtn").addEventListener("click", deleteReservationEdit);
+    document.getElementById("saveIntentionBtn").addEventListener("click", saveIntentionEdit);
+    document.getElementById("deleteIntentionBtn").addEventListener("click", deleteIntentionEdit);
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") login(); });
     document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -2070,6 +2530,21 @@
     document.getElementById("rosterTimeFilter").addEventListener("change", loadRoster);
     ["rosterShowCommitments", "rosterShowCaptains", "rosterShowSubstitutes"].forEach(function (id) {
         document.getElementById(id).addEventListener("change", updateRosterSectionVisibility);
+    });
+    document.getElementById("newCaptainRangeBtn").addEventListener("click", function () {
+        openCaptainRangeEditor(null);
+    });
+    document.getElementById("saveCaptainRangeBtn").addEventListener("click", saveCaptainRange);
+    document.getElementById("deleteCaptainRangeBtn").addEventListener("click", deleteCaptainRange);
+    document.getElementById("captainMessageBtn").addEventListener("click", copyCaptainAdorerPhones);
+    document.getElementById("captainNotifReadAll").addEventListener("click", captainMarkAllNotificationsRead);
+    document.getElementById("captainCalPrev").addEventListener("click", function () { shiftCaptainCal(-1); });
+    document.getElementById("captainCalNext").addEventListener("click", function () { shiftCaptainCal(1); });
+    document.querySelectorAll("[data-captain-cal-quick]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            captainCalAnchor = todayStr();
+            loadCaptainDashboard();
+        });
     });
     document.getElementById("newCaptainBtn").addEventListener("click", function () {
         openRosterMemberSheet("captain", null);

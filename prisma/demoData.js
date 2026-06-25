@@ -5,6 +5,7 @@
 
 const prisma = require('../src/db');
 const { buildFullName } = require('../src/utils/name');
+const { resolveKioskUserByPhone } = require('../src/utils/kioskUser');
 
 function todayStr(d = new Date()) {
     const y = d.getFullYear();
@@ -35,6 +36,9 @@ async function clearOperationalData() {
     await prisma.scanLog.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.reservation.deleteMany();
+    await prisma.attendanceLog.deleteMany();
+    await prisma.captainNotification.deleteMany();
+    await prisma.captainRange.deleteMany();
     await prisma.rosterMember.deleteMany();
     await prisma.slot.deleteMany();
     await prisma.physicalQR.deleteMany();
@@ -210,13 +214,32 @@ async function runDemoSeed({ adminId, wipeFirst = true } = {}) {
         qr = await seedDemoQr(adminId);
     }
 
+    const synced = await syncKioskUsersFromReservations();
+
     return {
         slots: slots.length,
         reservations,
         roster,
         intentions,
+        kioskUsers: synced,
         qrCode: qr?.qrCode ?? null,
     };
+}
+
+async function syncKioskUsersFromReservations() {
+    const reservations = await prisma.reservation.findMany({
+        where: { status: { in: ['confirmed', 'completed'] } },
+        select: { userPhone: true, userFirstName: true, userLastName: true, userName: true },
+    });
+    const phones = new Set();
+    let count = 0;
+    for (const r of reservations) {
+        if (!r.userPhone || phones.has(r.userPhone)) continue;
+        phones.add(r.userPhone);
+        const user = await resolveKioskUserByPhone(r.userPhone);
+        if (user) count += 1;
+    }
+    return count;
 }
 
 module.exports = {

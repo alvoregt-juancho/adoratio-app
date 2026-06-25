@@ -83,7 +83,9 @@ function requireAdminAccess(req, res, next) {
         return res.status(401).json({ error: 'No autenticado.' });
     }
     const privs = req.user.privileges ?? 0;
-    if (!hasPermission(privs, PRIV.DASHBOARD_VIEW) && privs === 0) {
+    const canEnter =
+        hasPermission(privs, PRIV.DASHBOARD_VIEW) || hasPermission(privs, PRIV.CAPTAIN_VIEW);
+    if (!canEnter && privs === 0) {
         return res.status(403).json({ error: 'No tienes acceso al panel de administración.' });
     }
     next();
@@ -124,6 +126,9 @@ async function buildSessionPayload(userId) {
     });
     if (!user) return null;
     const privileges = resolvePrivileges(user);
+    const captainRangeCount = await prisma.captainRange.count({
+        where: { userId, isActive: true },
+    });
     return {
         user: {
             id: user.id,
@@ -134,6 +139,11 @@ async function buildSessionPayload(userId) {
             adminRoleName: user.adminRole?.name ?? null,
             privileges,
             isSuperAdmin: hasPermission(privileges, ALL_PRIVILEGES),
+            captainRangeCount,
+            isScopedCaptain:
+                captainRangeCount > 0 &&
+                !hasPermission(privileges, PRIV.SLOTS_EDIT) &&
+                !hasPermission(privileges, PRIV.USERS_MANAGE),
         },
         permissionNodes: PERMISSION_NODES,
     };

@@ -4,6 +4,8 @@ const config = {
     port: parseInt(process.env.PORT, 10) || 3000,
     baseUrl: process.env.BASE_URL || 'http://localhost:3000',
     scanEndpoint: process.env.SCAN_ENDPOINT || '/scan.html',
+    kioskPagePath: process.env.KIOSK_PAGE_PATH || '/chapel-registro-7f3c2a1b.html',
+    kioskMaskUrl: process.env.KIOSK_MASK_URL || 'https://adorahora.com',
     jwtSecret: process.env.JWT_SECRET || 'dev-secret-no-usar-en-produccion',
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
     admin: {

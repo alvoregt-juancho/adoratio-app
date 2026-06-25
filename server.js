@@ -10,6 +10,7 @@ const checkinRoutes = require('./src/routes/checkin');
 const adminRoutes = require('./src/routes/admin');
 const settingsRoutes = require('./src/routes/settings');
 const muroRoutes = require('./src/routes/muro');
+const kioskRoutes = require('./src/routes/kiosk');
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api/reservations', reservationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/check-in', checkinRoutes);
 app.use('/api/muro', muroRoutes);
+app.use('/api/kiosk', kioskRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Estáticos

@@ -45,6 +45,7 @@
             <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-reservas">Reservas</button>
             <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-muro">Muro</button>
             <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW" data-hint-key="tab-turnos">Turnos</button>
+            <button class="tab" data-tab="capitan" data-perm="CAPTAIN_VIEW" data-hint-key="tab-capitan">Mi bloque</button>
             <button class="tab" data-tab="qrs" data-perm="QRS_VIEW" data-hint-key="tab-qrs">QR Capilla</button>
             <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW" data-hint-key="tab-perfiles">Perfiles</button>
             <button class="tab" data-tab="admins" data-perm="USERS_VIEW" data-hint-key="tab-admins">Administradores</button>
@@ -234,6 +235,17 @@
                     </div>
                     <div class="table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
                 </div>
+
+                <div class="roster-section" id="captainAssignSection" data-perm="CAPTAIN_ASSIGN">
+                    <div class="roster-section-header">
+                        <h3>Asignación de capitanes (cuentas) <span class="roster-count" id="captainRangesCount">0</span></h3>
+                        <div class="roster-section-actions">
+                            <button type="button" class="ghost-btn" id="newCaptainRangeBtn" data-hint-key="new-captain-range">+ Asignar bloque</button>
+                        </div>
+                    </div>
+                    <p class="roster-intro muted">Vincula un usuario del panel a un día y franja horaria. El capitán solo verá y gestionará turnos dentro de ese bloque.</p>
+                    <div class="table-wrap"><table class="data-table roster-table" id="captainRangesTable"></table></div>
+                </div>
             </div>
 
             <!-- Directorio de adoradores -->
@@ -275,6 +287,45 @@
                 <button class="ghost-btn" id="addSlot" data-hint-key="add-slot">+ Agregar turno</button>
             </div>
             <div class="table-wrap"><table class="data-table" id="slotsTable"></table></div>
+            </div>
+        </section>
+
+        <!-- Panel del capitán -->
+        <section class="tab-panel" id="tab-capitan" data-perm="CAPTAIN_VIEW">
+            <div class="captain-dashboard" data-hint-key="section-capitan">
+                <div class="command-header captain-header">
+                    <div>
+                        <h2>Mi bloque de responsabilidad</h2>
+                        <p id="captainRangesSummary" class="muted">Cargando franjas asignadas…</p>
+                    </div>
+                    <div class="captain-header-actions">
+                        <button type="button" class="ghost-btn" id="captainMessageBtn" data-hint-key="captain-message">Mensaje adoradores</button>
+                        <button type="button" class="ghost-btn" id="captainNotifReadAll">Marcar alertas leídas</button>
+                    </div>
+                </div>
+                <div class="metrics-grid captain-metrics" id="captainMetrics"></div>
+                <div class="panel-card captain-notifications-panel">
+                    <div class="panel-card-header">
+                        <h3>Alertas <span class="roster-count" id="captainNotifCount">0</span></h3>
+                    </div>
+                    <div class="panel-card-body" id="captainNotificationsList">
+                        <div class="empty-state">Sin alertas pendientes.</div>
+                    </div>
+                </div>
+                <div class="panel-card captain-grid-panel">
+                    <div class="panel-card-header">
+                        <h3>Turnos en mi bloque</h3>
+                        <div class="toolbar-inline">
+                            <button type="button" class="ghost-btn cal-quick" data-captain-cal-quick="today">Hoy</button>
+                            <button type="button" class="ghost-btn" id="captainCalPrev">←</button>
+                            <span id="captainCalLabel" class="muted"></span>
+                            <button type="button" class="ghost-btn" id="captainCalNext">→</button>
+                        </div>
+                    </div>
+                    <div class="panel-card-body" id="captainCalendarGrid">
+                        <div class="empty-state">Cargando calendario…</div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -351,6 +402,71 @@
         </section>
     </div>
 
+    <!-- Modal editar reserva / adorador -->
+    <div class="premium-sheet-overlay" id="reservationSheet">
+        <div class="sheet-window sheet-window--form">
+            <button class="sheet-close" data-close type="button" aria-label="Cerrar">×</button>
+            <h2 class="sheet-title">Editar adorador</h2>
+            <input type="hidden" id="reservationEditId">
+            <div class="booking-input-group">
+                <input type="text" id="reservationEditFirst" class="touch-input-field sheet-field" placeholder="Nombre">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="reservationEditLast" class="touch-input-field sheet-field" placeholder="Apellido">
+            </div>
+            <div class="booking-input-group">
+                <input type="tel" id="reservationEditPhone" class="touch-input-field sheet-field" placeholder="Celular (8 dígitos)" maxlength="8">
+            </div>
+            <div class="booking-input-group">
+                <label class="micro-label" for="reservationEditSlot">Turno</label>
+                <select id="reservationEditSlot" class="touch-input-field sheet-field"></select>
+            </div>
+            <div class="booking-input-group">
+                <label class="micro-label" for="reservationEditStatus">Estado</label>
+                <select id="reservationEditStatus" class="touch-input-field sheet-field">
+                    <option value="confirmed">Confirmada</option>
+                    <option value="completed">Asistió</option>
+                    <option value="no_show">No asistió</option>
+                    <option value="cancelled">Cancelada</option>
+                </select>
+            </div>
+            <p class="muted sheet-section-label" id="reservationEditMeta"></p>
+            <div class="role-editor-actions">
+                <button type="button" class="sheet-primary-btn" id="saveReservationBtn">Guardar</button>
+                <button type="button" class="sheet-primary-btn danger-outline" id="deleteReservationBtn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal editar intención del muro -->
+    <div class="premium-sheet-overlay" id="intentionSheet">
+        <div class="sheet-window sheet-window--form">
+            <button class="sheet-close" data-close type="button" aria-label="Cerrar">×</button>
+            <h2 class="sheet-title">Editar intención</h2>
+            <input type="hidden" id="intentionEditId">
+            <div class="booking-input-group">
+                <textarea id="intentionEditText" class="touch-input-field sheet-field" rows="4" placeholder="Texto de la intención" style="height:auto;min-height:100px;padding:12px 16px;"></textarea>
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="intentionEditName" class="touch-input-field sheet-field" placeholder="Nombre visible (opcional)">
+            </div>
+            <div class="booking-input-group">
+                <input type="tel" id="intentionEditPhone" class="touch-input-field sheet-field" placeholder="Celular (opcional)" maxlength="8">
+            </div>
+            <div class="booking-input-group">
+                <label class="micro-label" for="intentionEditStatus">Estado</label>
+                <select id="intentionEditStatus" class="touch-input-field sheet-field">
+                    <option value="active">Activa</option>
+                    <option value="prayed">Orada</option>
+                </select>
+            </div>
+            <div class="role-editor-actions">
+                <button type="button" class="sheet-primary-btn" id="saveIntentionBtn">Guardar</button>
+                <button type="button" class="sheet-primary-btn danger-outline" id="deleteIntentionBtn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal capitán / sustituto -->
     <div class="premium-sheet-overlay" id="rosterMemberSheet">
         <div class="sheet-window">
@@ -393,6 +509,45 @@
             </div>
             <button class="sheet-primary-btn" id="saveRosterMemberBtn">GUARDAR</button>
             <button class="sheet-primary-btn danger-outline" id="deleteRosterMemberBtn" style="margin-top:10px;display:none;">ELIMINAR</button>
+        </div>
+    </div>
+
+    <!-- Modal asignación capitán (cuenta + franja) -->
+    <div class="premium-sheet-overlay" id="captainRangeSheet">
+        <div class="sheet-window sheet-window--form">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title" id="captainRangeSheetTitle">Asignar capitán</h2>
+            <input type="hidden" id="captainRangeId">
+            <div class="booking-input-group">
+                <label class="micro-label" for="captainRangeUser">Usuario</label>
+                <select id="captainRangeUser" class="touch-input-field sheet-field"></select>
+            </div>
+            <div class="booking-input-group">
+                <label class="micro-label" for="captainRangeDay">Día</label>
+                <select id="captainRangeDay" class="touch-input-field sheet-field">
+                    <option value="">Todos los días</option>
+                    <option value="7">Domingo</option>
+                    <option value="1">Lunes</option>
+                    <option value="2">Martes</option>
+                    <option value="3">Miércoles</option>
+                    <option value="4">Jueves</option>
+                    <option value="5">Viernes</option>
+                    <option value="6">Sábado</option>
+                </select>
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="captainRangeStart" class="touch-input-field sheet-field" placeholder="Inicio (HH:MM)">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="captainRangeEnd" class="touch-input-field sheet-field" placeholder="Fin (HH:MM)">
+            </div>
+            <div class="booking-input-group">
+                <input type="text" id="captainRangeLabel" class="touch-input-field sheet-field" placeholder="Etiqueta (opcional)">
+            </div>
+            <div class="role-editor-actions">
+                <button type="button" class="sheet-primary-btn" id="saveCaptainRangeBtn">Guardar</button>
+                <button type="button" class="sheet-primary-btn danger-outline" id="deleteCaptainRangeBtn" style="display:none;">Eliminar</button>
+            </div>
         </div>
     </div>
 

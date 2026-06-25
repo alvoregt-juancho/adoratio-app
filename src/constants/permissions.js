@@ -25,6 +25,8 @@ const PRIV = {
     USERS_VIEW:            1 << 18,
     USERS_MANAGE:          1 << 19,
     AUDIT_VIEW:            1 << 20,
+    CAPTAIN_VIEW:          1 << 21,
+    CAPTAIN_ASSIGN:        1 << 22,
 };
 
 const ALL_PRIVILEGES = Object.values(PRIV).reduce((acc, bit) => acc | bit, 0);
@@ -43,7 +45,16 @@ const ADMIN_PRIVILEGES =
     PRIV.SLOTS_EDIT |
     PRIV.RESERVATIONS_CHECKIN |
     PRIV.QRS_CREATE |
-    PRIV.QRS_EDIT;
+    PRIV.QRS_EDIT |
+    PRIV.CAPTAIN_ASSIGN;
+
+/** Perfil limitado: solo ve y gestiona su bloque asignado. */
+const CAPTAIN_PRIVILEGES =
+    PRIV.CAPTAIN_VIEW |
+    PRIV.DASHBOARD_VIEW |
+    PRIV.SLOTS_VIEW |
+    PRIV.RESERVATIONS_VIEW |
+    PRIV.RESERVATIONS_CHECKIN;
 
 const LEGACY_ROLE_PRIVILEGES = {
     feligres: 0,
@@ -117,6 +128,14 @@ const PERMISSION_NODES = [
             { key: 'AUDIT_VIEW', bit: PRIV.AUDIT_VIEW, label: 'Consola de auditoría' },
         ],
     },
+    {
+        module: 'captains',
+        label: 'Capitanes de bloque',
+        nodes: [
+            { key: 'CAPTAIN_VIEW', bit: PRIV.CAPTAIN_VIEW, label: 'Panel de mi bloque' },
+            { key: 'CAPTAIN_ASSIGN', bit: PRIV.CAPTAIN_ASSIGN, label: 'Asignar capitanes a franjas' },
+        ],
+    },
 ];
 
 function hasPermission(privileges, required) {
@@ -149,6 +168,7 @@ module.exports = {
     ALL_PRIVILEGES,
     LECTOR_PRIVILEGES,
     ADMIN_PRIVILEGES,
+    CAPTAIN_PRIVILEGES,
     LEGACY_ROLE_PRIVILEGES,
     PERMISSION_NODES,
     hasPermission,

@@ -29,4 +29,15 @@ if [[ "$code" != "201" ]]; then
 fi
 echo "OK   POST /api/muro -> 201"
 
+code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/kiosk/check-in" \
+    -H "Content-Type: application/json" \
+    -d '{"phone_number":"00000000"}')
+if [[ "$code" != "404" ]]; then
+    echo "FAIL POST /api/kiosk/check-in (unknown) -> $code (expected 404)"
+    exit 1
+fi
+echo "OK   POST /api/kiosk/check-in (unknown) -> 404"
+
+check_get "/chapel-registro-7f3c2a1b.html" 200
+
 echo "Smoke tests passed for $BASE"

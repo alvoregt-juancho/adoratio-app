@@ -24,6 +24,7 @@ model User {
   adminRoleId      Int?      @map("admin_role_id")
   emailVerified    Boolean   @default(false) @map("email_verified")
   verificationCode String?   @map("verification_code")
+  phoneNumber      String?   @unique @map("phone_number")
   createdAt        DateTime  @default(now()) @map("created_at")
 
   adminRole     AdminRole?  @relation(fields: [adminRoleId], references: [id])
@@ -32,6 +33,9 @@ model User {
   audits        AuditLog[]  @relation("AuditActor")
   targetedAudits AuditLog[] @relation("AuditTarget")
   createdRoles  AdminRole[] @relation("RoleCreator")
+  captainRanges       CaptainRange[]
+  captainNotifications CaptainNotification[] @relation("CaptainNotifications")
+  attendanceLogs      AttendanceLog[]
 
   @@map("users")
 }
@@ -213,4 +217,59 @@ model RosterMember {
 
   @@index([role, isActive])
   @@map("roster_members")
+}
+
+// Franja de responsabilidad de un capitán (usuario con cuenta)
+// dayOfWeek: 1=Lun … 7=Dom; null = todos los días
+model CaptainRange {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  dayOfWeek   Int?     @map("day_of_week")
+  startTime   String   @map("start_time") // "HH:MM"
+  endTime     String   @map("end_time")   // "HH:MM"
+  label       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications CaptainNotification[]
+
+  @@index([userId, isActive])
+  @@map("captain_ranges")
+}
+
+// type: "open_slot" | "substitute_needed" | "gap_alert" | "urgent_open"
+model CaptainNotification {
+  id              Int      @id @default(autoincrement())
+  captainUserId   Int      @map("captain_user_id")
+  captainRangeId  Int?     @map("captain_range_id")
+  type            String
+  title           String
+  message         String
+  slotId          Int?     @map("slot_id")
+  reservationId   Int?     @map("reservation_id")
+  occurrenceDate  String?  @map("occurrence_date")
+  isRead          Boolean  @default(false) @map("is_read")
+  isUrgent        Boolean  @default(false) @map("is_urgent")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  captainUser  User          @relation("CaptainNotifications", fields: [captainUserId], references: [id], onDelete: Cascade)
+  captainRange CaptainRange? @relation(fields: [captainRangeId], references: [id], onDelete: SetNull)
+
+  @@index([captainUserId, isRead])
+  @@map("captain_notifications")
+}
+
+model AttendanceLog {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  checkInAt  DateTime  @map("check_in_at")
+  checkOutAt DateTime? @map("check_out_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, checkInAt])
+  @@map("attendance_logs")
 }

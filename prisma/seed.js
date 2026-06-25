@@ -6,6 +6,7 @@ const {
     ALL_PRIVILEGES,
     ADMIN_PRIVILEGES,
     LECTOR_PRIVILEGES,
+    CAPTAIN_PRIVILEGES,
 } = require('../src/constants/permissions');
 const { runDemoSeed } = require('./demoData');
 
@@ -29,6 +30,13 @@ const SYSTEM_ROLES = [
         slug: 'lector',
         description: 'Solo lectura y exportación de reportes.',
         privileges: LECTOR_PRIVILEGES,
+        isSystem: true,
+    },
+    {
+        name: 'Capitán',
+        slug: 'capitan',
+        description: 'Gestiona adoradores y sustitutos dentro de su bloque horario asignado.',
+        privileges: CAPTAIN_PRIVILEGES,
         isSystem: true,
     },
 ];
@@ -76,6 +84,36 @@ async function main() {
         },
     });
     console.log(`  ✓ Admin: ${admin.email} → ${roles['super-admin'].name}`);
+
+    const captainPasswordHash = await bcrypt.hash('capitan2026', 10);
+    const captainUser = await prisma.user.upsert({
+        where: { email: 'capitan@adoratio.com' },
+        update: {
+            role: 'lector',
+            passwordHash: captainPasswordHash,
+            emailVerified: true,
+            adminRoleId: roles['capitan'].id,
+        },
+        create: {
+            name: 'Capitán Demo',
+            email: 'capitan@adoratio.com',
+            passwordHash: captainPasswordHash,
+            role: 'lector',
+            emailVerified: true,
+            adminRoleId: roles['capitan'].id,
+        },
+    });
+    await prisma.captainRange.deleteMany({ where: { userId: captainUser.id } });
+    await prisma.captainRange.create({
+        data: {
+            userId: captainUser.id,
+            dayOfWeek: 1,
+            startTime: '07:00',
+            endTime: '12:00',
+            label: 'Lunes · 7 AM – 12 PM',
+        },
+    });
+    console.log(`  ✓ Capitán demo: ${captainUser.email} → ${roles['capitan'].name}`);
 
     console.log('  ↻ Sembrando datos de demostración…');
     const demo = await runDemoSeed({ adminId: admin.id, wipeFirst: true });
