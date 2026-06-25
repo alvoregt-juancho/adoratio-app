@@ -26,7 +26,6 @@ async function assignWallIntentionToReservation(reservationId) {
     return prisma.$transaction(async (tx) => {
         const available = await tx.prayerIntention.findFirst({
             where: {
-                visibility: 'wall',
                 status: 'active',
                 assignedToReservationId: null,
             },

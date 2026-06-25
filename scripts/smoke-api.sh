@@ -22,7 +22,7 @@ check_get "/api/slots?date=$(date +%Y-%m-%d)" 200
 
 code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/muro" \
     -H "Content-Type: application/json" \
-    -d '{"text":"smoke test","visibility":"private"}')
+    -d '{"text":"smoke test","privacy":"anonymous"}')
 if [[ "$code" != "201" ]]; then
     echo "FAIL POST /api/muro -> $code (expected 201)"
     exit 1

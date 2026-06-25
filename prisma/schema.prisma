@@ -106,14 +106,14 @@ model Reservation {
   @@map("reservations")
 }
 
-// visibility: "private" | "wall"
-// status: "active" | "prayed"
+// visibility: siempre "wall" (todas las intenciones van al muro)
+// displayName: con valor = personal (nombre visible); null = anónima
 model PrayerIntention {
   id            Int       @id @default(autoincrement())
   text          String
   displayName   String?   @map("display_name")
   userPhone     String?   @map("user_phone")
-  visibility    String    @default("private")
+  visibility    String    @default("wall")
   status        String    @default("active")
   reservationId           Int?      @map("reservation_id")
   assignedToReservationId Int?      @unique @map("assigned_to_reservation_id")

@@ -491,11 +491,9 @@ router.delete('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN),
 router.get('/intentions', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
     try {
         const status = req.query.status || 'active';
-        const where = { visibility: 'wall' };
-        if (status !== 'all') where.status = status;
 
         const intentions = await prisma.prayerIntention.findMany({
-            where,
+            where: status === 'all' ? {} : { status },
             orderBy: { createdAt: 'desc' },
             take: 200,
             include: {
