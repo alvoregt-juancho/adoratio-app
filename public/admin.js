@@ -916,6 +916,7 @@
             document.getElementById("reservationSheet").classList.remove("active");
             loadReservations();
             loadRoster();
+            loadAdoradores();
             loadMetrics();
             loadActivity();
         } else {
@@ -933,6 +934,7 @@
             document.getElementById("reservationSheet").classList.remove("active");
             loadReservations();
             loadRoster();
+            loadAdoradores();
             loadMetrics();
             loadActivity();
         } else {
@@ -949,6 +951,7 @@
             toast("Reserva eliminada.", "success");
             loadReservations();
             loadRoster();
+            loadAdoradores();
             loadMetrics();
             loadActivity();
         } else {
@@ -1383,6 +1386,7 @@
         table.innerHTML =
             "<thead><tr>" +
             "<th>#</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Días</th><th>Turnos</th>" +
+            (hasPerm("RESERVATIONS_CHECKIN") ? "<th></th>" : "") +
             "</tr><tr class='filter-row'>" +
             "<th></th>" +
             "<th><input type='text' class='col-filter' data-filter='firstName' placeholder='Buscar…'></th>" +
@@ -1396,6 +1400,7 @@
             "<option value='7'>Domingo</option>" +
             "</select></th>" +
             "<th></th>" +
+            (hasPerm("RESERVATIONS_CHECKIN") ? "<th></th>" : "") +
             "</tr></thead><tbody id='dirTableBody'></tbody>";
 
         table.querySelectorAll(".col-filter").forEach(function (input) {
@@ -1424,19 +1429,67 @@
         const filtered = filterAdoradores(adoradoresCache);
         const tbody = document.getElementById("dirTableBody");
         const badge = document.getElementById("dirCountBadge");
+        const canManage = hasPerm("RESERVATIONS_CHECKIN");
+        const colSpan = canManage ? 7 : 6;
 
         if (badge) {
             badge.textContent = filtered.length + (filtered.length === 1 ? " adorador" : " adoradores");
         }
 
         tbody.innerHTML = filtered.length ? filtered.map(function (a, idx) {
+            const ids = a.reservationIds || [];
+            const actions = canManage && ids.length
+                ? "<td><div class='admin-actions'>" +
+                "<button class='mini-btn' data-edit-adorador='" + ids[0] + "' data-adorador-ids='" + ids.join(",") + "'>Editar</button>" +
+                "<button class='mini-btn danger' data-delete-adorador-ids='" + ids.join(",") + "'>Eliminar</button></div></td>"
+                : (canManage ? "<td class='muted'>—</td>" : "");
             return "<tr><td class='col-num'>" + (idx + 1) + "</td>" +
                 "<td>" + escapeHtml(a.firstName || "—") + "</td>" +
                 "<td>" + escapeHtml(a.lastName || "—") + "</td>" +
                 "<td>" + escapeHtml(a.phone) + "</td>" +
                 "<td>" + escapeHtml(a.weekdaysLabel || "—") + "</td>" +
-                "<td class='dir-slots'>" + escapeHtml((a.slots || []).join(", ") || "—") + "</td></tr>";
-        }).join("") : "<tr><td colspan='6' class='muted'>Sin adoradores con estos filtros.</td></tr>";
+                "<td class='dir-slots'>" + escapeHtml((a.slots || []).join(", ") || "—") + "</td>" +
+                actions + "</tr>";
+        }).join("") : "<tr><td colspan='" + colSpan + "' class='muted'>Sin adoradores con estos filtros.</td></tr>";
+
+        tbody.querySelectorAll("[data-edit-adorador]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const ids = (btn.getAttribute("data-adorador-ids") || "").split(",").filter(Boolean).map(Number);
+                if (ids.length > 1) {
+                    toast("Este adorador tiene " + ids.length + " compromisos. Abriendo el primero.", "info");
+                }
+                openReservationEditor(Number(btn.getAttribute("data-edit-adorador")));
+            });
+        });
+        tbody.querySelectorAll("[data-delete-adorador-ids]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const ids = (btn.getAttribute("data-delete-adorador-ids") || "").split(",").filter(Boolean).map(Number);
+                deleteAdoradorCommitments(ids);
+            });
+        });
+    }
+
+    async function deleteAdoradorCommitments(reservationIds) {
+        if (!hasPerm("RESERVATIONS_CHECKIN") || !reservationIds.length) return;
+        const label = reservationIds.length === 1
+            ? "¿Eliminar este compromiso de adoración?"
+            : "¿Eliminar los " + reservationIds.length + " compromisos de este adorador?";
+        if (!confirm(label)) return;
+        let ok = 0;
+        for (const id of reservationIds) {
+            const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
+            if (res.ok) ok += 1;
+        }
+        if (ok) {
+            toast(ok === reservationIds.length ? "Adorador eliminado." : ok + " de " + reservationIds.length + " eliminados.", "success");
+            loadAdoradores();
+            loadReservations();
+            loadRoster();
+            loadMetrics();
+            loadActivity();
+        } else {
+            toast("No se pudo eliminar.", "error");
+        }
     }
 
     function onDirFilterChange(e) {
@@ -1510,7 +1563,8 @@
     }
 
     function renderRosterTables() {
-        const canEdit = hasPerm("SLOTS_EDIT");
+        const canEditRoster = hasPerm("SLOTS_EDIT");
+        const canManageReservations = hasPerm("RESERVATIONS_CHECKIN");
         const commitments = rosterCache.commitments || [];
         const captains = rosterCache.captains || [];
         const substitutes = rosterCache.substitutes || [];
@@ -1522,10 +1576,10 @@
         const cTable = document.getElementById("rosterCommitmentsTable");
         cTable.innerHTML =
             "<thead><tr><th>Turno</th><th>Duración</th><th>Frecuencia</th><th>Propietario</th><th>Teléfono</th><th>Notas</th>" +
-            (canEdit ? "<th></th>" : "") + "</tr></thead><tbody>" +
+            (canManageReservations ? "<th></th>" : "") + "</tr></thead><tbody>" +
             (commitments.length ? commitments.map(function (c) {
                 const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "—";
-                const actions = canEdit
+                const actions = canManageReservations
                     ? "<td><div class='admin-actions'>" +
                     "<button class='mini-btn' data-edit-reservation='" + c.reservationId + "'>Editar</button>" +
                     "<button class='mini-btn danger' data-delete-reservation='" + c.reservationId + "'>Eliminar</button></div></td>"
@@ -1536,7 +1590,7 @@
                     "<td>" + escapeHtml(name) + "</td>" +
                     "<td>" + escapeHtml(c.phone) + "</td>" +
                     "<td class='muted'>" + escapeHtml(c.internalNotes || "—") + "</td>" + actions + "</tr>";
-            }).join("") : "<tr><td colspan='" + (canEdit ? 7 : 6) + "' class='muted'>Sin compromisos con estos filtros.</td></tr>") +
+            }).join("") : "<tr><td colspan='" + (canManageReservations ? 7 : 6) + "' class='muted'>Sin compromisos con estos filtros.</td></tr>") +
             "</tbody>";
 
         function memberRows(list, role) {
@@ -1545,7 +1599,7 @@
                 const scope = (m.daysLabel !== "Todos" || m.timesLabel !== "Todos")
                     ? '<span class="muted roster-scope">' + escapeHtml(m.daysLabel) + " · " + escapeHtml(m.timesLabel) + "</span>"
                     : '<span class="muted roster-scope">Todos los días y horas</span>';
-                const editBtn = canEdit
+                const editBtn = canEditRoster
                     ? "<div class='admin-actions'>" +
                     "<button class='mini-btn' data-edit-roster='" + m.id + "'>Editar</button>" +
                     "<button class='mini-btn danger' data-delete-roster='" + m.id + "'>Eliminar</button></div>"

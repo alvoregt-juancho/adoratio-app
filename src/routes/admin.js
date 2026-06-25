@@ -1018,9 +1018,12 @@ router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) =
                     weekdays: new Set(),
                     slots: new Set(),
                     frequencies: new Set(),
+                    reservationIds: new Set(),
                 };
                 byPhone.set(phone, entry);
             }
+
+            entry.reservationIds.add(r.id);
 
             if (r.userFirstName && !entry.firstName) entry.firstName = r.userFirstName;
             if (r.userLastName && !entry.lastName) entry.lastName = r.userLastName;
@@ -1042,6 +1045,7 @@ router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) =
                 weekdaysLabel: formatWeekDays([...a.weekdays].join(',')),
                 slots: [...a.slots].sort(),
                 frequencies: [...a.frequencies].map((f) => FREQUENCY_LABELS[f] || f),
+                reservationIds: [...a.reservationIds].sort((x, y) => x - y),
             }))
             .sort((a, b) => {
                 const la = (a.lastName || a.firstName || '').toLowerCase();
