@@ -22,6 +22,13 @@ const { releaseWallIntentionAssignment, markIntentionPrayedById, markAssignedInt
 const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
+const { normalizeWeekDaysInput, formatSlotWeekDaysLabel, slotAppliesOnSelection, parseWeekDays } = require('../utils/slotWeekDays');
+const {
+    findTimeConflict,
+    applyScopedSlotDelete,
+    applyScopedSlotDeactivate,
+    applyScopedSlotActivate,
+} = require('../utils/slotScope');
 const { checkTimelineGaps, hasFractionalCoverage, GAP_STATUS } = require('../utils/timeline');
 const {
     commitmentAppliesOn,
@@ -201,26 +208,53 @@ router.get('/activity', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res)
 // ── TURNOS (SLOTS) CRUD ───────────────────────────────────────────────
 router.get('/slots', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
     const slots = await prisma.slot.findMany({ orderBy: { startTime: 'asc' } });
-    res.json({ slots });
+    const filterDays = parseWeekDays(req.query.weekdays);
+    const filtered = filterDays.length
+        ? slots.filter((s) => slotAppliesOnSelection(s, filterDays))
+        : slots;
+    res.json({
+        slots: filtered.map((s) => ({
+            ...s,
+            weekDaysLabel: formatSlotWeekDaysLabel(s.weekDays),
+        })),
+    });
 });
 
 router.post('/slots', requirePermission(PRIV.SLOTS_CREATE), async (req, res) => {
     try {
-        const { startTime, endTime, capacity, label } = req.body || {};
+        const { startTime, endTime, capacity, label, weekDays } = req.body || {};
         if (!startTime || !endTime) {
             return res.status(400).json({ error: 'Hora de inicio y fin requeridas.' });
         }
+        const normalizedWeekDays = normalizeWeekDaysInput(weekDays);
+        const conflict = await findTimeConflict(prisma, {
+            startTime,
+            endTime,
+            weekDays: normalizedWeekDays,
+        });
+        if (conflict) {
+            return res.status(409).json({
+                error: 'Ya existe un turno con el mismo horario en uno de esos días.',
+            });
+        }
+
         const slot = await prisma.slot.create({
-            data: { startTime, endTime, capacity: Number(capacity) || 4, label: label || null },
+            data: {
+                startTime,
+                endTime,
+                capacity: Number(capacity) || 4,
+                label: label || null,
+                weekDays: normalizedWeekDays,
+            },
         });
         await writeAudit({
             action: 'slot.create',
             entity: 'slot',
             entityId: slot.id,
-            meta: { startTime, endTime, capacity: slot.capacity },
+            meta: { startTime, endTime, capacity: slot.capacity, weekDays: slot.weekDays },
             req,
         });
-        res.status(201).json({ slot });
+        res.status(201).json({ slot: { ...slot, weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays) } });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al crear el turno.' });
@@ -230,14 +264,83 @@ router.post('/slots', requirePermission(PRIV.SLOTS_CREATE), async (req, res) => 
 router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { startTime, endTime, capacity, label, isActive } = req.body || {};
+        const existing = await prisma.slot.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Turno no encontrado.' });
+
+        const { startTime, endTime, capacity, label, isActive, weekDays, scopeWeekdays } = req.body || {};
         const timeRe = /^\d{2}:\d{2}$/;
+        const scopedToggle =
+            scopeWeekdays !== undefined &&
+            isActive !== undefined &&
+            startTime === undefined &&
+            endTime === undefined &&
+            capacity === undefined &&
+            weekDays === undefined &&
+            label === undefined;
+
+        if (scopedToggle && isActive === true && existing.isActive === false) {
+            const result = await applyScopedSlotActivate(prisma, existing);
+            await writeAudit({
+                action: 'slot.update',
+                entity: 'slot',
+                entityId: id,
+                meta: { isActive: true, mode: result.action },
+                req,
+            });
+            return res.json({
+                message: 'Turno activado.',
+                slot: { ...result.slot, weekDaysLabel: formatSlotWeekDaysLabel(result.slot.weekDays) },
+            });
+        }
+
+        if (scopedToggle && isActive === false && existing.isActive !== false) {
+            try {
+                const result = await applyScopedSlotDeactivate(prisma, existing, scopeWeekdays);
+                await writeAudit({
+                    action: 'slot.update',
+                    entity: 'slot',
+                    entityId: id,
+                    meta: { isActive: false, mode: result.action, scopeWeekdays },
+                    req,
+                });
+                return res.json({
+                    message: 'Turno desactivado para los días seleccionados.',
+                    slot: result.slot
+                        ? { ...result.slot, weekDaysLabel: formatSlotWeekDaysLabel(result.slot.weekDays) }
+                        : null,
+                });
+            } catch (err) {
+                if (err.message === 'SCOPE_MISMATCH') {
+                    return res.status(400).json({ error: 'Este turno no aplica a los días seleccionados.' });
+                }
+                throw err;
+            }
+        }
+
         if (startTime !== undefined && !timeRe.test(startTime)) {
             return res.status(400).json({ error: 'Hora de inicio inválida (HH:MM).' });
         }
         if (endTime !== undefined && !timeRe.test(endTime)) {
             return res.status(400).json({ error: 'Hora de fin inválida (HH:MM).' });
         }
+
+        const nextStart = startTime !== undefined ? startTime : existing.startTime;
+        const nextEnd = endTime !== undefined ? endTime : existing.endTime;
+        const nextWeekDays =
+            weekDays !== undefined ? normalizeWeekDaysInput(weekDays) : existing.weekDays;
+
+        const conflict = await findTimeConflict(prisma, {
+            startTime: nextStart,
+            endTime: nextEnd,
+            weekDays: nextWeekDays,
+            excludeId: id,
+        });
+        if (conflict) {
+            return res.status(409).json({
+                error: 'Ya existe un turno con el mismo horario en uno de esos días.',
+            });
+        }
+
         const slot = await prisma.slot.update({
             where: { id },
             data: {
@@ -245,6 +348,7 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
                 ...(endTime !== undefined && { endTime }),
                 ...(capacity !== undefined && { capacity: Number(capacity) }),
                 ...(label !== undefined && { label }),
+                ...(weekDays !== undefined && { weekDays: nextWeekDays }),
                 ...(isActive !== undefined && { isActive: Boolean(isActive) }),
             },
         });
@@ -252,10 +356,15 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
             action: 'slot.update',
             entity: 'slot',
             entityId: id,
-            meta: { startTime: slot.startTime, endTime: slot.endTime, isActive: slot.isActive },
+            meta: {
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                isActive: slot.isActive,
+                weekDays: slot.weekDays,
+            },
             req,
         });
-        res.json({ slot });
+        res.json({ slot: { ...slot, weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays) } });
     } catch (e) {
         console.error(e);
         if (e.code === 'P2025') return res.status(404).json({ error: 'Turno no encontrado.' });
@@ -268,6 +377,27 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
         const id = Number(req.params.id);
         const existing = await prisma.slot.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: 'Turno no encontrado.' });
+
+        const scopeWeekdays = req.body?.scopeWeekdays ?? req.query.weekdays ?? null;
+        const plan = await applyScopedSlotDelete(prisma, existing, scopeWeekdays);
+
+        if (plan.action === 'trim') {
+            const slot = await prisma.slot.update({
+                where: { id: plan.slotId },
+                data: { weekDays: plan.weekDays },
+            });
+            await writeAudit({
+                action: 'slot.update',
+                entity: 'slot',
+                entityId: id,
+                meta: { weekDays: slot.weekDays, scopedDelete: scopeWeekdays },
+                req,
+            });
+            return res.json({
+                message: 'Turno quitado de los días seleccionados.',
+                slot: { ...slot, weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays) },
+            });
+        }
 
         const linked = await prisma.reservation.count({ where: { slotId: id } });
         if (linked > 0) {

@@ -67,6 +67,7 @@ model Slot {
   endTime    String   @map("end_time")   // "HH:MM"
   capacity   Int      @default(4)
   label      String?
+  weekDays   String?  @map("week_days") // "1,3" (Lun=1 … Dom=7); null = todos
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
 

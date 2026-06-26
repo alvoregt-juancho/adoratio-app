@@ -276,6 +276,25 @@
                     <button class="ghost-btn" id="saveSettingsBtn">Guardar configuración</button>
                 </div>
             </div>
+            <div class="panel-card slot-day-panel" data-perm="SLOTS_VIEW">
+                <div class="panel-card-header">
+                    <h3>Días de la semana</h3>
+                    <button type="button" class="ghost-btn" id="slotDaysSelectAll">Todos</button>
+                </div>
+                <div class="panel-card-body">
+                    <p class="muted slot-day-hint">Selecciona uno o más días antes de agregar, editar, desactivar o eliminar las franjas de abajo.</p>
+                    <div class="slot-day-buttons" id="slotDayButtons" role="group" aria-label="Días de la semana">
+                        <button type="button" class="slot-day-btn active" data-weekday="1">Lun</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="2">Mar</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="3">Mié</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="4">Jue</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="5">Vie</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="6">Sáb</button>
+                        <button type="button" class="slot-day-btn active" data-weekday="7">Dom</button>
+                    </div>
+                    <p class="slot-day-context" id="slotDayContextLabel">Editando horario para: todos los días</p>
+                </div>
+            </div>
             <div class="toolbar" data-perm="SLOTS_CREATE">
                 <input type="text" id="slotStart" class="touch-input-field dark-input" placeholder="Inicio (HH:MM)">
                 <input type="text" id="slotEnd" class="touch-input-field dark-input" placeholder="Fin (HH:MM)">
@@ -651,6 +670,19 @@
             <button class="sheet-close" data-close>×</button>
             <h2 class="sheet-title">Editar turno</h2>
             <input type="hidden" id="editSlotId">
+            <fieldset class="settings-fieldset roster-sheet-fieldset">
+                <legend>Días del turno</legend>
+                <p class="muted roster-hint">Sin selección = todos los días</p>
+                <div class="roster-day-grid" id="editSlotDays">
+                    <label class="admin-check"><input type="checkbox" value="1"><span>Lun</span></label>
+                    <label class="admin-check"><input type="checkbox" value="2"><span>Mar</span></label>
+                    <label class="admin-check"><input type="checkbox" value="3"><span>Mié</span></label>
+                    <label class="admin-check"><input type="checkbox" value="4"><span>Jue</span></label>
+                    <label class="admin-check"><input type="checkbox" value="5"><span>Vie</span></label>
+                    <label class="admin-check"><input type="checkbox" value="6"><span>Sáb</span></label>
+                    <label class="admin-check"><input type="checkbox" value="7"><span>Dom</span></label>
+                </div>
+            </fieldset>
             <div class="booking-input-group">
                 <input type="text" id="editSlotStart" class="touch-input-field" placeholder="Inicio (HH:MM)" style="background:#fff;color:#000;">
             </div>

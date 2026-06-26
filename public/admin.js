@@ -29,7 +29,7 @@
         "turnos-calendario": "Cuadrícula semanal o mensual con adoradores por franja y alertas de huecos.",
         "turnos-lista": "Lista de compromisos, contactos de capitanes/sustitutos filtrable por día y hora.",
         "turnos-directorio": "Directorio completo de adoradores con filtros por nombre, teléfono y día.",
-        "turnos-config": "Configura frecuencias permitidas, horarios de turno y cupos por franja.",
+        "turnos-config": "Configura frecuencias permitidas, horarios de turno y cupos por franja según día.",
         "cal-needs": "Cantidad de franjas horarias sin cobertura suficiente en el período.",
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
         "roster-export": "Exporta la sección visible (turnos, capitanes o sustitutos) a CSV.",
@@ -1406,17 +1406,94 @@
         }
     }
 
+    // ── TURNOS (config por día) ──
+    const SLOT_DAY_LABELS = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb", 7: "Dom" };
+
+    function getSlotConfigDays() {
+        const btns = document.querySelectorAll("#slotDayButtons .slot-day-btn.active");
+        return Array.from(btns).map(function (b) { return Number(b.getAttribute("data-weekday")); }).sort(function (a, b) { return a - b; });
+    }
+
+    function formatSlotConfigDaysLabel(days) {
+        if (!days.length || days.length === 7) return "todos los días";
+        return days.map(function (d) { return SLOT_DAY_LABELS[d] || d; }).join(", ");
+    }
+
+    function weekDaysPayloadFromSelection(days) {
+        if (!days.length || days.length === 7) return null;
+        return days.join(",");
+    }
+
+    function readEditSlotDays() {
+        const days = [];
+        document.querySelectorAll("#editSlotDays input:checked").forEach(function (cb) {
+            days.push(cb.value);
+        });
+        return days.length ? days.join(",") : null;
+    }
+
+    function setEditSlotDays(weekDays) {
+        const selected = weekDays ? String(weekDays).split(",") : [];
+        document.querySelectorAll("#editSlotDays input[type='checkbox']").forEach(function (cb) {
+            cb.checked = !selected.length || selected.includes(cb.value);
+        });
+    }
+
+    function updateSlotDayContextLabel() {
+        const el = document.getElementById("slotDayContextLabel");
+        const days = getSlotConfigDays();
+        if (!el) return;
+        if (!days.length) {
+            el.textContent = "Selecciona al menos un día para ver y editar franjas.";
+            return;
+        }
+        el.textContent = "Editando horario para: " + formatSlotConfigDaysLabel(days);
+    }
+
+    function setupSlotDayButtons() {
+        const wrap = document.getElementById("slotDayButtons");
+        if (!wrap || wrap.dataset.bound) return;
+        wrap.dataset.bound = "1";
+        wrap.querySelectorAll(".slot-day-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                btn.classList.toggle("active");
+                updateSlotDayContextLabel();
+                loadSlots();
+            });
+        });
+        const allBtn = document.getElementById("slotDaysSelectAll");
+        if (allBtn) {
+            allBtn.addEventListener("click", function () {
+                wrap.querySelectorAll(".slot-day-btn").forEach(function (b) { b.classList.add("active"); });
+                updateSlotDayContextLabel();
+                loadSlots();
+            });
+        }
+        updateSlotDayContextLabel();
+    }
+
     // ── TURNOS ──
     async function loadSlots() {
         if (!hasPerm("SLOTS_VIEW")) return;
-        const res = await api("/api/admin/slots");
+        setupSlotDayButtons();
+        const selectedDays = getSlotConfigDays();
+        const qs = selectedDays.length ? "?weekdays=" + selectedDays.join(",") : "";
+        const res = await api("/api/admin/slots" + qs);
         const data = await res.json();
         slotsCache = data.slots || [];
         const canEdit = hasPerm("SLOTS_EDIT");
         const canDelete = hasPerm("SLOTS_DELETE");
         const table = document.getElementById("slotsTable");
+        const addBtn = document.getElementById("addSlot");
+        if (addBtn) addBtn.disabled = !selectedDays.length;
+
+        if (!selectedDays.length) {
+            table.innerHTML = '<tbody><tr><td colspan="6" class="empty-state">Selecciona al menos un día arriba.</td></tr></tbody>';
+            return;
+        }
+
         table.innerHTML =
-            "<thead><tr><th>Inicio</th><th>Fin</th><th>Cupo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>" +
+            "<thead><tr><th>Inicio</th><th>Fin</th><th>Cupo</th><th>Días</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>" +
             slotsCache.map(function (s) {
                 let actions = "";
                 if (canEdit) {
@@ -1425,11 +1502,15 @@
                         (s.isActive ? "Desactivar" : "Activar") + "</button>";
                 }
                 if (canDelete) actions += "<button class='mini-btn danger' data-delete='" + s.id + "'>Eliminar</button>";
-                return "<tr><td>" + s.startTime + "</td><td>" + s.endTime + "</td><td>" + s.capacity + "</td>" +
+                const rowCls = s.isActive ? "" : " slots-table-row--inactive";
+                return "<tr class='" + rowCls + "'><td>" + escapeHtml(s.startTime) + "</td><td>" + escapeHtml(s.endTime) + "</td><td>" + s.capacity + "</td>" +
+                    "<td>" + escapeHtml(s.weekDaysLabel || "Todos") + "</td>" +
                     "<td><span class='status-pill " + (s.isActive ? "status-completed" : "status-cancelled") + "'>" +
                     (s.isActive ? "Activo" : "Inactivo") + "</span></td>" +
                     "<td><div class='admin-actions'>" + (actions || "—") + "</div></td></tr>";
-            }).join("") + "</tbody>";
+            }).join("") +
+            (slotsCache.length ? "" : "<tr><td colspan='6' class='empty-state'>No hay franjas para los días seleccionados.</td></tr>") +
+            "</tbody>";
         if (canEdit) {
             table.querySelectorAll("[data-toggle]").forEach(function (b) {
                 b.addEventListener("click", function () {
@@ -1455,6 +1536,7 @@
         document.getElementById("editSlotEnd").value = slot.endTime;
         document.getElementById("editSlotCap").value = slot.capacity;
         document.getElementById("editSlotActive").checked = slot.isActive;
+        setEditSlotDays(slot.weekDays);
         document.getElementById("slotSheet").classList.add("active");
     }
 
@@ -1464,6 +1546,7 @@
         const endTime = document.getElementById("editSlotEnd").value.trim();
         const capacity = document.getElementById("editSlotCap").value;
         const isActive = document.getElementById("editSlotActive").checked;
+        const weekDays = readEditSlotDays();
         if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
             return toast("Usa formato HH:MM.", "error");
         }
@@ -1472,11 +1555,11 @@
         try {
             const res = await api("/api/admin/slots/" + id, {
                 method: "PUT",
-                body: JSON.stringify({ startTime, endTime, capacity, isActive }),
+                body: JSON.stringify({ startTime, endTime, capacity, isActive, weekDays }),
             });
             const data = await res.json();
             if (res.ok) {
-                toast("Turno actualizado.", "success");
+                toast(data.message || "Turno actualizado.", "success");
                 document.getElementById("slotSheet").classList.remove("active");
                 loadSlots(); loadMetrics(); loadActivity();
             } else toast(data.error || "Error.", "error");
@@ -1484,30 +1567,68 @@
     }
 
     async function deleteSlot(id) {
+        const selectedDays = getSlotConfigDays();
+        if (!selectedDays.length) return toast("Selecciona al menos un día.", "error");
         const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
-        if (!slot || !confirm("¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + "?")) return;
-        const res = await api("/api/admin/slots/" + id, { method: "DELETE" });
+        if (!slot) return;
+        const dayLabel = formatSlotConfigDaysLabel(selectedDays);
+        const msg = selectedDays.length === 7
+            ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + "?"
+            : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?";
+        if (!confirm(msg)) return;
+        const res = await api("/api/admin/slots/" + id, {
+            method: "DELETE",
+            body: JSON.stringify({ scopeWeekdays: weekDaysPayloadFromSelection(selectedDays) }),
+        });
         const data = await res.json();
-        if (res.ok) { toast("Turno eliminado.", "success"); loadSlots(); loadMetrics(); }
-        else toast(data.error || "No se pudo eliminar.", "error");
+        if (res.ok) {
+            toast(data.message || "Turno eliminado.", "success");
+            loadSlots(); loadMetrics();
+        } else toast(data.error || "No se pudo eliminar.", "error");
     }
 
     async function addSlot() {
+        const selectedDays = getSlotConfigDays();
+        if (!selectedDays.length) return toast("Selecciona al menos un día arriba.", "error");
         const startTime = document.getElementById("slotStart").value.trim();
         const endTime = document.getElementById("slotEnd").value.trim();
         const capacity = document.getElementById("slotCap").value;
         if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
             return toast("Usa formato HH:MM.", "error");
         }
-        const res = await api("/api/admin/slots", { method: "POST", body: JSON.stringify({ startTime, endTime, capacity }) });
-                if (res.ok) { toast("Turno agregado.", "success"); loadSlots(); loadActivity(); loadTimeline(); }
+        const res = await api("/api/admin/slots", {
+            method: "POST",
+            body: JSON.stringify({
+                startTime: startTime,
+                endTime: endTime,
+                capacity: capacity,
+                weekDays: weekDaysPayloadFromSelection(selectedDays),
+            }),
+        });
+        if (res.ok) { toast("Turno agregado.", "success"); loadSlots(); loadActivity(); loadTimeline(); }
         else { const d = await res.json(); toast(d.error || "Error.", "error"); }
     }
 
     async function toggleSlot(id, isActive) {
-        const res = await api("/api/admin/slots/" + id, { method: "PUT", body: JSON.stringify({ isActive }) });
-        if (res.ok) loadSlots();
-        else { const d = await res.json(); toast(d.error || "Error.", "error"); }
+        const selectedDays = getSlotConfigDays();
+        if (!selectedDays.length) return toast("Selecciona al menos un día.", "error");
+        const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
+        const dayLabel = formatSlotConfigDaysLabel(selectedDays);
+        if (isActive && slot && selectedDays.length < 7) {
+            if (!confirm("¿Desactivar " + slot.startTime + "–" + slot.endTime + " en " + dayLabel + "?")) return;
+        }
+        const res = await api("/api/admin/slots/" + id, {
+            method: "PUT",
+            body: JSON.stringify({
+                isActive: isActive,
+                scopeWeekdays: weekDaysPayloadFromSelection(selectedDays),
+            }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast(data.message || (isActive ? "Turno activado." : "Turno desactivado."), "success");
+            loadSlots();
+        } else toast(data.error || "Error.", "error");
     }
 
     // ── CALENDARIO DE GUARDIAS ──

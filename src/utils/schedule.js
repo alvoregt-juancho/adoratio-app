@@ -47,7 +47,13 @@ function isSlotAvailable(startTime, weekday) {
 
 function filterSlotsForDate(slots, dateStr) {
     const weekday = weekdayFromDate(dateStr);
-    const filtered = slots.filter((s) => isSlotAvailable(s.startTime, weekday));
+    const { slotAppliesOnWeekday } = require('./slotWeekDays');
+    const filtered = slots.filter(
+        (s) =>
+            s.isActive !== false &&
+            slotAppliesOnWeekday(s, weekday) &&
+            isSlotAvailable(s.startTime, weekday)
+    );
     return {
         slots: filtered,
         message: filtered.length ? null : 'No hay turnos disponibles para este día.',

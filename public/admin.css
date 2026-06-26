@@ -1537,3 +1537,51 @@ body.admin.hints-enabled [data-hint-key] {
     margin-top: 6px;
 }
 
+.slot-day-panel {
+    margin-bottom: 16px;
+}
+
+.slot-day-hint {
+    margin: 0 0 10px;
+    font-size: 0.86rem;
+}
+
+.slot-day-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.slot-day-btn {
+    border: 1px solid rgba(219, 191, 124, 0.35);
+    background: transparent;
+    color: var(--paper-dim, #ccc);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.84rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.slot-day-btn:hover {
+    border-color: rgba(219, 191, 124, 0.6);
+    color: var(--paper, #fff);
+}
+
+.slot-day-btn.active {
+    background: rgba(219, 191, 124, 0.18);
+    border-color: rgba(219, 191, 124, 0.75);
+    color: var(--admin-gold, #dbbf7c);
+    font-weight: 600;
+}
+
+.slot-day-context {
+    margin: 10px 0 0;
+    font-size: 0.86rem;
+    color: var(--paper-dim, #aaa);
+}
+
+.slots-table-row--inactive {
+    opacity: 0.65;
+}
+
