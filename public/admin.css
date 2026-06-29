@@ -10,6 +10,7 @@
     --admin-surface: #fafafa;
     --admin-gold: #8a6d2f;
     --admin-gold-soft: rgba(219, 191, 124, 0.18);
+    --admin-alert-surface: #F2F2F2;
     --admin-radius: 16px;
     --admin-ease: cubic-bezier(0.22, 1, 0.36, 1);
     --admin-serif: 'Cormorant Garamond', Georgia, serif;
@@ -428,7 +429,7 @@ body.admin {
     padding: 18px 20px;
     border: 1px solid rgba(192, 57, 43, 0.35);
     border-radius: var(--admin-radius);
-    background: rgba(192, 57, 43, 0.04);
+    background: var(--admin-alert-surface);
 }
 
 .audit-demo-zone-inner h3 {
@@ -464,7 +465,7 @@ body.admin {
 
 @media (hover: hover) {
     .danger-btn:hover {
-        background: rgba(192, 57, 43, 0.08) !important;
+        background: var(--admin-alert-surface) !important;
     }
 }
 
@@ -574,7 +575,7 @@ body.admin {
 
 @media (hover: hover) {
     .sheet-primary-btn.danger-outline:hover {
-        background: rgba(192, 57, 43, 0.06);
+        background: var(--admin-alert-surface);
     }
 }
 
@@ -686,12 +687,16 @@ body.admin {
 }
 
 .chronos-card.gap-alert {
-    background-color: #FCF5F5;
+    background-color: var(--admin-alert-surface);
     border: 2px solid var(--apple-red-alert);
     box-shadow: 0 0 15px rgba(217, 56, 58, 0.15);
 }
 
 .chronos-card.gap-alert .time-signature {
+    color: var(--apple-red-alert);
+}
+
+.chronos-card.gap-alert .chronos-meta {
     color: var(--apple-red-alert);
 }
 
@@ -939,11 +944,11 @@ body.admin {
 }
 
 .cal-cell--needs {
-    background: rgba(197, 160, 89, 0.08);
+    background: var(--admin-alert-surface);
 }
 
 .cal-cell--gap {
-    background: #FCF5F5;
+    background: var(--admin-alert-surface);
     box-shadow: inset 0 0 0 1px rgba(217, 56, 58, 0.25);
 }
 
@@ -1332,7 +1337,8 @@ body.admin.hints-enabled [data-hint-key] {
 }
 
 .captain-slot-row--gap {
-    background: rgba(220, 80, 80, 0.08);
+    background: var(--admin-alert-surface);
+    border: 1px solid rgba(217, 56, 58, 0.35);
     border-radius: 6px;
     padding: 6px 8px;
 }
@@ -1357,7 +1363,9 @@ body.admin.hints-enabled [data-hint-key] {
     margin-left: 6px;
     padding: 1px 6px;
     border-radius: 4px;
-    background: rgba(220, 80, 80, 0.25);
+    background: var(--admin-alert-surface);
+    border: 1px solid rgba(217, 56, 58, 0.35);
+    color: var(--apple-red-alert);
     font-size: 0.72rem;
     font-weight: 600;
 }

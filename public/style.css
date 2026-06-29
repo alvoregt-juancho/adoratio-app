@@ -1150,7 +1150,7 @@ body.admin .metric-card--clickable:focus-visible {
 
 body.admin .metric-card.critical {
     border-color: rgba(217, 56, 58, 0.45);
-    background: #fff8f8;
+    background: var(--admin-alert-surface, #F2F2F2);
 }
 
 body.admin .metric-value {
@@ -1206,7 +1206,7 @@ body.admin .mini-btn.danger {
 
 @media (hover: hover) {
     body.admin .mini-btn.danger:hover {
-        background: rgba(217, 56, 58, 0.08);
+        background: var(--admin-alert-surface, #F2F2F2);
     }
 }
 
@@ -1234,7 +1234,7 @@ body.admin .status-completed {
 body.admin .status-cancelled {
     color: #c0392b;
     border-color: rgba(192, 57, 43, 0.4);
-    background: rgba(192, 57, 43, 0.06);
+    background: var(--admin-alert-surface, #F2F2F2);
 }
 
 body.admin .premium-sheet-overlay {
