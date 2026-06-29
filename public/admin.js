@@ -1682,7 +1682,7 @@
                 ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + " de toda la semana?"
                 : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?",
             html: fullWeek
-                ? "<p>¿Eliminar permanentemente el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de toda la semana?</p><p class=\"confirm-sheet-note\">Si hay compromisos activos, te ofreceremos desactivarlo en su lugar.</p>"
+                ? "<p>¿Eliminar permanentemente el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de toda la semana?</p><p class=\"confirm-sheet-note\">Solo se bloquea si hay compromisos activos (confirmados). Los registros históricos cancelados se retiran automáticamente.</p>"
                 : "<p>¿Quitar el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de " + escapeHtml(dayLabel) + "?</p>",
             confirmLabel: fullWeek ? "Eliminar" : "Quitar días",
             danger: true,

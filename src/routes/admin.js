@@ -28,6 +28,7 @@ const {
     applyScopedSlotDelete,
     applyScopedSlotDeactivate,
     applyScopedSlotActivate,
+    purgeHistoricalReservationsForSlot,
 } = require('../utils/slotScope');
 const { checkTimelineGaps, hasFractionalCoverage, GAP_STATUS } = require('../utils/timeline');
 const {
@@ -407,9 +408,8 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
         }
 
         const activeLinked = await prisma.reservation.count({
-            where: { slotId: id, status: { in: ['confirmed', 'completed'] } },
+            where: { slotId: id, status: 'confirmed' },
         });
-        const totalLinked = await prisma.reservation.count({ where: { slotId: id } });
 
         if (activeLinked > 0) {
             await writeAudit({
@@ -435,30 +435,25 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
             });
         }
 
-        if (totalLinked > 0) {
-            await writeAudit({
-                action: 'slot.delete_blocked',
-                entity: 'slot',
-                entityId: id,
-                meta: { reason: 'historical_reservations', count: totalLinked, scopeWeekdays },
-                req,
-            });
-            return res.status(409).json({
-                error: `No se puede eliminar: ${totalLinked} reserva(s) histórica(s) siguen vinculadas a este turno.`,
-                code: 'SLOT_HAS_HISTORY',
-                reservationCount: totalLinked,
-            });
-        }
+        const purgedCount = await purgeHistoricalReservationsForSlot(prisma, id);
 
         await prisma.slot.delete({ where: { id } });
         await writeAudit({
             action: 'slot.delete',
             entity: 'slot',
             entityId: id,
-            meta: { startTime: existing.startTime, endTime: existing.endTime },
+            meta: {
+                startTime: existing.startTime,
+                endTime: existing.endTime,
+                purgedReservations: purgedCount,
+            },
             req,
         });
-        res.json({ message: 'Turno eliminado permanentemente.' });
+        res.json({
+            message: purgedCount
+                ? `Turno eliminado permanentemente (${purgedCount} registro(s) histórico(s) retirados).`
+                : 'Turno eliminado permanentemente.',
+        });
     } catch (e) {
         console.error(e);
         await writeAudit({

@@ -120,9 +120,43 @@ async function applyScopedSlotActivate(prisma, slot) {
     return { action: 'activated', slot: updated };
 }
 
+/** Elimina reservas no activas (canceladas, completadas, etc.) para permitir borrar el turno. */
+async function purgeHistoricalReservationsForSlot(prisma, slotId) {
+    const historical = await prisma.reservation.findMany({
+        where: { slotId, status: { not: 'confirmed' } },
+        select: { id: true },
+    });
+    if (!historical.length) return 0;
+
+    const ids = historical.map((r) => r.id);
+
+    await prisma.$transaction([
+        prisma.prayerIntention.updateMany({
+            where: { reservationId: { in: ids } },
+            data: { reservationId: null },
+        }),
+        prisma.prayerIntention.updateMany({
+            where: { assignedToReservationId: { in: ids } },
+            data: { assignedToReservationId: null },
+        }),
+        prisma.scanLog.updateMany({
+            where: { reservationId: { in: ids } },
+            data: { reservationId: null },
+        }),
+        prisma.auditLog.updateMany({
+            where: { reservationId: { in: ids } },
+            data: { reservationId: null },
+        }),
+        prisma.reservation.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    return ids.length;
+}
+
 module.exports = {
     findTimeConflict,
     applyScopedSlotDelete,
     applyScopedSlotDeactivate,
     applyScopedSlotActivate,
+    purgeHistoricalReservationsForSlot,
 };
