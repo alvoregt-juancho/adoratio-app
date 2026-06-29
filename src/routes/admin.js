@@ -378,7 +378,8 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
         const existing = await prisma.slot.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: 'Turno no encontrado.' });
 
-        const scopeWeekdays = req.body?.scopeWeekdays ?? req.query.weekdays ?? null;
+        const scopeWeekdays =
+            req.body?.scopeWeekdays ?? req.query.scopeWeekdays ?? req.query.weekdays ?? null;
         const plan = await applyScopedSlotDelete(prisma, existing, scopeWeekdays);
 
         if (plan.action === 'trim') {
@@ -399,10 +400,15 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
             });
         }
 
-        const linked = await prisma.reservation.count({ where: { slotId: id } });
+        const linked = await prisma.reservation.count({
+            where: { slotId: id, status: { in: ['confirmed', 'completed'] } },
+        });
         if (linked > 0) {
             return res.status(409).json({
-                error: 'No se puede eliminar: hay reservas asociadas. Desactívalo en su lugar.',
+                error: `No se puede eliminar: hay ${linked} compromiso(s) activo(s) en este turno. Desactívalo en su lugar; las reservas existentes se conservan.`,
+                code: 'SLOT_HAS_RESERVATIONS',
+                reservationCount: linked,
+                canDeactivate: true,
             });
         }
 

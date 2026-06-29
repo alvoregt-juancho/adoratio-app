@@ -21,7 +21,8 @@ async function findTimeConflict(prisma, { startTime, endTime, weekDays, excludeI
 
 async function applyScopedSlotDelete(prisma, slot, scopeRaw) {
     const scope = parseWeekDays(scopeRaw);
-    if (!scope.length || scopeCoversEntireSlot(slot, scope)) {
+    const fullWeekScope = !scope.length || scope.length === 7;
+    if (fullWeekScope || scopeCoversEntireSlot(slot, scope)) {
         return { action: 'delete', slotId: slot.id };
     }
 
@@ -36,7 +37,8 @@ async function applyScopedSlotDelete(prisma, slot, scopeRaw) {
 
 async function applyScopedSlotDeactivate(prisma, slot, scopeRaw) {
     const scope = parseWeekDays(scopeRaw);
-    if (!scope.length || scopeCoversEntireSlot(slot, scope)) {
+    const fullWeekScope = !scope.length || scope.length === 7;
+    if (fullWeekScope || scopeCoversEntireSlot(slot, scope)) {
         const updated = await prisma.slot.update({
             where: { id: slot.id },
             data: { isActive: false },

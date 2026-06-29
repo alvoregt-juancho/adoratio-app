@@ -2,6 +2,19 @@ const { execSync } = require('child_process');
 const prisma = require('./db');
 const { PRIV } = require('./constants/permissions');
 
+async function migrateSlotsDeletePrivilege() {
+    const roles = await prisma.adminRole.findMany();
+    for (const role of roles) {
+        if (role.slug === 'capitan' || role.slug === 'lector') continue;
+        if ((role.privileges & PRIV.SLOTS_EDIT) && !(role.privileges & PRIV.SLOTS_DELETE)) {
+            await prisma.adminRole.update({
+                where: { id: role.id },
+                data: { privileges: role.privileges | PRIV.SLOTS_DELETE },
+            });
+        }
+    }
+}
+
 async function migrateMuroPrivileges() {
     const roles = await prisma.adminRole.findMany();
     for (const role of roles) {
@@ -38,6 +51,7 @@ async function initDatabase() {
     await prisma.$connect();
 
     await migrateMuroPrivileges();
+    await migrateSlotsDeletePrivilege();
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {

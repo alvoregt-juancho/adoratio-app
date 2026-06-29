@@ -1439,7 +1439,8 @@
     }
 
     function weekDaysPayloadFromSelection(days) {
-        if (!days.length || days.length === 7) return null;
+        if (!days.length) return null;
+        if (days.length === 7) return "1,2,3,4,5,6,7";
         return days.join(",");
     }
 
@@ -1499,6 +1500,15 @@
         }
         syncSlotDayButtonStates();
         updateSlotDayContextLabel();
+    }
+
+    function refreshTurnosViews() {
+        loadMetrics();
+        const calPanel = document.getElementById("turnos-calendario");
+        const configPanel = document.getElementById("turnos-config");
+        if (calPanel && calPanel.classList.contains("active")) loadCalendar();
+        if (configPanel && configPanel.classList.contains("active")) loadSlots();
+        else if (hasPerm("SLOTS_VIEW")) loadTimeline();
     }
 
     // ── TURNOS ──
@@ -1590,7 +1600,8 @@
             if (res.ok) {
                 toast(data.message || "Turno actualizado.", "success");
                 document.getElementById("slotSheet").classList.remove("active");
-                loadSlots(); loadMetrics(); loadActivity();
+                refreshTurnosViews();
+                loadActivity();
             } else toast(data.error || "Error.", "error");
         } finally { btn.disabled = false; }
     }
@@ -1601,19 +1612,36 @@
         const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
         if (!slot) return;
         const dayLabel = formatSlotConfigDaysLabel(selectedDays);
-        const msg = selectedDays.length === 7
-            ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + "?"
+        const scopePayload = weekDaysPayloadFromSelection(selectedDays);
+        const fullWeek = selectedDays.length === 7;
+        const msg = fullWeek
+            ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + " de toda la semana?\n\nSi hay compromisos activos, se te ofrecerá desactivarlo en su lugar."
             : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?";
         if (!confirm(msg)) return;
-        const res = await api("/api/admin/slots/" + id, {
+        const scopeQs = scopePayload ? "?scopeWeekdays=" + encodeURIComponent(scopePayload) : "";
+        const res = await api("/api/admin/slots/" + id + scopeQs, {
             method: "DELETE",
-            body: JSON.stringify({ scopeWeekdays: weekDaysPayloadFromSelection(selectedDays) }),
+            body: JSON.stringify({ scopeWeekdays: scopePayload }),
         });
         const data = await res.json();
         if (res.ok) {
             toast(data.message || "Turno eliminado.", "success");
-            loadSlots(); loadMetrics();
-        } else toast(data.error || "No se pudo eliminar.", "error");
+            refreshTurnosViews();
+            return;
+        }
+        if (res.status === 409 && data.code === "SLOT_HAS_RESERVATIONS" && data.canDeactivate) {
+            const n = data.reservationCount || "varios";
+            const deactivateMsg = fullWeek
+                ? "Este turno tiene " + n + " compromiso(s) activo(s). ¿Desactivarlo en toda la semana en su lugar? Las reservas se conservan."
+                : "Este turno tiene " + n + " compromiso(s) activo(s). ¿Desactivarlo en " + dayLabel + " en su lugar?";
+            if (!confirm(deactivateMsg)) {
+                toast(data.error || "No se pudo eliminar.", "error");
+                return;
+            }
+            await toggleSlot(id, false, { skipConfirm: true });
+            return;
+        }
+        toast(data.error || "No se pudo eliminar.", "error");
     }
 
     async function addSlot() {
@@ -1634,17 +1662,21 @@
                 weekDays: weekDaysPayloadFromSelection(selectedDays),
             }),
         });
-        if (res.ok) { toast("Turno agregado.", "success"); loadSlots(); loadActivity(); loadTimeline(); }
+        if (res.ok) { toast("Turno agregado.", "success"); refreshTurnosViews(); loadActivity(); }
         else { const d = await res.json(); toast(d.error || "Error.", "error"); }
     }
 
-    async function toggleSlot(id, isActive) {
+    async function toggleSlot(id, isActive, opts) {
+        opts = opts || {};
         const selectedDays = getSlotConfigDays();
         if (!selectedDays.length) return toast("Selecciona al menos un día.", "error");
         const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
         const dayLabel = formatSlotConfigDaysLabel(selectedDays);
-        if (isActive && slot && selectedDays.length < 7) {
+        if (!opts.skipConfirm && isActive && slot && selectedDays.length < 7) {
             if (!confirm("¿Desactivar " + slot.startTime + "–" + slot.endTime + " en " + dayLabel + "?")) return;
+        }
+        if (!opts.skipConfirm && !isActive && slot && selectedDays.length === 7) {
+            if (!confirm("¿Desactivar " + slot.startTime + "–" + slot.endTime + " en toda la semana?")) return;
         }
         const res = await api("/api/admin/slots/" + id, {
             method: "PUT",
@@ -1656,7 +1688,7 @@
         const data = await res.json();
         if (res.ok) {
             toast(data.message || (isActive ? "Turno activado." : "Turno desactivado."), "success");
-            loadSlots();
+            refreshTurnosViews();
         } else toast(data.error || "Error.", "error");
     }
 

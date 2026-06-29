@@ -43,6 +43,7 @@ describe('slotWeekDays', () => {
         assert.equal(scopeCoversEntireSlot({ weekDays: '1,3' }, '1,3,5'), true);
         assert.equal(scopeCoversEntireSlot({ weekDays: '1,3' }, '1'), false);
         assert.equal(scopeCoversEntireSlot({ weekDays: '1,3' }, '1,3'), true);
+        assert.equal(scopeCoversEntireSlot({ weekDays: null }, '1,2,3,4,5,6,7'), true);
     });
 
     it('normalizeWeekDaysInput', () => {
