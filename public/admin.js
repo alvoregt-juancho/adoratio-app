@@ -2,6 +2,46 @@
     "use strict";
 
     const toast = window.AdoratioToast || function (m) { alert(m); };
+
+    function confirmDialog(opts) {
+        opts = opts || {};
+        return new Promise(function (resolve) {
+            const overlay = document.getElementById("confirmSheet");
+            if (!overlay) return resolve(window.confirm(opts.message || ""));
+            const titleEl = document.getElementById("confirmSheetTitle");
+            const msgEl = document.getElementById("confirmSheetMessage");
+            const okBtn = document.getElementById("confirmSheetOk");
+            const cancelBtn = document.getElementById("confirmSheetCancel");
+            titleEl.textContent = opts.title || "Confirmar";
+            if (opts.html) msgEl.innerHTML = opts.html;
+            else msgEl.textContent = opts.message || "";
+            okBtn.textContent = opts.confirmLabel || "Confirmar";
+            cancelBtn.textContent = opts.cancelLabel || "Cancelar";
+            okBtn.className = "sheet-primary-btn" + (opts.danger ? " danger-solid" : "");
+            function finish(value) {
+                overlay.classList.remove("active");
+                overlay.setAttribute("aria-hidden", "true");
+                document.body.classList.remove("sheet-open");
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                overlay.onclick = null;
+                document.removeEventListener("keydown", onKey);
+                resolve(value);
+            }
+            function onKey(e) {
+                if (e.key === "Escape") finish(false);
+            }
+            okBtn.onclick = function () { finish(true); };
+            cancelBtn.onclick = function () { finish(false); };
+            overlay.onclick = function (e) { if (e.target === overlay) finish(false); };
+            document.addEventListener("keydown", onKey);
+            overlay.classList.add("active");
+            overlay.setAttribute("aria-hidden", "false");
+            document.body.classList.add("sheet-open");
+            cancelBtn.focus();
+        });
+    }
+
     const TOKEN_KEY = "adoratio_admin_token";
     const HINTS_DISABLED_PREFIX = "adoratio_hints_disabled_";
 
@@ -950,6 +990,8 @@
             "slot.create": "Creó un bloque horario",
             "slot.update": "Modificó un turno",
             "slot.delete": "Eliminó un turno",
+            "slot.delete_blocked": "Bloqueó eliminación de turno",
+            "slot.delete_failed": "Error al eliminar turno",
             "qr.create": "Generó un QR",
             "qr.update": "Actualizó un QR",
             "qr.deactivate": "Desactivó un QR",
@@ -1220,7 +1262,12 @@
 
     async function deleteReservationEdit() {
         const id = Number(document.getElementById("reservationEditId").value);
-        if (!confirm("¿Eliminar este compromiso de adoración?")) return;
+        if (!(await confirmDialog({
+            title: "Eliminar compromiso",
+            message: "¿Eliminar este compromiso de adoración?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -1238,7 +1285,12 @@
 
     async function deleteReservationById(id) {
         if (!hasPerm("RESERVATIONS_CHECKIN")) return;
-        if (!confirm("¿Eliminar este compromiso de adoración?")) return;
+        if (!(await confirmDialog({
+            title: "Eliminar compromiso",
+            message: "¿Eliminar este compromiso de adoración?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -1288,7 +1340,12 @@
 
     async function deleteIntentionById(id) {
         if (!hasPerm("MURO_MANAGE")) return;
-        if (!confirm("¿Eliminar esta intención del muro?")) return;
+        if (!(await confirmDialog({
+            title: "Eliminar intención",
+            message: "¿Eliminar esta intención del muro?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -1302,7 +1359,12 @@
 
     async function deleteIntentionEdit() {
         const id = Number(document.getElementById("intentionEditId").value);
-        if (!confirm("¿Eliminar esta intención del muro?")) return;
+        if (!(await confirmDialog({
+            title: "Eliminar intención",
+            message: "¿Eliminar esta intención del muro?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -1614,10 +1676,18 @@
         const dayLabel = formatSlotConfigDaysLabel(selectedDays);
         const scopePayload = weekDaysPayloadFromSelection(selectedDays);
         const fullWeek = selectedDays.length === 7;
-        const msg = fullWeek
-            ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + " de toda la semana?\n\nSi hay compromisos activos, se te ofrecerá desactivarlo en su lugar."
-            : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?";
-        if (!confirm(msg)) return;
+        const confirmed = await confirmDialog({
+            title: fullWeek ? "Eliminar turno completo" : "Quitar días del turno",
+            message: fullWeek
+                ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + " de toda la semana?"
+                : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?",
+            html: fullWeek
+                ? "<p>¿Eliminar permanentemente el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de toda la semana?</p><p class=\"confirm-sheet-note\">Si hay compromisos activos, te ofreceremos desactivarlo en su lugar.</p>"
+                : "<p>¿Quitar el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de " + escapeHtml(dayLabel) + "?</p>",
+            confirmLabel: fullWeek ? "Eliminar" : "Quitar días",
+            danger: true,
+        });
+        if (!confirmed) return;
         const scopeQs = scopePayload ? "?scopeWeekdays=" + encodeURIComponent(scopePayload) : "";
         const res = await api("/api/admin/slots/" + id + scopeQs, {
             method: "DELETE",
@@ -1629,15 +1699,19 @@
             refreshTurnosViews();
             return;
         }
-        if (res.status === 409 && data.code === "SLOT_HAS_RESERVATIONS" && data.canDeactivate) {
+        if (res.status === 409 && data.code === "SLOT_HAS_RESERVATIONS") {
             const n = data.reservationCount || "varios";
-            const deactivateMsg = fullWeek
-                ? "Este turno tiene " + n + " compromiso(s) activo(s). ¿Desactivarlo en toda la semana en su lugar? Las reservas se conservan."
-                : "Este turno tiene " + n + " compromiso(s) activo(s). ¿Desactivarlo en " + dayLabel + " en su lugar?";
-            if (!confirm(deactivateMsg)) {
-                toast(data.error || "No se pudo eliminar.", "error");
+            if (data.alreadyInactive || !data.canDeactivate) {
+                toast(data.error || "No se puede eliminar este turno.", "error");
                 return;
             }
+            const deactivateOk = await confirmDialog({
+                title: "Compromisos activos",
+                html: "<p>Este turno tiene <strong>" + escapeHtml(String(n)) + "</strong> compromiso(s) activo(s).</p><p class=\"confirm-sheet-note\">¿Desactivarlo en " + escapeHtml(fullWeek ? "toda la semana" : dayLabel) + " en su lugar? Las reservas se conservan.</p>",
+                confirmLabel: "Desactivar turno",
+                danger: true,
+            });
+            if (!deactivateOk) return;
             await toggleSlot(id, false, { skipConfirm: true });
             return;
         }
@@ -1673,10 +1747,20 @@
         const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
         const dayLabel = formatSlotConfigDaysLabel(selectedDays);
         if (!opts.skipConfirm && isActive && slot && selectedDays.length < 7) {
-            if (!confirm("¿Desactivar " + slot.startTime + "–" + slot.endTime + " en " + dayLabel + "?")) return;
+            if (!(await confirmDialog({
+                title: "Desactivar turno",
+                message: "¿Desactivar " + slot.startTime + "–" + slot.endTime + " en " + dayLabel + "?",
+                confirmLabel: "Desactivar",
+                danger: true,
+            }))) return;
         }
         if (!opts.skipConfirm && !isActive && slot && selectedDays.length === 7) {
-            if (!confirm("¿Desactivar " + slot.startTime + "–" + slot.endTime + " en toda la semana?")) return;
+            if (!(await confirmDialog({
+                title: "Desactivar turno",
+                message: "¿Desactivar " + slot.startTime + "–" + slot.endTime + " en toda la semana?",
+                confirmLabel: "Desactivar",
+                danger: true,
+            }))) return;
         }
         const res = await api("/api/admin/slots/" + id, {
             method: "PUT",
@@ -1937,7 +2021,12 @@
         const label = reservationIds.length === 1
             ? "¿Eliminar este compromiso de adoración?"
             : "¿Eliminar los " + reservationIds.length + " compromisos de este adorador?";
-        if (!confirm(label)) return;
+        if (!(await confirmDialog({
+            title: "Eliminar compromisos",
+            message: label,
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         let ok = 0;
         for (const id of reservationIds) {
             const res = await api("/api/admin/reservations/" + id, { method: "DELETE" });
@@ -2241,7 +2330,12 @@
 
     async function deleteRosterMember(id) {
         if (!hasPerm("SLOTS_EDIT")) return;
-        if (!confirm("¿Eliminar este registro de la lista?")) return;
+        if (!(await confirmDialog({
+            title: "Eliminar contacto",
+            message: "¿Eliminar este registro de la lista?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/roster-members/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -2378,7 +2472,12 @@
 
     async function deleteCaptainRange() {
         const id = document.getElementById("captainRangeId").value;
-        if (!id || !confirm("¿Eliminar esta asignación de capitán?")) return;
+        if (!id || !(await confirmDialog({
+            title: "Quitar capitán",
+            message: "¿Eliminar esta asignación de capitán?",
+            confirmLabel: "Eliminar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/captain/ranges/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
@@ -2557,8 +2656,13 @@
                 });
             });
             grid.querySelectorAll("[data-captain-cancel]").forEach(function (btn) {
-                btn.addEventListener("click", function () {
-                    if (confirm("¿Cancelar esta reserva?")) {
+                btn.addEventListener("click", async function () {
+                    if (await confirmDialog({
+                        title: "Cancelar reserva",
+                        message: "¿Cancelar esta reserva?",
+                        confirmLabel: "Cancelar reserva",
+                        danger: true,
+                    })) {
                         deleteReservationById(Number(btn.getAttribute("data-captain-cancel")));
                     }
                 });
@@ -2631,7 +2735,12 @@
     }
 
     async function rejectSubstitution(id) {
-        if (!confirm("¿Rechazar esta solicitud de sustitución?")) return;
+        if (!(await confirmDialog({
+            title: "Rechazar sustitución",
+            message: "¿Rechazar esta solicitud de sustitución?",
+            confirmLabel: "Rechazar",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/captain/substitutions/" + id + "/reject", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2729,7 +2838,12 @@
 
     async function replaceChapelQr() {
         if (!hasPerm("QRS_CREATE")) return;
-        if (!confirm("¿Generar un nuevo QR de capilla? El código actual dejará de funcionar y deberás imprimir el nuevo.")) return;
+        if (!(await confirmDialog({
+            title: "Nuevo QR de capilla",
+            message: "¿Generar un nuevo QR de capilla? El código actual dejará de funcionar y deberás imprimir el nuevo.",
+            confirmLabel: "Generar nuevo QR",
+            danger: true,
+        }))) return;
         const res = await api("/api/admin/qrs/chapel/replace", { method: "POST" });
         const data = await res.json();
         if (res.ok) {
@@ -2909,7 +3023,12 @@
         const msg = role.userCount > 0
             ? "¿Eliminar el perfil «" + role.name + "» y reasignar " + role.userCount + " administrador(es)?"
             : "¿Eliminar el perfil «" + role.name + "»?";
-        if (!confirm(msg)) return;
+        if (!(await confirmDialog({
+            title: "Eliminar perfil",
+            message: msg,
+            confirmLabel: "Eliminar perfil",
+            danger: true,
+        }))) return;
         const body = {};
         if (role.userCount > 0) {
             const sel = document.getElementById("reassignRoleSelect");
@@ -3039,7 +3158,12 @@
         if (confirm !== "BORRAR") {
             return toast('Escribe BORRAR en el campo de confirmación.', "error");
         }
-        if (!window.confirm("¿Resetear todos los datos operativos y cargar la demostración?")) return;
+        if (!(await confirmDialog({
+            title: "Reset de demostración",
+            message: "¿Resetear todos los datos operativos y cargar la demostración?",
+            confirmLabel: "Resetear datos",
+            danger: true,
+        }))) return;
 
         const btn = document.getElementById("demoResetBtn");
         btn.disabled = true;

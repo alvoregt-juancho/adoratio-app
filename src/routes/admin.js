@@ -293,7 +293,13 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
             });
         }
 
-        if (scopedToggle && isActive === false && existing.isActive !== false) {
+        if (scopedToggle && isActive === false) {
+            if (existing.isActive === false) {
+                return res.json({
+                    message: 'El turno ya estaba desactivado.',
+                    slot: { ...existing, weekDaysLabel: formatSlotWeekDaysLabel(existing.weekDays) },
+                });
+            }
             try {
                 const result = await applyScopedSlotDeactivate(prisma, existing, scopeWeekdays);
                 await writeAudit({
@@ -400,15 +406,47 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
             });
         }
 
-        const linked = await prisma.reservation.count({
+        const activeLinked = await prisma.reservation.count({
             where: { slotId: id, status: { in: ['confirmed', 'completed'] } },
         });
-        if (linked > 0) {
+        const totalLinked = await prisma.reservation.count({ where: { slotId: id } });
+
+        if (activeLinked > 0) {
+            await writeAudit({
+                action: 'slot.delete_blocked',
+                entity: 'slot',
+                entityId: id,
+                meta: {
+                    reason: 'active_reservations',
+                    count: activeLinked,
+                    scopeWeekdays,
+                    isActive: existing.isActive,
+                },
+                req,
+            });
             return res.status(409).json({
-                error: `No se puede eliminar: hay ${linked} compromiso(s) activo(s) en este turno. Desactívalo en su lugar; las reservas existentes se conservan.`,
+                error: existing.isActive
+                    ? `No se puede eliminar: hay ${activeLinked} compromiso(s) activo(s) en este turno. Desactívalo en su lugar; las reservas se conservan.`
+                    : `No se puede eliminar: hay ${activeLinked} compromiso(s) activo(s) vinculados. El turno ya está inactivo; cancela o reasigna esos compromisos primero.`,
                 code: 'SLOT_HAS_RESERVATIONS',
-                reservationCount: linked,
-                canDeactivate: true,
+                reservationCount: activeLinked,
+                canDeactivate: existing.isActive,
+                alreadyInactive: !existing.isActive,
+            });
+        }
+
+        if (totalLinked > 0) {
+            await writeAudit({
+                action: 'slot.delete_blocked',
+                entity: 'slot',
+                entityId: id,
+                meta: { reason: 'historical_reservations', count: totalLinked, scopeWeekdays },
+                req,
+            });
+            return res.status(409).json({
+                error: `No se puede eliminar: ${totalLinked} reserva(s) histórica(s) siguen vinculadas a este turno.`,
+                code: 'SLOT_HAS_HISTORY',
+                reservationCount: totalLinked,
             });
         }
 
@@ -423,6 +461,13 @@ router.delete('/slots/:id', requirePermission(PRIV.SLOTS_DELETE), async (req, re
         res.json({ message: 'Turno eliminado permanentemente.' });
     } catch (e) {
         console.error(e);
+        await writeAudit({
+            action: 'slot.delete_failed',
+            entity: 'slot',
+            entityId: Number(req.params.id) || null,
+            meta: { message: e.message, code: e.code },
+            req,
+        });
         res.status(500).json({ error: 'Error al eliminar el turno.' });
     }
 });

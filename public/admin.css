@@ -1587,6 +1587,81 @@ body.admin.hints-enabled [data-hint-key] {
     padding: 16px 20px;
 }
 
+/* Diálogo de confirmación (reemplaza alert/confirm nativos) */
+body.admin .sheet-window--confirm {
+    max-width: 400px;
+    padding: 28px 24px 24px;
+    text-align: center;
+}
+
+body.admin .sheet-title--confirm {
+    font-family: var(--admin-serif);
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: var(--admin-ink);
+    margin: 0 0 12px;
+}
+
+.confirm-sheet-message {
+    margin: 0 0 22px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--admin-muted);
+    text-align: left;
+}
+
+.confirm-sheet-message p {
+    margin: 0 0 10px;
+}
+
+.confirm-sheet-message p:last-child {
+    margin-bottom: 0;
+}
+
+.confirm-sheet-note {
+    font-size: 0.84rem !important;
+    color: var(--admin-muted);
+    opacity: 0.9;
+}
+
+.confirm-sheet-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: stretch;
+}
+
+.confirm-sheet-actions .ghost-btn,
+.confirm-sheet-actions .sheet-primary-btn {
+    flex: 1;
+    margin: 0;
+}
+
+.sheet-primary-btn.danger-solid {
+    background: var(--apple-red-alert, #D9383A);
+    border-color: var(--apple-red-alert, #D9383A);
+    color: #fff;
+}
+
+@media (hover: hover) {
+    .sheet-primary-btn.danger-solid:hover {
+        filter: brightness(1.05);
+    }
+}
+
+body.admin .toast {
+    background: var(--admin-ink);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-family: var(--admin-sans);
+    z-index: 220;
+}
+
+body.admin .toast.info {
+    border-color: rgba(138, 109, 47, 0.5);
+}
+
 .slots-table-row--inactive {
     opacity: 0.65;
 }
