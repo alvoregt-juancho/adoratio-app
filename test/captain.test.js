@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
     captainRangesOverlap,
+    blockRangesOverlap,
     timeRangesOverlap,
     daysOverlap,
     slotMatchesCaptainScope,
@@ -33,11 +34,19 @@ describe('captainRangesOverlap', () => {
         );
     });
 
-    it('ignores different users', () => {
+    it('ignores different users for same-user overlap helper', () => {
         assert.equal(
             captainRangesOverlap(base, { ...base, id: 2, userId: 2 }),
             false
         );
+    });
+});
+
+describe('blockRangesOverlap', () => {
+    it('detects conflict between different captains on same block', () => {
+        const a = { id: 1, userId: 1, isActive: true, dayOfWeek: 1, startTime: '07:00', endTime: '12:00' };
+        const b = { id: 2, userId: 2, isActive: true, dayOfWeek: 1, startTime: '10:00', endTime: '14:00' };
+        assert.equal(blockRangesOverlap(a, b), true);
     });
 });
 

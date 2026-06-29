@@ -19,6 +19,7 @@ const {
     syncCaptainOpenSlotAlerts,
     slotMatchesCaptainScope,
     findOverlappingCaptainRange,
+    findConflictingCaptainBlock,
     occurrenceMatchesCaptainScope,
 } = require('../utils/captainScope');
 
@@ -124,6 +125,13 @@ router.post('/ranges', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, res) 
             });
         }
 
+        const blockConflict = await findConflictingCaptainBlock(parsed);
+        if (blockConflict) {
+            return res.status(409).json({
+                error: `Este bloque ya está asignado a ${blockConflict.user?.name || 'otro capitán'}.`,
+            });
+        }
+
         const range = await prisma.captainRange.create({
             data: {
                 userId: parsed.userId,
@@ -180,6 +188,13 @@ router.put('/ranges/:id', requirePermission(PRIV.CAPTAIN_ASSIGN), async (req, re
         if (overlap) {
             return res.status(409).json({
                 error: 'Ya existe una franja solapada para este capitán en el mismo día y horario.',
+            });
+        }
+
+        const blockConflict = await findConflictingCaptainBlock(parsed, id);
+        if (blockConflict) {
+            return res.status(409).json({
+                error: `Este bloque ya está asignado a ${blockConflict.user?.name || 'otro capitán'}.`,
             });
         }
 

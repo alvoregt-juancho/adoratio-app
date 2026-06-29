@@ -27,6 +27,8 @@ const PRIV = {
     AUDIT_VIEW:            1 << 20,
     CAPTAIN_VIEW:          1 << 21,
     CAPTAIN_ASSIGN:        1 << 22,
+    MURO_VIEW:             1 << 23,
+    MURO_MANAGE:           1 << 24,
 };
 
 const ALL_PRIVILEGES = Object.values(PRIV).reduce((acc, bit) => acc | bit, 0);
@@ -37,7 +39,8 @@ const LECTOR_PRIVILEGES =
     PRIV.SLOTS_VIEW |
     PRIV.RESERVATIONS_VIEW |
     PRIV.RESERVATIONS_EXPORT |
-    PRIV.QRS_VIEW;
+    PRIV.QRS_VIEW |
+    PRIV.MURO_VIEW;
 
 const ADMIN_PRIVILEGES =
     LECTOR_PRIVILEGES |
@@ -46,7 +49,8 @@ const ADMIN_PRIVILEGES =
     PRIV.RESERVATIONS_CHECKIN |
     PRIV.QRS_CREATE |
     PRIV.QRS_EDIT |
-    PRIV.CAPTAIN_ASSIGN;
+    PRIV.CAPTAIN_ASSIGN |
+    PRIV.MURO_MANAGE;
 
 /** Perfil limitado: solo ve y gestiona su bloque asignado. */
 const CAPTAIN_PRIVILEGES =
@@ -89,6 +93,14 @@ const PERMISSION_NODES = [
             { key: 'RESERVATIONS_VIEW', bit: PRIV.RESERVATIONS_VIEW, label: 'Ver reservas' },
             { key: 'RESERVATIONS_CHECKIN', bit: PRIV.RESERVATIONS_CHECKIN, label: 'Marcar asistencia' },
             { key: 'RESERVATIONS_EXPORT', bit: PRIV.RESERVATIONS_EXPORT, label: 'Exportar CSV' },
+        ],
+    },
+    {
+        module: 'muro',
+        label: 'Muro de intenciones',
+        nodes: [
+            { key: 'MURO_VIEW', bit: PRIV.MURO_VIEW, label: 'Ver muro en el panel' },
+            { key: 'MURO_MANAGE', bit: PRIV.MURO_MANAGE, label: 'Editar, marcar oradas y eliminar' },
         ],
     },
     {

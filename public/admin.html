@@ -45,12 +45,12 @@
         </header>
 
         <nav class="admin-tabs" id="adminTabs">
+            <button class="tab" data-tab="capitan" data-perm="CAPTAIN_VIEW" data-hint-key="tab-capitan">Mi bloque</button>
             <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW" data-hint-key="tab-resumen">Centro de Mando</button>
             <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-reservas">Reservas</button>
-            <button class="tab" data-tab="muro" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-muro">Muro</button>
+            <button class="tab" data-tab="muro" data-perm="MURO_VIEW" data-hint-key="tab-muro">Muro</button>
             <button class="tab" data-tab="turnos" data-perm="SLOTS_VIEW" data-hint-key="tab-turnos">Turnos</button>
             <button class="tab" data-tab="capitanes" data-perm="CAPTAIN_ASSIGN" data-hint-key="tab-capitanes">Capitanes</button>
-            <button class="tab" data-tab="capitan" data-perm="CAPTAIN_VIEW" data-hint-key="tab-capitan">Mi bloque</button>
             <button class="tab" data-tab="qrs" data-perm="QRS_VIEW" data-hint-key="tab-qrs">QR Capilla</button>
             <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW" data-hint-key="tab-perfiles">Perfiles</button>
             <button class="tab" data-tab="admins" data-perm="USERS_VIEW" data-hint-key="tab-admins">Administradores</button>
@@ -132,7 +132,7 @@
         </section>
 
         <!-- Muro de Intenciones -->
-        <section class="tab-panel" id="tab-muro" data-perm="RESERVATIONS_VIEW">
+        <section class="tab-panel" id="tab-muro" data-perm="MURO_VIEW">
             <div class="toolbar res-toolbar" data-hint-key="section-muro">
                 <label class="field"><span>Estado</span>
                     <select id="muroStatusFilter" class="touch-input-field dark-input" data-hint-key="muro-filter">

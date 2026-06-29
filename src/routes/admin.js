@@ -621,7 +621,7 @@ router.delete('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN),
 });
 
 // ── MURO DE INTENCIONES ───────────────────────────────────────────────
-router.get('/intentions', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
+router.get('/intentions', requirePermission(PRIV.MURO_VIEW), async (req, res) => {
     try {
         const status = req.query.status || 'active';
 
@@ -666,7 +666,7 @@ router.get('/intentions', requirePermission(PRIV.RESERVATIONS_VIEW), async (req,
     }
 });
 
-router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+router.post('/intentions/:id/prayed', requirePermission(PRIV.MURO_MANAGE), async (req, res) => {
     try {
         const id = Number(req.params.id);
         const existing = await prisma.prayerIntention.findUnique({ where: { id } });
@@ -689,7 +689,7 @@ router.post('/intentions/:id/prayed', requirePermission(PRIV.RESERVATIONS_CHECKI
     }
 });
 
-router.put('/intentions/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+router.put('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req, res) => {
     try {
         const id = Number(req.params.id);
         const existing = await prisma.prayerIntention.findUnique({ where: { id } });
@@ -735,7 +735,7 @@ router.put('/intentions/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), asyn
     }
 });
 
-router.delete('/intentions/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+router.delete('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req, res) => {
     try {
         const id = Number(req.params.id);
         const existing = await prisma.prayerIntention.findUnique({ where: { id } });

@@ -36,9 +36,9 @@ function daysOverlap(dayA, dayB) {
     return Number(dayA) === Number(dayB);
 }
 
-/** True when two active ranges for the same user share day + overlapping hours. */
-function captainRangesOverlap(a, b) {
-    if (!a || !b || Number(a.userId) !== Number(b.userId)) return false;
+/** True when two active ranges share day + overlapping hours (any users). */
+function blockRangesOverlap(a, b) {
+    if (!a || !b) return false;
     if (a.isActive === false || b.isActive === false) return false;
     if (a.id != null && b.id != null && Number(a.id) === Number(b.id)) return false;
     if (!daysOverlap(a.dayOfWeek, b.dayOfWeek)) return false;
@@ -50,6 +50,12 @@ function captainRangesOverlap(a, b) {
     );
 }
 
+/** True when two active ranges for the same user share day + overlapping hours. */
+function captainRangesOverlap(a, b) {
+    if (!a || !b || Number(a.userId) !== Number(b.userId)) return false;
+    return blockRangesOverlap(a, b);
+}
+
 async function findOverlappingCaptainRange(parsed, excludeId = null) {
     const existing = await prisma.captainRange.findMany({
         where: { userId: parsed.userId, isActive: true },
@@ -57,6 +63,18 @@ async function findOverlappingCaptainRange(parsed, excludeId = null) {
     return existing.find(
         (range) =>
             (!excludeId || range.id !== excludeId) && captainRangesOverlap(range, parsed)
+    );
+}
+
+/** Another captain already assigned to the same day/time block. */
+async function findConflictingCaptainBlock(parsed, excludeId = null) {
+    const existing = await prisma.captainRange.findMany({
+        where: { isActive: true, userId: { not: parsed.userId } },
+        include: { user: { select: { id: true, name: true } } },
+    });
+    return existing.find(
+        (range) =>
+            (!excludeId || range.id !== excludeId) && blockRangesOverlap(range, parsed)
     );
 }
 
@@ -368,7 +386,9 @@ module.exports = {
     timeRangesOverlap,
     daysOverlap,
     captainRangesOverlap,
+    blockRangesOverlap,
     findOverlappingCaptainRange,
+    findConflictingCaptainBlock,
     formatTimeLabel,
     slotMatchesCaptainScope,
     occurrenceMatchesCaptainScope,

@@ -80,12 +80,13 @@
         },
         {
             tab: "muro",
-            tabPerm: "RESERVATIONS_VIEW",
+            tabPerm: "MURO_VIEW",
             title: "Muro de intenciones",
             introKey: "tab-muro",
             items: [
-                { perm: "RESERVATIONS_VIEW", label: "Ver intenciones publicadas", hintKey: "section-muro" },
-                { perm: "RESERVATIONS_CHECKIN", label: "Marcar intenciones como oradas", hintKey: "muro-filter" },
+                { perm: "MURO_VIEW", label: "Ver intenciones publicadas", hintKey: "section-muro" },
+                { perm: "MURO_MANAGE", label: "Marcar intenciones como oradas", hintKey: "muro-filter" },
+                { perm: "MURO_MANAGE", label: "Editar o eliminar intenciones", hintKey: "section-muro" },
             ],
         },
         {
@@ -330,6 +331,8 @@
         AUDIT_VIEW:            1 << 20,
         CAPTAIN_VIEW:          1 << 21,
         CAPTAIN_ASSIGN:        1 << 22,
+        MURO_VIEW:             1 << 23,
+        MURO_MANAGE:           1 << 24,
     };
 
     let token = localStorage.getItem(TOKEN_KEY);
@@ -411,6 +414,14 @@
     }
 
     /** Zero-Trust UI: oculta nodos DOM sin permiso exacto. */
+    function reorderNavForCaptain() {
+        const nav = document.getElementById("adminTabs");
+        const capTab = nav && nav.querySelector('.tab[data-tab="capitan"]');
+        if (!nav || !capTab || capTab.classList.contains("perm-denied")) return;
+        if (!session.user?.isScopedCaptain) return;
+        nav.insertBefore(capTab, nav.firstChild);
+    }
+
     function applyZeroTrustUI() {
         document.querySelectorAll("[data-perm]").forEach(function (el) {
             const key = el.getAttribute("data-perm");
@@ -420,6 +431,7 @@
                 el.classList.add("perm-denied");
             }
         });
+        reorderNavForCaptain();
         document.querySelectorAll(".tab-panel[data-perm]").forEach(function (panel) {
             if (panel.classList.contains("perm-denied") && panel.classList.contains("active")) {
                 const firstVisible = document.querySelector(".tab:not(.perm-denied)");
@@ -452,7 +464,14 @@
         const container = document.getElementById("accountGuideContent");
         if (!container || !session.user) return;
 
-        const sections = BACKOFFICE_GUIDE.map(function (section) {
+        const sections = BACKOFFICE_GUIDE.slice();
+        if (session.user?.isScopedCaptain) {
+            const capIdx = sections.findIndex(function (s) { return s.tab === "capitan"; });
+            if (capIdx > 0) {
+                sections.unshift(sections.splice(capIdx, 1)[0]);
+            }
+        }
+        const rendered = sections.map(function (section) {
             if (!hasPerm(section.tabPerm)) return null;
             const items = (section.items || []).filter(function (item) {
                 return hasPerm(item.perm);
@@ -476,7 +495,7 @@
                 "</article>";
         }).filter(Boolean);
 
-        if (!sections.length) {
+        if (!rendered.length) {
             container.innerHTML = '<div class="empty-state">Tu perfil no incluye módulos del back-office visibles.</div>';
             return;
         }
@@ -484,7 +503,7 @@
         const roleName = session.user.adminRoleName || session.user.role || "Sin perfil";
         container.innerHTML =
             '<p class="account-guide-role">Perfil activo: <strong>' + escapeHtml(roleName) + "</strong></p>" +
-            sections.join("");
+            rendered.join("");
 
         container.querySelectorAll("[data-guide-tab]").forEach(function (btn) {
             btn.addEventListener("click", function () {
@@ -1236,7 +1255,7 @@
     }
 
     function openIntentionEditor(id) {
-        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        if (!hasPerm("MURO_MANAGE")) return;
         const item = intentionsCache.find(function (i) { return i.id === id; });
         if (!item) return;
         document.getElementById("intentionEditId").value = item.id;
@@ -1268,7 +1287,7 @@
     }
 
     async function deleteIntentionById(id) {
-        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        if (!hasPerm("MURO_MANAGE")) return;
         if (!confirm("¿Eliminar esta intención del muro?")) return;
         const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
         const data = await res.json();
@@ -1331,8 +1350,8 @@
 
     function renderMuroTable() {
         const table = document.getElementById("muroTable");
-        const canNotify = hasPerm("RESERVATIONS_CHECKIN");
-        const canManage = hasPerm("RESERVATIONS_CHECKIN");
+        const canNotify = hasPerm("MURO_MANAGE");
+        const canManage = hasPerm("MURO_MANAGE");
         const tbody = intentionsCache;
 
         table.innerHTML =
@@ -1381,7 +1400,7 @@
     }
 
     async function loadIntentions() {
-        if (!hasPerm("RESERVATIONS_VIEW")) return;
+        if (!hasPerm("MURO_VIEW")) return;
         const status = document.getElementById("muroStatusFilter").value;
         const qs = new URLSearchParams();
         if (status) qs.set("status", status);
@@ -1450,6 +1469,13 @@
         el.textContent = "Editando horario para: " + formatSlotConfigDaysLabel(days);
     }
 
+    function syncSlotDayButtonStates() {
+        document.querySelectorAll("#slotDayButtons .slot-day-btn").forEach(function (btn) {
+            const on = btn.classList.contains("active");
+            btn.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+    }
+
     function setupSlotDayButtons() {
         const wrap = document.getElementById("slotDayButtons");
         if (!wrap || wrap.dataset.bound) return;
@@ -1457,6 +1483,7 @@
         wrap.querySelectorAll(".slot-day-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 btn.classList.toggle("active");
+                syncSlotDayButtonStates();
                 updateSlotDayContextLabel();
                 loadSlots();
             });
@@ -1465,10 +1492,12 @@
         if (allBtn) {
             allBtn.addEventListener("click", function () {
                 wrap.querySelectorAll(".slot-day-btn").forEach(function (b) { b.classList.add("active"); });
+                syncSlotDayButtonStates();
                 updateSlotDayContextLabel();
                 loadSlots();
             });
         }
+        syncSlotDayButtonStates();
         updateSlotDayContextLabel();
     }
 

@@ -58,18 +58,32 @@
         .kiosk-content {
             position: relative;
             z-index: 1;
-            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: max(24px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+            padding: max(20px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
             min-height: 100dvh;
         }
+        .kiosk-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: min(420px, 100%);
+            flex-shrink: 0;
+        }
+        .kiosk-logo-wrap {
+            flex-shrink: 0;
+            line-height: 0;
+            margin-bottom: 20px;
+        }
         .kiosk-logo {
-            width: min(220px, 58vw);
-            margin-bottom: 28px;
-            opacity: 0.95;
+            display: block;
+            height: clamp(44px, 12vw, 56px);
+            width: auto;
+            max-width: min(280px, 86vw);
+            object-fit: contain;
+            aspect-ratio: 925 / 195;
         }
         .kiosk-card {
             width: min(420px, 100%);
@@ -216,8 +230,11 @@
     <div class="kiosk-viewport">
         <div class="kiosk-hero" aria-hidden="true"></div>
         <main class="kiosk-content">
-            <img src="logo-adorahora-dark.png" alt="" class="kiosk-logo" width="220" height="73">
-            <div class="kiosk-card">
+            <div class="kiosk-stack">
+                <div class="kiosk-logo-wrap">
+                    <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="kiosk-logo" width="925" height="195">
+                </div>
+                <div class="kiosk-card">
                 <p class="kiosk-eyebrow">Capilla Cristo Rey</p>
                 <h1 class="kiosk-title">Registro de asistencia</h1>
                 <form id="kioskForm" autocomplete="off">
@@ -238,6 +255,7 @@
                     <p class="kiosk-hint">Ingresa los 8 dígitos de tu celular registrado en la capilla.</p>
                     <p class="kiosk-error" id="kioskError" role="alert"></p>
                 </form>
+                </div>
             </div>
         </main>
     </div>

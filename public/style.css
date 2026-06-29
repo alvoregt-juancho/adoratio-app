@@ -1344,25 +1344,29 @@ body.admin .sheet-primary-btn {
 .brand-logo {
     display: block;
     width: auto;
+    height: auto;
     object-fit: contain;
     background: transparent;
 }
 
 .brand-logo--header {
     height: 34px;
-    max-width: 152px;
+    max-width: 162px;
+    aspect-ratio: 925 / 195;
 }
 
 .brand-logo--hero {
     height: clamp(58px, 17vw, 84px);
-    max-width: min(360px, 92vw);
+    max-width: min(398px, 92vw);
+    aspect-ratio: 925 / 195;
     margin: 0 auto 6px;
     filter: drop-shadow(0 6px 28px rgba(0, 0, 0, 0.45));
 }
 
 .brand-logo--totem {
-    height: clamp(40px, 11vw, 52px);
+    height: clamp(44px, 12vw, 56px);
     max-width: min(280px, 86vw);
+    aspect-ratio: 925 / 195;
     margin: 0 auto 18px;
 }
 

@@ -1187,18 +1187,21 @@
         .brand-logo {
             display: block;
             width: auto;
+            height: auto;
             object-fit: contain;
             background: transparent;
         }
 
         .brand-logo--header {
             height: 34px;
-            max-width: 152px;
+            max-width: 162px;
+            aspect-ratio: 925 / 195;
         }
 
         .brand-logo--hero {
             height: clamp(75px, 22.1vw, 109px);
-            max-width: min(468px, 92vw);
+            max-width: min(516px, 92vw);
+            aspect-ratio: 925 / 195;
             filter: drop-shadow(0 6px 28px rgba(0, 0, 0, 0.45));
         }
 
@@ -1451,8 +1454,8 @@
 
     <header class="app-header">
         <a href="#" class="brand-logo-link" onclick="switchTab('home'); return false;" aria-label="adorahora.com — inicio">
-            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--header brand-logo--on-dark" width="152" height="51">
-            <img src="logo-adorahora.png" alt="" class="brand-logo brand-logo--header brand-logo--on-light" aria-hidden="true" width="152" height="51">
+            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--header brand-logo--on-dark" width="925" height="195">
+            <img src="logo-adorahora.png" alt="" class="brand-logo brand-logo--header brand-logo--on-light" aria-hidden="true" width="925" height="195">
         </a>
         <button type="button" class="theme-toggle" id="themeToggle" aria-label="Activar modo claro"></button>
     </header>
@@ -1465,7 +1468,7 @@
                     <div class="hero-visual">
                         <div class="cinematic-bg" id="heroBg"></div>
                         <div class="hero-logo-wrap">
-                            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--hero" width="468" height="156">
+                            <img src="logo-adorahora-dark.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--hero" width="925" height="195">
                         </div>
                     </div>
                     <div class="hero-content-panel">
