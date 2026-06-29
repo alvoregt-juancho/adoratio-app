@@ -1553,32 +1553,38 @@ body.admin.hints-enabled [data-hint-key] {
 }
 
 .slot-day-btn {
-    border: 1px solid rgba(219, 191, 124, 0.35);
-    background: transparent;
-    color: var(--paper-dim, #ccc);
+    border: 1px solid var(--admin-border);
+    background: #fff;
+    color: var(--admin-muted);
     border-radius: 8px;
     padding: 8px 14px;
     font-size: 0.84rem;
+    font-weight: 500;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .slot-day-btn:hover {
-    border-color: rgba(219, 191, 124, 0.6);
-    color: var(--paper, #fff);
+    border-color: var(--admin-gold);
+    background: var(--admin-surface);
+    color: var(--admin-ink);
 }
 
 .slot-day-btn.active {
-    background: rgba(219, 191, 124, 0.18);
-    border-color: rgba(219, 191, 124, 0.75);
-    color: var(--admin-gold, #dbbf7c);
+    background: var(--admin-gold-soft);
+    border-color: var(--admin-gold);
+    color: var(--admin-gold);
     font-weight: 600;
 }
 
 .slot-day-context {
     margin: 10px 0 0;
     font-size: 0.86rem;
-    color: var(--paper-dim, #aaa);
+    color: var(--admin-muted);
+}
+
+.slot-day-panel .panel-card-body {
+    padding: 16px 20px;
 }
 
 .slots-table-row--inactive {

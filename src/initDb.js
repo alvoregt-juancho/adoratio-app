@@ -1,6 +1,24 @@
 const { execSync } = require('child_process');
 const prisma = require('./db');
-const { PRIV } = require('./constants/permissions');
+const { PRIV, ALL_PRIVILEGES, ADMIN_PRIVILEGES, LECTOR_PRIVILEGES, CAPTAIN_PRIVILEGES } = require('./constants/permissions');
+
+async function migrateSystemRolePrivileges() {
+    const sync = [
+        { slug: 'super-admin', privileges: ALL_PRIVILEGES },
+        { slug: 'administrador', privileges: ADMIN_PRIVILEGES },
+        { slug: 'lector', privileges: LECTOR_PRIVILEGES },
+        { slug: 'capitan', privileges: CAPTAIN_PRIVILEGES },
+    ];
+    for (const def of sync) {
+        const role = await prisma.adminRole.findUnique({ where: { slug: def.slug } });
+        if (!role || role.privileges === def.privileges) continue;
+        await prisma.adminRole.update({
+            where: { id: role.id },
+            data: { privileges: def.privileges },
+        });
+        console.log(`ℹ Perfil «${def.slug}» actualizado con privilegios del sistema.`);
+    }
+}
 
 async function migrateSlotsDeletePrivilege() {
     const roles = await prisma.adminRole.findMany();
@@ -52,6 +70,7 @@ async function initDatabase() {
 
     await migrateMuroPrivileges();
     await migrateSlotsDeletePrivilege();
+    await migrateSystemRolePrivileges();
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {

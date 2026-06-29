@@ -28,7 +28,7 @@ if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev
 npx prisma generate
 if grep -q 'file:' .env 2>/dev/null; then npx prisma db push; else npx prisma migrate deploy; fi
 pm2 restart adoratio
-sleep 5
+sleep 10
 curl -fsS http://127.0.0.1:3000/api/health
 echo ""
 echo "✔ Adoratio en línea"
