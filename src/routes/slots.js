@@ -4,6 +4,7 @@ const { todayStr } = require('../utils/dates');
 const { filterSlotsForDate } = require('../utils/schedule');
 const { getSettings } = require('../utils/settings');
 const { getEnabledFrequencies } = require('../constants/commitment');
+const { formatTimeRange12, withSlotTimeLabels } = require('../utils/timeFormat');
 const { checkTimelineGaps, hasFractionalCoverage, GAP_STATUS } = require('../utils/timeline');
 
 const router = express.Router();
@@ -44,7 +45,7 @@ router.get('/', async (req, res) => {
             const taken = countBySlot[s.id] || 0;
             const commitments = commitmentsBySlot[s.id] || [];
             const gapStatus = checkTimelineGaps(commitments);
-            return {
+            return withSlotTimeLabels({
                 id: s.id,
                 startTime: s.startTime,
                 endTime: s.endTime,
@@ -55,7 +56,7 @@ router.get('/', async (req, res) => {
                 critical: taken === 0 || gapStatus === GAP_STATUS.CRITICAL_GAP,
                 gapAlert: gapStatus === GAP_STATUS.CRITICAL_GAP,
                 fractional: hasFractionalCoverage(commitments),
-            };
+            });
         });
 
         res.json({

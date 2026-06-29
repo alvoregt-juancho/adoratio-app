@@ -25,9 +25,10 @@ function formatWeekDaysFilter(raw) {
     return days.map((d) => WEEKDAY_FULL[d]).join(', ');
 }
 
+const { formatTime12 } = require('./timeFormat');
+
 function formatRosterTime(hhmm) {
-    const [h, m] = hhmm.split(':').map(Number);
-    return `${h}:${String(m).padStart(2, '0')}`;
+    return formatTime12(hhmm);
 }
 
 function addMinutesToTime(hhmm, minutes) {

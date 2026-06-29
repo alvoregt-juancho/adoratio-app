@@ -296,8 +296,8 @@
                 </div>
             </div>
             <div class="toolbar" data-perm="SLOTS_CREATE">
-                <input type="text" id="slotStart" class="touch-input-field dark-input" placeholder="Inicio (HH:MM)">
-                <input type="text" id="slotEnd" class="touch-input-field dark-input" placeholder="Fin (HH:MM)">
+                <input type="text" id="slotStart" class="touch-input-field dark-input" placeholder="Inicio (ej. 7:00 AM)">
+                <input type="text" id="slotEnd" class="touch-input-field dark-input" placeholder="Fin (ej. 8:00 AM)">
                 <input type="number" id="slotCap" class="touch-input-field dark-input" placeholder="Cupo" min="1" value="4">
                 <button class="ghost-btn" id="addSlot" data-hint-key="add-slot">+ Agregar turno</button>
             </div>
@@ -649,10 +649,10 @@
                 </select>
             </div>
             <div class="booking-input-group">
-                <input type="text" id="captainRangeStart" class="touch-input-field sheet-field" placeholder="Inicio (HH:MM)">
+                <input type="text" id="captainRangeStart" class="touch-input-field sheet-field" placeholder="Inicio (ej. 7:00 AM)">
             </div>
             <div class="booking-input-group">
-                <input type="text" id="captainRangeEnd" class="touch-input-field sheet-field" placeholder="Fin (HH:MM)">
+                <input type="text" id="captainRangeEnd" class="touch-input-field sheet-field" placeholder="Fin (ej. 12:00 PM)">
             </div>
             <div class="booking-input-group">
                 <input type="text" id="captainRangeLabel" class="touch-input-field sheet-field" placeholder="Etiqueta (opcional)">
@@ -684,10 +684,10 @@
                 </div>
             </fieldset>
             <div class="booking-input-group">
-                <input type="text" id="editSlotStart" class="touch-input-field" placeholder="Inicio (HH:MM)" style="background:#fff;color:#000;">
+                <input type="text" id="editSlotStart" class="touch-input-field" placeholder="Inicio (ej. 7:00 AM)" style="background:#fff;color:#000;">
             </div>
             <div class="booking-input-group">
-                <input type="text" id="editSlotEnd" class="touch-input-field" placeholder="Fin (HH:MM)" style="background:#fff;color:#000;">
+                <input type="text" id="editSlotEnd" class="touch-input-field" placeholder="Fin (ej. 8:00 AM)" style="background:#fff;color:#000;">
             </div>
             <div class="booking-input-group">
                 <input type="number" id="editSlotCap" class="touch-input-field" placeholder="Cupo" min="1" style="background:#fff;color:#000;">
@@ -751,7 +751,8 @@
         </div>
     </div>
 
+    <script src="timeFormat.js"></script>
     <script src="app.js"></script>
-    <script src="admin.js?v=2025063002"></script>
+    <script src="admin.js?v=2025063003"></script>
 </body>
 </html>

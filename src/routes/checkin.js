@@ -9,6 +9,7 @@ const {
     endOfDay,
 } = require('../utils/checkinMatch');
 const { getChapelQr } = require('../utils/chapelQr');
+const { formatTimeRange12 } = require('../utils/timeFormat');
 const { markAssignedIntentionPrayed } = require('../utils/intentions');
 const qrUtil = require('../utils/qr');
 
@@ -138,7 +139,7 @@ router.post('/scan', async (req, res) => {
             message: `¡Bienvenido/a ${activeReservation.userName}! Tu asistencia ha sido registrada.`,
             details: {
                 date,
-                slot: `${activeReservation.slot.startTime} - ${activeReservation.slot.endTime}`,
+                slot: formatTimeRange12(activeReservation.slot.startTime, activeReservation.slot.endTime, ' - '),
                 checkedInAt: new Date().toLocaleTimeString('es-MX'),
             },
         });

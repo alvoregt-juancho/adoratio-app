@@ -1756,6 +1756,7 @@
         </nav>
     </div>
 
+    <script src="timeFormat.js"></script>
     <script>
         const COORDINATOR_PHONE = '00000000';
         const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -2055,6 +2056,7 @@
         }
 
         function formatSlotTime(start, end) {
+            if (window.AdoratioTime) return window.AdoratioTime.formatRange(start, end);
             return start.slice(0, 5) + ' – ' + end.slice(0, 5);
         }
 

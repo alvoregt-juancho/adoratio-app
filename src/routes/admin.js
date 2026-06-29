@@ -23,6 +23,7 @@ const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
 const { normalizeWeekDaysInput, formatSlotWeekDaysLabel, slotAppliesOnSelection, parseWeekDays } = require('../utils/slotWeekDays');
+const { formatTimeRange12, withSlotTimeLabels, normalizeTimeBody } = require('../utils/timeFormat');
 const {
     findTimeConflict,
     applyScopedSlotDelete,
@@ -72,7 +73,7 @@ function formatReservationBrief(r) {
         id: r.id,
         name,
         phone: r.userPhone,
-        slot: `${r.slot.startTime}–${r.slot.endTime}`,
+        slot: formatTimeRange12(r.slot.startTime, r.slot.endTime, '–'),
         status: r.status,
         checkedInAt: r.checkedInAt,
     };
@@ -195,7 +196,7 @@ router.get('/activity', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res)
                 userFirstName: r.userFirstName,
                 userLastName: r.userLastName,
                 userName: r.userName,
-                slot: r.slot.startTime + '–' + r.slot.endTime,
+                slot: formatTimeRange12(r.slot.startTime, r.slot.endTime, '–'),
                 status: r.status,
                 createdAt: r.createdAt,
             })),
@@ -214,16 +215,20 @@ router.get('/slots', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
         ? slots.filter((s) => slotAppliesOnSelection(s, filterDays))
         : slots;
     res.json({
-        slots: filtered.map((s) => ({
-            ...s,
-            weekDaysLabel: formatSlotWeekDaysLabel(s.weekDays),
-        })),
+        slots: filtered.map((s) =>
+            withSlotTimeLabels({
+                ...s,
+                weekDaysLabel: formatSlotWeekDaysLabel(s.weekDays),
+            })
+        ),
     });
 });
 
 router.post('/slots', requirePermission(PRIV.SLOTS_CREATE), async (req, res) => {
     try {
-        const { startTime, endTime, capacity, label, weekDays } = req.body || {};
+        const bodyNorm = normalizeTimeBody(req.body || {});
+        if (bodyNorm.error) return res.status(400).json({ error: bodyNorm.error });
+        const { startTime, endTime, capacity, label, weekDays } = bodyNorm.value;
         if (!startTime || !endTime) {
             return res.status(400).json({ error: 'Hora de inicio y fin requeridas.' });
         }
@@ -255,7 +260,12 @@ router.post('/slots', requirePermission(PRIV.SLOTS_CREATE), async (req, res) => 
             meta: { startTime, endTime, capacity: slot.capacity, weekDays: slot.weekDays },
             req,
         });
-        res.status(201).json({ slot: { ...slot, weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays) } });
+        res.status(201).json({
+            slot: withSlotTimeLabels({
+                ...slot,
+                weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays),
+            }),
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al crear el turno.' });
@@ -269,7 +279,6 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
         if (!existing) return res.status(404).json({ error: 'Turno no encontrado.' });
 
         const { startTime, endTime, capacity, label, isActive, weekDays, scopeWeekdays } = req.body || {};
-        const timeRe = /^\d{2}:\d{2}$/;
         const scopedToggle =
             scopeWeekdays !== undefined &&
             isActive !== undefined &&
@@ -324,15 +333,19 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
             }
         }
 
-        if (startTime !== undefined && !timeRe.test(startTime)) {
-            return res.status(400).json({ error: 'Hora de inicio inválida (HH:MM).' });
-        }
-        if (endTime !== undefined && !timeRe.test(endTime)) {
-            return res.status(400).json({ error: 'Hora de fin inválida (HH:MM).' });
-        }
+        const timeNorm = normalizeTimeBody(
+            { startTime, endTime },
+            [
+                ...(startTime !== undefined ? ['startTime'] : []),
+                ...(endTime !== undefined ? ['endTime'] : []),
+            ]
+        );
+        if (timeNorm.error) return res.status(400).json({ error: timeNorm.error });
+        const parsedStart = startTime !== undefined ? timeNorm.value.startTime : undefined;
+        const parsedEnd = endTime !== undefined ? timeNorm.value.endTime : undefined;
 
-        const nextStart = startTime !== undefined ? startTime : existing.startTime;
-        const nextEnd = endTime !== undefined ? endTime : existing.endTime;
+        const nextStart = parsedStart !== undefined ? parsedStart : existing.startTime;
+        const nextEnd = parsedEnd !== undefined ? parsedEnd : existing.endTime;
         const nextWeekDays =
             weekDays !== undefined ? normalizeWeekDaysInput(weekDays) : existing.weekDays;
 
@@ -351,8 +364,8 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
         const slot = await prisma.slot.update({
             where: { id },
             data: {
-                ...(startTime !== undefined && { startTime }),
-                ...(endTime !== undefined && { endTime }),
+                ...(parsedStart !== undefined && { startTime: parsedStart }),
+                ...(parsedEnd !== undefined && { endTime: parsedEnd }),
                 ...(capacity !== undefined && { capacity: Number(capacity) }),
                 ...(label !== undefined && { label }),
                 ...(weekDays !== undefined && { weekDays: nextWeekDays }),
@@ -371,7 +384,12 @@ router.put('/slots/:id', requirePermission(PRIV.SLOTS_EDIT), async (req, res) =>
             },
             req,
         });
-        res.json({ slot: { ...slot, weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays) } });
+        res.json({
+            slot: withSlotTimeLabels({
+                ...slot,
+                weekDaysLabel: formatSlotWeekDaysLabel(slot.weekDays),
+            }),
+        });
     } catch (e) {
         console.error(e);
         if (e.code === 'P2025') return res.status(404).json({ error: 'Turno no encontrado.' });
@@ -701,7 +719,11 @@ router.get('/intentions', requirePermission(PRIV.MURO_VIEW), async (req, res) =>
                         id: i.reservation.id,
                         userName: i.reservation.userName,
                         date: i.reservation.date,
-                        slot: i.reservation.slot.startTime + '–' + i.reservation.slot.endTime,
+                        slot: formatTimeRange12(
+                            i.reservation.slot.startTime,
+                            i.reservation.slot.endTime,
+                            '–'
+                        ),
                     }
                     : null,
             })),

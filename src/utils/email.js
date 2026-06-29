@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
+const { formatTimeRange12 } = require('./timeFormat');
 
 let transporter = null;
 if (config.smtpEnabled) {
@@ -30,7 +31,7 @@ function sendReservationConfirmation({ to, name, slot, date }) {
         `Hola ${name},\n\n` +
         `Has reservado tu turno de adoración:\n` +
         `  Fecha: ${date}\n` +
-        `  Horario: ${slot.startTime} - ${slot.endTime}\n\n` +
+        `  Horario: ${formatTimeRange12(slot.startTime, slot.endTime, ' - ')}\n\n` +
         `Al llegar a la capilla, escanea el QR de la entrada y confirma tu asistencia ` +
         `con este mismo correo.\n\n` +
         `Capilla del Santísimo Sacramento — Cristo Rey`;

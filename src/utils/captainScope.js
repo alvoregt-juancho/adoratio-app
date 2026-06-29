@@ -2,20 +2,10 @@ const prisma = require('../db');
 const { weekdayFromDate } = require('../utils/schedule');
 const { commitmentAppliesOn, participationWeekdays } = require('../utils/commitmentMatch');
 const { formatWeekDays } = require('../utils/weekDays');
-
-function timeToMinutes(hhmm) {
-    if (!hhmm) return 0;
-    const [h, m] = String(hhmm).split(':').map(Number);
-    return h * 60 + (m || 0);
-}
+const { timeToMinutes, formatTime12, formatTimeRange12 } = require('../utils/timeFormat');
 
 function formatTimeLabel(hhmm) {
-    const mins = timeToMinutes(hhmm);
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    const suffix = h < 12 ? 'AM' : 'PM';
-    const hour12 = h % 12 || 12;
-    return m ? `${hour12}:${String(m).padStart(2, '0')} ${suffix}` : `${hour12} ${suffix}`;
+    return formatTime12(hhmm);
 }
 
 function timeRangesOverlap(startA, endA, startB, endB) {
@@ -310,7 +300,7 @@ async function notifyCaptainsSubstituteNeeded(reservation) {
         });
     }
 
-    const slotLabel = `${reservation.slot.startTime}–${reservation.slot.endTime}`;
+    const slotLabel = formatTimeRange12(reservation.slot.startTime, reservation.slot.endTime, '–');
     const name = reservation.userName || 'Un adorador';
 
     for (const dateStr of [...new Set(dates)]) {
@@ -370,7 +360,7 @@ async function syncCaptainOpenSlotAlerts(captainUserId, ranges) {
                 captainUserId,
                 type: isUrgent ? 'urgent_open' : 'open_slot',
                 title: isUrgent ? 'Turno abierto — urgente' : 'Turno con cupo libre',
-                message: `${dateStr} ${slot.startTime}–${slot.endTime}: faltan ${open} adorador${open === 1 ? '' : 'es'}.`,
+                message: `${dateStr} ${formatTimeRange12(slot.startTime, slot.endTime, '–')}: faltan ${open} adorador${open === 1 ? '' : 'es'}.`,
                 slotId: slot.id,
                 occurrenceDate: dateStr,
                 isUrgent,

@@ -3,6 +3,15 @@
 
     const toast = window.AdoratioToast || function (m) { alert(m); };
 
+    function slotTimeRange(start, end, sep) {
+        if (window.AdoratioTime) return window.AdoratioTime.formatRange(start, end, sep);
+        return start + (sep || " – ") + end;
+    }
+
+    function slotTime12(t) {
+        return window.AdoratioTime ? window.AdoratioTime.format12(t) : t;
+    }
+
     const DAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
     const DAY_SHORT = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -245,7 +254,7 @@
         buildWeekdayGrid();
         const slotLabel = document.getElementById("daySelectSlotLabel");
         if (slotLabel && selectedSlot) {
-            slotLabel.textContent = selectedSlot.startTime + " – " + selectedSlot.endTime;
+            slotLabel.textContent = slotTimeRange(selectedSlot.startTime, selectedSlot.endTime);
         } else if (slotLabel) {
             slotLabel.textContent = "";
         }
@@ -356,7 +365,7 @@
     }
 
     function buildCardHtml(slot, status) {
-        const time = slot.startTime + "–" + slot.endTime;
+        const time = slotTimeRange(slot.startTime, slot.endTime, "–");
         let html = '<span class="time-signature">' + time + "</span>";
         html += '<div class="status-indicator">';
         if (status.showIcon) html += ICON_ADD;
@@ -625,7 +634,7 @@
         const prayBox = document.getElementById("resPrayForWall");
         if (prayBox) prayBox.checked = false;
         document.getElementById("reserveSlotLabel").textContent =
-            slot.startTime + " – " + slot.endTime + " · " +
+            slotTimeRange(slot.startTime, slot.endTime) + " · " +
             selectedDayLabel() + " " + formatDateShort(selectedDate());
         applyBookingSettings();
         openModal(reserveModal);
@@ -722,7 +731,7 @@
                 row.className = "my-item status-" + r.status;
                 const canCancel = r.status === "confirmed";
                 let body =
-                    '<div class="my-item-block"><strong>' + r.slot.startTime + "–" + r.slot.endTime + "</strong>" +
+                    '<div class="my-item-block"><strong>' + slotTimeRange(r.slot.startTime, r.slot.endTime, "–") + "</strong>" +
                     '<span class="my-date">' + formatDateShort(r.date) + "</span>";
                 if (r.assignedIntention) {
                     body += '<button type="button" class="petition-link-btn" data-index="' + index + '">🙏 Ver petición asignada</button>';

@@ -3,6 +3,25 @@
 
     const toast = window.AdoratioToast || function (m) { alert(m); };
 
+    function T12(t) {
+        return t && window.AdoratioTime ? window.AdoratioTime.format12(t) : (t || "");
+    }
+
+    function TRange(s, e, sep) {
+        if (!s || !e) return "";
+        return window.AdoratioTime ? window.AdoratioTime.formatRange(s, e, sep) : s + "–" + e;
+    }
+
+    function parseSlotTimeInput(v) {
+        if (window.AdoratioTime) return window.AdoratioTime.parseInput(v);
+        const t = String(v || "").trim();
+        return /^\d{2}:\d{2}$/.test(t) ? t : null;
+    }
+
+    function timeInputValue(hhmm) {
+        return window.AdoratioTime ? window.AdoratioTime.formatForInput(hhmm) : (hhmm || "");
+    }
+
     function confirmDialog(opts) {
         opts = opts || {};
         return new Promise(function (resolve) {
@@ -738,7 +757,7 @@
         if (type === "activeSlots" || type === "criticalSlots") {
             return '<ul class="metric-detail-list">' + items.map(function (s) {
                 const label = s.label ? " · " + escapeHtml(s.label) : "";
-                return "<li><strong>" + escapeHtml(s.startTime) + "–" + escapeHtml(s.endTime) + "</strong>" +
+                return "<li><strong>" + escapeHtml(TRange(s.startTime, s.endTime)) + "</strong>" +
                     label + ' <span class="muted">cupo ' + s.capacity + "</span></li>";
             }).join("") + "</ul>";
         }
@@ -877,7 +896,12 @@
                 const names = (block.commitments || []).map(function (c) {
                     const display = [c.userFirstName, c.userLastName].filter(Boolean).join(" ") || c.userName;
                     const detail = [];
-                    if (c.startTimeOffset === 30) detail.push(":30");
+                    if (c.startTimeOffset === 30) {
+                        const offsetLabel = window.AdoratioTime
+                            ? T12(window.AdoratioTime.addMinutes(block.startTime, 30))
+                            : ":30";
+                        detail.push("desde " + offsetLabel);
+                    }
                     if (c.durationMinutes === 30) detail.push("30 min");
                     if (c.frequency && c.frequency !== "WEEKLY") detail.push(c.frequency);
                     return escapeHtml(display) + (detail.length ? " <span class=\"muted\">(" + detail.join(", ") + ")</span>" : "");
@@ -886,7 +910,7 @@
                     ? '<span style="color:var(--apple-red-alert)">Hueco de 30 min sin custodia</span>'
                     : (block.commitments?.length || 0) + " adorador" + ((block.commitments?.length || 0) !== 1 ? "es" : "");
                 return '<div class="' + cardClass + '" style="animation-delay:' + (i * 0.03) + 's">' +
-                    '<div class="time-signature">' + escapeHtml(block.startTime) + "–" + escapeHtml(block.endTime) + '</div>' +
+                    '<div class="time-signature">' + escapeHtml(TRange(block.startTime, block.endTime)) + '</div>' +
                     '<div class="chronos-body">' +
                     '<div class="chronos-names">' + names + '</div>' +
                     '<div class="chronos-meta">' + meta + '</div></div></div>';
@@ -1031,7 +1055,7 @@
     // ── RESERVAS / PARTICIPANTES ──
     function filterReservations(rows) {
         return rows.filter(function (r) {
-            const slotStr = r.slot.startTime + "–" + r.slot.endTime;
+            const slotStr = TRange(r.slot.startTime, r.slot.endTime);
             const f = resColFilters;
             if (f.slot && slotStr.toLowerCase().indexOf(f.slot.toLowerCase()) === -1) return false;
             if (f.date && r.date.indexOf(f.date) === -1) return false;
@@ -1090,7 +1114,7 @@
 
         tbody.innerHTML = filtered.length ? filtered.map(function (r, idx) {
             const freq = FREQUENCY_SHORT[r.frequency] || r.frequency || "";
-            const turnoLabel = r.slot.startTime + "–" + r.slot.endTime +
+            const turnoLabel = TRange(r.slot.startTime, r.slot.endTime) +
                 (freq ? ' <span class="muted">(' + escapeHtml(freq) + ")</span>" : "");
             return "<tr><td class='col-num'>" + (idx + 1) + "</td>" +
                 "<td>" + turnoLabel + "</td><td>" + r.date + "</td>" +
@@ -1222,7 +1246,7 @@
         const slots = await ensureSlotsForReservationEdit();
         const slotSelect = document.getElementById("reservationEditSlot");
         slotSelect.innerHTML = slots.map(function (s) {
-            const label = s.startTime + "–" + s.endTime + (s.label ? " (" + s.label + ")" : "");
+            const label = TRange(s.startTime, s.endTime) + (s.label ? " (" + s.label + ")" : "");
             return "<option value='" + s.id + "'" + (s.id === r.slotId ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
         }).join("");
 
@@ -1604,7 +1628,7 @@
                 }
                 if (canDelete) actions += "<button class='mini-btn danger' data-delete='" + s.id + "'>Eliminar</button>";
                 const rowCls = s.isActive ? "" : " slots-table-row--inactive";
-                return "<tr class='" + rowCls + "'><td>" + escapeHtml(s.startTime) + "</td><td>" + escapeHtml(s.endTime) + "</td><td>" + s.capacity + "</td>" +
+                return "<tr class='" + rowCls + "'><td>" + escapeHtml(T12(s.startTime)) + "</td><td>" + escapeHtml(T12(s.endTime)) + "</td><td>" + s.capacity + "</td>" +
                     "<td>" + escapeHtml(s.weekDaysLabel || "Todos") + "</td>" +
                     "<td><span class='status-pill " + (s.isActive ? "status-completed" : "status-cancelled") + "'>" +
                     (s.isActive ? "Activo" : "Inactivo") + "</span></td>" +
@@ -1633,8 +1657,8 @@
         const slot = slotsCache.find(function (s) { return String(s.id) === String(id); });
         if (!slot) return;
         document.getElementById("editSlotId").value = slot.id;
-        document.getElementById("editSlotStart").value = slot.startTime;
-        document.getElementById("editSlotEnd").value = slot.endTime;
+        document.getElementById("editSlotStart").value = timeInputValue(slot.startTime);
+        document.getElementById("editSlotEnd").value = timeInputValue(slot.endTime);
         document.getElementById("editSlotCap").value = slot.capacity;
         document.getElementById("editSlotActive").checked = slot.isActive;
         setEditSlotDays(slot.weekDays);
@@ -1643,13 +1667,15 @@
 
     async function saveSlot() {
         const id = document.getElementById("editSlotId").value;
-        const startTime = document.getElementById("editSlotStart").value.trim();
-        const endTime = document.getElementById("editSlotEnd").value.trim();
+        const startRaw = document.getElementById("editSlotStart").value.trim();
+        const endRaw = document.getElementById("editSlotEnd").value.trim();
+        const startTime = parseSlotTimeInput(startRaw);
+        const endTime = parseSlotTimeInput(endRaw);
         const capacity = document.getElementById("editSlotCap").value;
         const isActive = document.getElementById("editSlotActive").checked;
         const weekDays = readEditSlotDays();
-        if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
-            return toast("Usa formato HH:MM.", "error");
+        if (!startTime || !endTime) {
+            return toast("Usa formato estándar, ej. 7:00 AM.", "error");
         }
         const btn = document.getElementById("saveSlotBtn");
         btn.disabled = true;
@@ -1679,11 +1705,11 @@
         const confirmed = await confirmDialog({
             title: fullWeek ? "Eliminar turno completo" : "Quitar días del turno",
             message: fullWeek
-                ? "¿Eliminar permanentemente el turno " + slot.startTime + "–" + slot.endTime + " de toda la semana?"
-                : "¿Quitar el turno " + slot.startTime + "–" + slot.endTime + " de " + dayLabel + "?",
+                ? "¿Eliminar permanentemente el turno " + TRange(slot.startTime, slot.endTime) + " de toda la semana?"
+                : "¿Quitar el turno " + TRange(slot.startTime, slot.endTime) + " de " + dayLabel + "?",
             html: fullWeek
-                ? "<p>¿Eliminar permanentemente el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de toda la semana?</p><p class=\"confirm-sheet-note\">Solo se bloquea si hay compromisos activos (confirmados). Los registros históricos cancelados se retiran automáticamente.</p>"
-                : "<p>¿Quitar el turno <strong>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + "</strong> de " + escapeHtml(dayLabel) + "?</p>",
+                ? "<p>¿Eliminar permanentemente el turno <strong>" + escapeHtml(TRange(slot.startTime, slot.endTime)) + "</strong> de toda la semana?</p><p class=\"confirm-sheet-note\">Solo se bloquea si hay compromisos activos (confirmados). Los registros históricos cancelados se retiran automáticamente.</p>"
+                : "<p>¿Quitar el turno <strong>" + escapeHtml(TRange(slot.startTime, slot.endTime)) + "</strong> de " + escapeHtml(dayLabel) + "?</p>",
             confirmLabel: fullWeek ? "Eliminar" : "Quitar días",
             danger: true,
         });
@@ -1721,11 +1747,13 @@
     async function addSlot() {
         const selectedDays = getSlotConfigDays();
         if (!selectedDays.length) return toast("Selecciona al menos un día arriba.", "error");
-        const startTime = document.getElementById("slotStart").value.trim();
-        const endTime = document.getElementById("slotEnd").value.trim();
+        const startRaw = document.getElementById("slotStart").value.trim();
+        const endRaw = document.getElementById("slotEnd").value.trim();
+        const startTime = parseSlotTimeInput(startRaw);
+        const endTime = parseSlotTimeInput(endRaw);
         const capacity = document.getElementById("slotCap").value;
-        if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
-            return toast("Usa formato HH:MM.", "error");
+        if (!startTime || !endTime) {
+            return toast("Usa formato estándar, ej. 7:00 AM.", "error");
         }
         const res = await api("/api/admin/slots", {
             method: "POST",
@@ -1749,7 +1777,7 @@
         if (!opts.skipConfirm && isActive && slot && selectedDays.length < 7) {
             if (!(await confirmDialog({
                 title: "Desactivar turno",
-                message: "¿Desactivar " + slot.startTime + "–" + slot.endTime + " en " + dayLabel + "?",
+                message: "¿Desactivar " + TRange(slot.startTime, slot.endTime) + " en " + dayLabel + "?",
                 confirmLabel: "Desactivar",
                 danger: true,
             }))) return;
@@ -1757,7 +1785,7 @@
         if (!opts.skipConfirm && !isActive && slot && selectedDays.length === 7) {
             if (!(await confirmDialog({
                 title: "Desactivar turno",
-                message: "¿Desactivar " + slot.startTime + "–" + slot.endTime + " en toda la semana?",
+                message: "¿Desactivar " + TRange(slot.startTime, slot.endTime) + " en toda la semana?",
                 confirmLabel: "Desactivar",
                 danger: true,
             }))) return;
@@ -1855,7 +1883,7 @@
             html += '<tr><td colspan="' + (data.days.length + 1) + '" class="muted">Sin turnos configurados.</td></tr>';
         } else {
             slotTimes.forEach(function (slot) {
-                html += '<tr><td class="cal-time-col"><span class="cal-time">' + escapeHtml(slot.start) + "</span></td>";
+                html += '<tr><td class="cal-time-col"><span class="cal-time">' + escapeHtml(T12(slot.start)) + "</span></td>";
                 data.days.forEach(function (day) {
                     const block = (day.slots || []).find(function (s) {
                         return s.startTime === slot.start && s.endTime === slot.end;
@@ -2415,7 +2443,7 @@
                     "<td>" + escapeHtml(r.adminRoleName || "—") + "</td>" +
                     "<td>" + escapeHtml(r.label || "") + "</td>" +
                     "<td>" + escapeHtml(r.dayLabel || "") + "</td>" +
-                    "<td>" + escapeHtml(r.startTime) + " – " + escapeHtml(r.endTime) + "</td>" +
+                    "<td>" + escapeHtml(TRange(r.startTime, r.endTime, " – ")) + "</td>" +
                     "<td>" + escapeHtml(status) + "</td>" +
                     actions + "</tr>";
             }).join("") +
@@ -2440,8 +2468,8 @@
         }).join("");
         if (range) userSel.value = String(range.userId);
         document.getElementById("captainRangeDay").value = range && range.dayOfWeek != null ? String(range.dayOfWeek) : "";
-        document.getElementById("captainRangeStart").value = range ? range.startTime : "";
-        document.getElementById("captainRangeEnd").value = range ? range.endTime : "";
+        document.getElementById("captainRangeStart").value = range ? timeInputValue(range.startTime) : "";
+        document.getElementById("captainRangeEnd").value = range ? timeInputValue(range.endTime) : "";
         document.getElementById("captainRangeLabel").value = range && range.label ? range.label : "";
         const delBtn = document.getElementById("deleteCaptainRangeBtn");
         delBtn.style.display = range ? "" : "none";
@@ -2639,7 +2667,7 @@
                             }).join("")
                             : '<div class="captain-slot-row"><span class="muted">Sin adoradores</span></div>';
                         return '<div class="captain-slot-block">' +
-                            "<span class='captain-slot-time'>" + escapeHtml(slot.startTime) + "–" + escapeHtml(slot.endTime) + open + gap + "</span>" +
+                            "<span class='captain-slot-time'>" + escapeHtml(TRange(slot.startTime, slot.endTime)) + open + gap + "</span>" +
                             rows + "</div>";
                     }).join("");
                     return '<div class="captain-day-block"><h4>' + escapeHtml(day.label) + " <span class='muted'>" + escapeHtml(day.date) + "</span></h4>" + slots + "</div>";

@@ -22,6 +22,7 @@ const {
     findConflictingCaptainBlock,
     occurrenceMatchesCaptainScope,
 } = require('../utils/captainScope');
+const { parseTimeInput, formatTimeRange12 } = require('../utils/timeFormat');
 
 const router = express.Router();
 
@@ -44,12 +45,17 @@ function parseRangeBody(body) {
         body.dayOfWeek === null || body.dayOfWeek === '' || body.dayOfWeek === undefined
             ? null
             : Number(body.dayOfWeek);
-    const startTime = String(body.startTime || '').trim();
-    const endTime = String(body.endTime || '').trim();
+    const startRaw = String(body.startTime || '').trim();
+    const endRaw = String(body.endTime || '').trim();
+    const startTime = parseTimeInput(startRaw);
+    const endTime = parseTimeInput(endRaw);
     const label = body.label ? String(body.label).trim() : null;
 
     if (!userId) return { error: 'Selecciona un usuario.' };
-    if (!startTime || !endTime) return { error: 'Hora de inicio y fin son requeridas.' };
+    if (!startRaw || !endRaw) return { error: 'Hora de inicio y fin son requeridas.' };
+    if (!startTime || !endTime) {
+        return { error: 'Hora inválida. Usa formato estándar, ej. 7:00 AM.' };
+    }
     if (dayOfWeek != null && (dayOfWeek < 1 || dayOfWeek > 7)) {
         return { error: 'Día inválido (1=Lun … 7=Dom).' };
     }
@@ -538,10 +544,11 @@ router.get('/intentions', requirePermission(PRIV.CAPTAIN_VIEW), async (req, res)
                         id: i.assignedToReservation.id,
                         userName: i.assignedToReservation.userName,
                         date: i.assignedToReservation.date,
-                        slot:
-                            i.assignedToReservation.slot.startTime +
-                            '–' +
+                        slot: formatTimeRange12(
+                            i.assignedToReservation.slot.startTime,
                             i.assignedToReservation.slot.endTime,
+                            '–'
+                        ),
                     }
                     : null,
             })),
@@ -584,8 +591,11 @@ router.get('/substitutions', requirePermission(PRIV.CAPTAIN_VIEW), async (req, r
                         id: row.reservation.id,
                         userName: row.reservation.userName,
                         userPhone: row.reservation.userPhone,
-                        slot:
-                            row.reservation.slot.startTime + '–' + row.reservation.slot.endTime,
+                        slot: formatTimeRange12(
+                            row.reservation.slot.startTime,
+                            row.reservation.slot.endTime,
+                            '–'
+                        ),
                     }
                     : null,
             })),
