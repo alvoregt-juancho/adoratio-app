@@ -402,6 +402,14 @@
                 </div>
                 <div class="panel-card-body chapel-qr-body">
                     <p class="muted chapel-qr-intro">Un solo código para <strong>todos los adoradores</strong>. Imprímelo en la entrada; cada persona registra su guardia en horarios y valida su visita escaneando este mismo QR con su celular.</p>
+                    <div class="chapel-kiosk-info" id="chapelKioskInfo" data-hint-key="chapel-kiosk-link">
+                        <p class="chapel-kiosk-info-title">Link del quiosco (kiosk)</p>
+                        <p class="muted chapel-kiosk-info-desc">Abrí esta URL en la tablet o pantalla de la capilla para el registro de asistencia por celular.</p>
+                        <div class="chapel-kiosk-link-row">
+                            <input type="text" readonly id="chapelKioskUrl" class="touch-input-field dark-input chapel-kiosk-url-input" value="" aria-label="URL del quiosco de registro">
+                            <button type="button" class="ghost-btn" id="copyChapelKioskUrlBtn">Copiar link</button>
+                        </div>
+                    </div>
                     <div class="chapel-qr-preview" id="chapelQrPreview">
                         <div class="empty-state">Cargando QR de capilla…</div>
                     </div>

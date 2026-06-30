@@ -102,6 +102,7 @@
         "slot-settings": "Opciones globales: qué frecuencias de compromiso y duraciones están permitidas.",
         "add-slot": "Crea una nueva franja horaria (inicio, fin y cupo máximo de adoradores).",
         "section-qrs": "QR único de la capilla. Todos los adoradores escanean el mismo código al llegar.",
+        "chapel-kiosk-link": "URL del quiosco para la tablet de registro de asistencia en la capilla.",
         "print-chapel-qr": "Descarga el PNG listo para imprimir y colocar en la entrada.",
         "replace-chapel-qr": "Genera un código nuevo; el anterior deja de funcionar (útil si se filtró o perdió).",
         "new-role": "Crea un perfil personalizado con permisos a la medida.",
@@ -190,6 +191,7 @@
             introKey: "tab-qrs",
             items: [
                 { perm: "QRS_VIEW", label: "Ver e imprimir QR de la capilla", hintKey: "section-qrs" },
+                { perm: "QRS_VIEW", label: "Copiar link del quiosco (kiosk)", hintKey: "chapel-kiosk-link" },
                 { perm: "QRS_EDIT", label: "Reemplazar código QR", hintKey: "replace-chapel-qr" },
             ],
         },
@@ -2792,6 +2794,28 @@
         loadCaptainDashboard();
     }
 
+    function setChapelKioskUrl(url) {
+        const input = document.getElementById("chapelKioskUrl");
+        if (input && url) input.value = url;
+    }
+
+    function copyChapelKioskUrl() {
+        const input = document.getElementById("chapelKioskUrl");
+        const url = input?.value?.trim();
+        if (!url) return toast("No hay link de quiosco disponible.", "error");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function () {
+                toast("Link del quiosco copiado.", "success");
+            }).catch(function () {
+                input.select();
+                toast(url, "info");
+            });
+        } else {
+            input.select();
+            toast(url, "info");
+        }
+    }
+
     async function loadChapelQr() {
         if (!hasPerm("QRS_VIEW")) return;
         const preview = document.getElementById("chapelQrPreview");
@@ -2804,6 +2828,7 @@
                 return;
             }
             const c = data.chapel;
+            setChapelKioskUrl(c.kioskUrl || data.kioskUrl || "");
             if (usesEl) usesEl.textContent = c.uses + (c.uses === 1 ? " escaneo" : " escaneos");
             if (preview) {
                 preview.innerHTML =
@@ -3466,6 +3491,7 @@
         });
     });
     document.getElementById("printChapelQrBtn").addEventListener("click", printChapelQr);
+    document.getElementById("copyChapelKioskUrlBtn").addEventListener("click", copyChapelKioskUrl);
     document.getElementById("replaceChapelQrBtn").addEventListener("click", replaceChapelQr);
     document.getElementById("newRoleBtn").addEventListener("click", openNewRoleSheet);
     document.getElementById("saveRoleBtn").addEventListener("click", saveNewRole);

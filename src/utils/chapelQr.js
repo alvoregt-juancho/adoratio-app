@@ -1,4 +1,5 @@
 const prisma = require('../db');
+const config = require('../config');
 const { generateQrCodeId } = require('./qr');
 
 const CHAPEL_QR_NAME = 'Capilla — Tótem de ingreso';
@@ -52,6 +53,14 @@ async function replaceChapelQr(generatedBy = null) {
     });
 }
 
+function buildKioskUrl() {
+    const base = (config.kioskMaskUrl || config.baseUrl).replace(/\/$/, '');
+    const path = config.kioskPagePath.startsWith('/')
+        ? config.kioskPagePath
+        : `/${config.kioskPagePath}`;
+    return `${base}${path}`;
+}
+
 function formatChapelQrPayload(qr, qrUtil) {
     if (!qr) return null;
     return {
@@ -64,6 +73,7 @@ function formatChapelQrPayload(qr, qrUtil) {
         lastUsedAt: qr.lastUsedAt,
         uses: qr._count?.scans ?? 0,
         scanUrl: qrUtil.buildScanUrl(qr.qrCode),
+        kioskUrl: buildKioskUrl(),
     };
 }
 
@@ -73,5 +83,6 @@ module.exports = {
     getChapelQr,
     ensureChapelQr,
     replaceChapelQr,
+    buildKioskUrl,
     formatChapelQrPayload,
 };
