@@ -350,33 +350,69 @@ router.get('/audit-logs', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), 
 
 // ── ZONA TEMPORAL: reset datos de demostración ───────────────────────
 const { runDemoSeed } = require('../../prisma/demoData');
+const {
+    DEMO_WIPE_CATEGORIES,
+    OPERATIONAL_CATEGORY_IDS,
+    normalizeCategoryIds,
+    expandCategoryDependencies,
+} = require('../utils/demoWipe');
+
+function requireSuperAdmin(req, res) {
+    if (!req.user.isSuperAdmin && req.user.adminRoleSlug !== 'super-admin') {
+        res.status(403).json({ error: 'Solo Super Admin puede gestionar los datos de demostración.' });
+        return false;
+    }
+    return true;
+}
+
+router.get('/demo/categories', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), (req, res) => {
+    if (!requireSuperAdmin(req, res)) return;
+    res.json({
+        categories: DEMO_WIPE_CATEGORIES,
+        operationalIds: OPERATIONAL_CATEGORY_IDS,
+    });
+});
 
 router.post('/demo/reset', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), async (req, res) => {
     try {
-        if (!req.user.isSuperAdmin && req.user.adminRoleSlug !== 'super-admin') {
-            return res.status(403).json({ error: 'Solo Super Admin puede resetear los datos de demostración.' });
-        }
+        if (!requireSuperAdmin(req, res)) return;
         if (String(req.body?.confirm || '').trim() !== 'BORRAR') {
             return res.status(400).json({ error: 'Escribe BORRAR en el campo de confirmación.' });
         }
 
-        const counts = await runDemoSeed({ adminId: req.user.id, wipeFirst: true });
+        const categories = normalizeCategoryIds(req.body?.categories);
+        if (categories.length === 0) {
+            return res.status(400).json({ error: 'Selecciona al menos una categoría para borrar.' });
+        }
+
+        const reloadDemo = req.body?.reloadDemo !== false;
+        const expanded = expandCategoryDependencies(categories);
+        const counts = await runDemoSeed({
+            adminId: req.user.id,
+            wipeFirst: true,
+            categories: expanded,
+            reloadDemo,
+        });
 
         await writeAudit({
-            action: 'demo.reset',
+            action: 'demo.reset.partial',
             entity: 'database',
             userId: req.user.id,
-            meta: counts,
+            meta: { categories: expanded, reloadDemo, ...counts },
             req,
         });
 
-        res.json({
-            message: 'Datos de demostración restaurados. Usuarios y perfiles RBAC se conservaron.',
-            counts,
-        });
+        const message = reloadDemo
+            ? 'Datos seleccionados borrados y datos de demostración cargados donde correspondía.'
+            : 'Datos seleccionados borrados.';
+
+        res.json({ message, counts });
     } catch (e) {
         console.error(e);
-        res.status(500).json({ error: 'Error al resetear los datos de demostración.' });
+        const status = e.status || 500;
+        res.status(status).json({
+            error: status === 500 ? 'Error al resetear los datos de demostración.' : e.message,
+        });
     }
 });
 

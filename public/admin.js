@@ -107,7 +107,7 @@
         "new-role": "Crea un perfil personalizado con permisos a la medida.",
         "section-perfiles": "Selecciona un perfil a la izquierda y ajusta sus permisos en la matriz de la derecha.",
         "new-admin": "Da de alta un usuario con acceso al back-office y asígnale un perfil RBAC.",
-        "audit-demo": "Zona temporal: borra datos operativos y carga demo (solo Super Admin).",
+        "audit-demo": "Zona temporal: elige categorías a borrar y opcionalmente carga demo (solo Super Admin).",
         "audit-refresh": "Actualiza el listado de auditoría con el filtro de acción actual.",
         "hints-toggle": "Activa u oculta los consejos al pasar el mouse. La preferencia se guarda en este navegador.",
         "tab-cuenta": "Tu perfil, contraseña y guía personalizada según los permisos de tu rol.",
@@ -499,7 +499,9 @@
         });
         const demoZone = document.getElementById("auditDemoZone");
         if (demoZone) {
-            demoZone.classList.toggle("hidden", !(session.user && session.user.isSuperAdmin));
+            const showDemo = !!(session.user && session.user.isSuperAdmin);
+            demoZone.classList.toggle("hidden", !showDemo);
+            if (showDemo) initDemoWipeCategories();
         }
     }
 
@@ -3178,18 +3180,87 @@
     }
 
     // ── AUDITORÍA ──
+    let demoWipeCatalog = null;
+
+    function getSelectedDemoWipeIds() {
+        return Array.from(document.querySelectorAll(".demo-wipe-cat:checked")).map(function (el) {
+            return el.value;
+        });
+    }
+
+    function setDemoWipeSelection(ids) {
+        const wanted = new Set(ids || []);
+        document.querySelectorAll(".demo-wipe-cat").forEach(function (el) {
+            el.checked = wanted.has(el.value);
+        });
+    }
+
+    function renderDemoWipeCategories(categories, operationalIds) {
+        const host = document.getElementById("demoWipeCategories");
+        if (!host) return;
+        const groupLabels = { operativo: "Datos operativos", acceso: "Usuarios y acceso" };
+        const byGroup = { operativo: [], acceso: [] };
+        categories.forEach(function (cat) {
+            (byGroup[cat.group] || byGroup.operativo).push(cat);
+        });
+        let html = "";
+        ["operativo", "acceso"].forEach(function (group) {
+            const items = byGroup[group];
+            if (!items.length) return;
+            html += '<p class="audit-demo-category-group-title">' + escapeHtml(groupLabels[group]) + "</p>";
+            items.forEach(function (cat) {
+                html +=
+                    '<label class="audit-demo-category-option">' +
+                    '<input type="checkbox" class="demo-wipe-cat" value="' + escapeHtml(cat.id) + '">' +
+                    "<span>" + escapeHtml(cat.label) + "</span>" +
+                    "</label>";
+            });
+        });
+        host.innerHTML = html;
+        setDemoWipeSelection(operationalIds || []);
+    }
+
+    async function initDemoWipeCategories() {
+        if (demoWipeCatalog) {
+            renderDemoWipeCategories(demoWipeCatalog.categories, demoWipeCatalog.operationalIds);
+            return;
+        }
+        try {
+            const res = await api("/api/admin/demo/categories");
+            const data = await res.json();
+            if (res.ok && Array.isArray(data.categories)) {
+                demoWipeCatalog = data;
+                renderDemoWipeCategories(data.categories, data.operationalIds);
+            }
+        } catch (e) {
+            /* ignore — zona sigue usable con checkboxes vacíos */
+        }
+    }
+
     async function resetDemoData() {
         if (!session.user?.isSuperAdmin) {
             return toast("Solo Super Admin puede resetear datos de demostración.", "error");
+        }
+        const categories = getSelectedDemoWipeIds();
+        if (!categories.length) {
+            return toast("Selecciona al menos una categoría para borrar.", "error");
         }
         const confirm = document.getElementById("demoResetConfirm").value.trim();
         if (confirm !== "BORRAR") {
             return toast('Escribe BORRAR en el campo de confirmación.', "error");
         }
+        const reloadDemo = document.getElementById("demoReloadAfterWipe")?.checked !== false;
+        const labels = categories.map(function (id) {
+            const cat = demoWipeCatalog?.categories?.find(function (c) { return c.id === id; });
+            return cat?.label || id;
+        });
+        const confirmMsg = reloadDemo
+            ? "¿Borrar las categorías seleccionadas y cargar datos de demostración donde corresponda?\n\n" + labels.join("\n")
+            : "¿Borrar las categorías seleccionadas?\n\n" + labels.join("\n");
         if (!(await confirmDialog({
-            title: "Reset de demostración",
-            message: "¿Resetear todos los datos operativos y cargar la demostración?",
-            confirmLabel: "Resetear datos",
+            title: "Borrado selectivo",
+            message: confirmMsg,
+            confirmLabel: reloadDemo ? "Borrar y cargar demo" : "Borrar",
             danger: true,
         }))) return;
 
@@ -3198,18 +3269,18 @@
         try {
             const res = await api("/api/admin/demo/reset", {
                 method: "POST",
-                body: JSON.stringify({ confirm: "BORRAR" }),
+                body: JSON.stringify({ confirm: "BORRAR", categories: categories, reloadDemo: reloadDemo }),
             });
             const data = await res.json();
             if (res.ok) {
-                toast(data.message || "Datos de demostración cargados.", "success");
+                toast(data.message || "Operación completada.", "success");
                 document.getElementById("demoResetConfirm").value = "";
                 auditOffset = 0;
                 loadAudit();
                 loadMetrics();
                 loadActivity();
             } else {
-                toast(data.error || "Error al resetear.", "error");
+                toast(data.error || "Error al borrar.", "error");
             }
         } catch (e) {
             toast("Error de conexión.", "error");
@@ -3402,6 +3473,12 @@
     document.getElementById("createAdminBtn").addEventListener("click", createAdmin);
     document.getElementById("auditRefresh").addEventListener("click", function () { auditOffset = 0; loadAudit(); });
     document.getElementById("demoResetBtn").addEventListener("click", resetDemoData);
+    document.getElementById("demoWipeSelectOperational").addEventListener("click", function () {
+        if (demoWipeCatalog?.operationalIds) setDemoWipeSelection(demoWipeCatalog.operationalIds);
+    });
+    document.getElementById("demoWipeClearAll").addEventListener("click", function () {
+        setDemoWipeSelection([]);
+    });
     document.getElementById("auditFilter").addEventListener("keydown", function (e) {
         if (e.key === "Enter") { auditOffset = 0; loadAudit(); }
     });

@@ -31,17 +31,10 @@ function dateForWeekday(targetWeekday, fromDate = new Date()) {
     return todayStr(result);
 }
 
+const { OPERATIONAL_CATEGORY_IDS, wipeSelectedCategories } = require('../src/utils/demoWipe');
+
 async function clearOperationalData() {
-    await prisma.prayerIntention.deleteMany();
-    await prisma.scanLog.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.reservation.deleteMany();
-    await prisma.attendanceLog.deleteMany();
-    await prisma.captainNotification.deleteMany();
-    await prisma.captainRange.deleteMany();
-    await prisma.rosterMember.deleteMany();
-    await prisma.slot.deleteMany();
-    await prisma.physicalQR.deleteMany();
+    await wipeSelectedCategories(OPERATIONAL_CATEGORY_IDS);
 }
 
 async function seedSlots() {
@@ -200,29 +193,58 @@ async function seedDemoQr(adminId) {
     return qr;
 }
 
-async function runDemoSeed({ adminId, wipeFirst = true } = {}) {
+async function reloadDemoForCategories(categoryIds, { adminId } = {}) {
+    const selected = new Set(categoryIds);
+    const counts = {};
+
+    let slots = null;
+    const needsSlots = selected.has('slots') || selected.has('reservations');
+    if (needsSlots) {
+        const existing = await prisma.slot.count();
+        if (existing === 0 || selected.has('slots')) {
+            slots = await seedSlots();
+            counts.slots = slots.length;
+        } else {
+            slots = await prisma.slot.findMany({ orderBy: { startTime: 'asc' } });
+        }
+    }
+
+    if (selected.has('reservations') && slots?.length) {
+        counts.reservations = await seedDemoReservations(slots);
+    }
+    if (selected.has('roster')) {
+        counts.roster = await seedRosterMembers();
+    }
+    if (selected.has('intentions')) {
+        counts.intentions = await seedDemoIntentions();
+    }
+    if (selected.has('qrs') && adminId) {
+        const qr = await seedDemoQr(adminId);
+        counts.qrCode = qr?.qrCode ?? null;
+    }
+    if (selected.has('reservations')) {
+        counts.kioskUsers = await syncKioskUsersFromReservations();
+    }
+
+    return counts;
+}
+
+async function runDemoSeed({ adminId, wipeFirst = true, categories = null, reloadDemo = true } = {}) {
+    const wipeCategories = categories ?? OPERATIONAL_CATEGORY_IDS;
+    let wipeResult = null;
+
     if (wipeFirst) {
-        await clearOperationalData();
+        wipeResult = await wipeSelectedCategories(wipeCategories, { excludeUserId: adminId });
     }
 
-    const slots = await seedSlots();
-    const reservations = await seedDemoReservations(slots);
-    const roster = await seedRosterMembers();
-    const intentions = await seedDemoIntentions();
-    let qr = null;
-    if (adminId) {
-        qr = await seedDemoQr(adminId);
-    }
-
-    const synced = await syncKioskUsersFromReservations();
+    const seedCounts = reloadDemo
+        ? await reloadDemoForCategories(wipeCategories, { adminId })
+        : {};
 
     return {
-        slots: slots.length,
-        reservations,
-        roster,
-        intentions,
-        kioskUsers: synced,
-        qrCode: qr?.qrCode ?? null,
+        wiped: wipeResult?.deleted ?? null,
+        categories: wipeResult?.categoryIds ?? wipeCategories,
+        ...seedCounts,
     };
 }
 
@@ -247,5 +269,6 @@ module.exports = {
     dateForWeekday,
     clearOperationalData,
     seedSlots,
+    reloadDemoForCategories,
     runDemoSeed,
 };

@@ -443,13 +443,22 @@
         <section class="tab-panel" id="tab-auditoria" data-perm="AUDIT_VIEW">
             <div class="audit-demo-zone hidden" id="auditDemoZone" data-hint-key="audit-demo">
                 <div class="audit-demo-zone-inner">
-                    <div>
+                    <div class="audit-demo-copy">
                         <h3>Zona temporal — datos de demostración</h3>
-                        <p class="muted">Borra reservas, turnos, roster, intenciones, QR y auditoría. Conserva administradores y perfiles RBAC. Luego carga datos de ejemplo para probar el back-office.</p>
+                        <p class="muted">Elige qué categorías borrar. Puedes incluir datos operativos, capitanes, administradores, perfiles RBAC y usuarios feligreses. Tu sesión y las cuentas super-admin no se eliminan.</p>
+                        <div class="audit-demo-category-groups" id="demoWipeCategories" aria-label="Categorías a borrar"></div>
+                        <div class="audit-demo-preset-row">
+                            <button type="button" class="ghost-btn subtle-btn" id="demoWipeSelectOperational">Seleccionar operativo</button>
+                            <button type="button" class="ghost-btn subtle-btn" id="demoWipeClearAll">Quitar selección</button>
+                        </div>
                     </div>
                     <div class="audit-demo-actions">
+                        <label class="audit-demo-reload">
+                            <input type="checkbox" id="demoReloadAfterWipe" checked>
+                            Cargar datos de demostración después
+                        </label>
                         <input type="text" id="demoResetConfirm" class="touch-input-field dark-input" placeholder='Escribe BORRAR para confirmar' autocomplete="off">
-                        <button type="button" class="ghost-btn danger-btn" id="demoResetBtn">Resetear y cargar demo</button>
+                        <button type="button" class="ghost-btn danger-btn" id="demoResetBtn">Borrar seleccionado</button>
                     </div>
                 </div>
             </div>

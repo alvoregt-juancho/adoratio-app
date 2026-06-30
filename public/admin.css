@@ -423,13 +423,18 @@ body.admin {
 .audit-demo-zone-inner {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
     padding: 18px 20px;
     border: 1px solid rgba(192, 57, 43, 0.35);
     border-radius: var(--admin-radius);
     background: var(--admin-alert-surface);
+}
+
+.audit-demo-copy {
+    flex: 1 1 320px;
+    min-width: 0;
 }
 
 .audit-demo-zone-inner h3 {
@@ -449,13 +454,72 @@ body.admin {
 
 .audit-demo-actions {
     display: flex;
+    flex-direction: column;
     flex-wrap: wrap;
     gap: 10px;
-    align-items: center;
+    align-items: stretch;
+    min-width: 240px;
 }
 
-.audit-demo-actions input {
+.audit-demo-actions input[type="text"] {
     min-width: 220px;
+}
+
+.audit-demo-reload {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--admin-ink);
+    cursor: pointer;
+}
+
+.audit-demo-category-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px 14px;
+    margin-top: 12px;
+}
+
+.audit-demo-category-group-title {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+}
+
+.audit-demo-category-group-title:first-child {
+    margin-top: 0;
+}
+
+.audit-demo-category-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: var(--admin-ink);
+    cursor: pointer;
+}
+
+.audit-demo-category-option input {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.audit-demo-preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.subtle-btn {
+    font-size: 0.78rem !important;
+    padding: 6px 10px !important;
 }
 
 .danger-btn {
