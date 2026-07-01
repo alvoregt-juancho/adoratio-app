@@ -13,8 +13,21 @@ function nowHHMM(d = new Date()) {
     return `${h}:${m}`;
 }
 
+const { weekdayFromDate } = require('./schedule');
+
 function isPastDate(dateStr) {
     return dateStr < todayStr();
 }
 
-module.exports = { todayStr, nowHHMM, isPastDate };
+function dateForWeekday(targetWeekday, fromDate = new Date()) {
+    const today = new Date(fromDate);
+    today.setHours(0, 0, 0, 0);
+    const current = weekdayFromDate(todayStr(today));
+    let diff = Number(targetWeekday) - current;
+    if (diff < 0) diff += 7;
+    const result = new Date(today);
+    result.setDate(today.getDate() + diff);
+    return todayStr(result);
+}
+
+module.exports = { todayStr, nowHHMM, isPastDate, dateForWeekday };

@@ -22,6 +22,25 @@
 body.admin {
     font-family: var(--admin-sans);
     -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    background: #ffffff;
+}
+
+html:has(body.admin) {
+    background: #ffffff;
+}
+
+.reservation-create-only,
+.reservation-edit-only {
+    display: none;
+}
+
+.reservation-sheet-mode-create .reservation-create-only {
+    display: block;
+}
+
+.reservation-sheet-mode-edit .reservation-edit-only {
+    display: block;
 }
 
 .command-center {
@@ -1074,10 +1093,24 @@ body.admin {
 }
 
 /* ── Lista / Roster ── */
+.roster-list-shell {
+    background: #fff;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    overflow: hidden;
+}
+
 .roster-intro {
     font-size: 0.86rem;
     line-height: 1.5;
     margin: 0 0 16px;
+    max-width: 720px;
+}
+
+.roster-section-note {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    margin: 0 0 12px;
     max-width: 720px;
 }
 
@@ -1097,7 +1130,17 @@ body.admin {
 }
 
 .roster-section {
-    margin-bottom: 28px;
+    padding: 20px 24px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.roster-section:last-child {
+    border-bottom: none;
+}
+
+.roster-table-wrap {
+    margin-top: 4px;
 }
 
 .roster-section-header {

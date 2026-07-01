@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo | Adoratio</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="admin.css?v=2025063002">
+    <link rel="stylesheet" href="admin.css?v=2025062501">
 </head>
 <body class="admin">
     <!-- Login -->
@@ -207,15 +207,19 @@
                     </div>
                 </div>
 
+                <div class="roster-list-shell">
                 <div class="roster-section" id="rosterCommitmentsSection">
                     <div class="roster-section-header">
                         <h3>Turnos de adoración <span class="roster-count" id="rosterCommitmentsCount">0</span></h3>
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="commitments" data-hint-key="roster-message">Mensaje adoradores</button>
+                            <button type="button" class="ghost-btn" id="newCommitmentBtn" data-perm="RESERVATIONS_CHECKIN" data-hint-key="new-commitment">+ Adorador</button>
+                            <button type="button" class="ghost-btn roster-template" data-template="commitments" data-hint-key="roster-template">Plantilla Excel</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="commitments" data-perm="SLOTS_EDIT" data-hint-key="roster-import">Cargar CSV</button>
                             <button type="button" class="ghost-btn roster-export" data-export="commitments" data-perm="RESERVATIONS_EXPORT" data-hint-key="roster-export">Exportar CSV</button>
                         </div>
                     </div>
-                    <div class="table-wrap"><table class="data-table roster-table" id="rosterCommitmentsTable"></table></div>
+                    <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterCommitmentsTable"></table></div>
                 </div>
 
                 <div class="roster-section" id="rosterCaptainsSection">
@@ -224,11 +228,13 @@
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="captains">Mensaje capitanes</button>
                             <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Contacto</button>
+                            <button type="button" class="ghost-btn roster-template" data-template="captains">Plantilla Excel</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="captains" data-perm="SLOTS_EDIT">Cargar CSV</button>
                             <button type="button" class="ghost-btn roster-export" data-export="captains" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
                         </div>
                     </div>
-                    <p class="roster-intro muted">Directorio de contacto (llamar/WhatsApp). No da acceso al panel — para asignar un capitán con cuenta, usa la pestaña <strong>Capitanes</strong>.</p>
-                    <div class="table-wrap"><table class="data-table roster-table" id="rosterCaptainsTable"></table></div>
+                    <p class="roster-section-note muted">Directorio de contacto (llamar/WhatsApp). No da acceso al panel — para asignar un capitán con cuenta, usa la pestaña <strong>Capitanes</strong>.</p>
+                    <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterCaptainsTable"></table></div>
                 </div>
 
                 <div class="roster-section" id="rosterSubstitutesSection">
@@ -237,11 +243,15 @@
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="substitutes">Mensaje sustitutos</button>
                             <button type="button" class="ghost-btn" id="newSubstituteBtn" data-perm="SLOTS_EDIT" data-hint-key="new-substitute">+ Sustituto</button>
+                            <button type="button" class="ghost-btn roster-template" data-template="substitutes">Plantilla Excel</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="substitutes" data-perm="SLOTS_EDIT">Cargar CSV</button>
                             <button type="button" class="ghost-btn roster-export" data-export="substitutes" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
                         </div>
                     </div>
-                    <div class="table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
+                    <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
                 </div>
+                </div>
+                <input type="file" id="rosterImportFile" accept=".csv,text/csv" hidden>
             </div>
 
             <!-- Directorio de adoradores -->
@@ -536,7 +546,7 @@
     <div class="premium-sheet-overlay" id="reservationSheet">
         <div class="sheet-window sheet-window--form">
             <button class="sheet-close" data-close type="button" aria-label="Cerrar">×</button>
-            <h2 class="sheet-title">Editar adorador</h2>
+            <h2 class="sheet-title" id="reservationSheetTitle">Editar adorador</h2>
             <input type="hidden" id="reservationEditId">
             <div class="booking-input-group">
                 <input type="text" id="reservationEditFirst" class="touch-input-field sheet-field" placeholder="Nombre">
@@ -547,11 +557,40 @@
             <div class="booking-input-group">
                 <input type="tel" id="reservationEditPhone" class="touch-input-field sheet-field" placeholder="Celular (8 dígitos)" maxlength="8">
             </div>
-            <div class="booking-input-group">
-                <label class="micro-label" for="reservationEditSlot">Turno</label>
-                <select id="reservationEditSlot" class="touch-input-field sheet-field"></select>
+            <div class="booking-input-group reservation-create-only">
+                <label class="micro-label" for="reservationEditWeekday">Día de guardia</label>
+                <select id="reservationEditWeekday" class="touch-input-field sheet-field">
+                    <option value="7">Domingo</option>
+                    <option value="1">Lunes</option>
+                    <option value="2">Martes</option>
+                    <option value="3">Miércoles</option>
+                    <option value="4">Jueves</option>
+                    <option value="5">Viernes</option>
+                    <option value="6">Sábado</option>
+                </select>
             </div>
             <div class="booking-input-group">
+                <label class="micro-label" for="reservationEditSlot">Turno (hora)</label>
+                <select id="reservationEditSlot" class="touch-input-field sheet-field"></select>
+            </div>
+            <div class="booking-input-group reservation-create-only">
+                <label class="micro-label" for="reservationEditFrequency">Frecuencia</label>
+                <select id="reservationEditFrequency" class="touch-input-field sheet-field">
+                    <option value="WEEKLY">Semanal</option>
+                    <option value="DAILY">Diario</option>
+                    <option value="BIWEEKLY">Quincenal</option>
+                    <option value="MONTHLY">Mensual</option>
+                    <option value="ONCE">Una sola vez</option>
+                </select>
+            </div>
+            <div class="booking-input-group reservation-create-only">
+                <label class="micro-label" for="reservationEditDuration">Duración</label>
+                <select id="reservationEditDuration" class="touch-input-field sheet-field">
+                    <option value="60">1 hora</option>
+                    <option value="30">30 minutos</option>
+                </select>
+            </div>
+            <div class="booking-input-group reservation-edit-only">
                 <label class="micro-label" for="reservationEditStatus">Estado</label>
                 <select id="reservationEditStatus" class="touch-input-field sheet-field">
                     <option value="confirmed">Confirmada</option>
@@ -560,10 +599,10 @@
                     <option value="cancelled">Cancelada</option>
                 </select>
             </div>
-            <p class="muted sheet-section-label" id="reservationEditMeta"></p>
+            <p class="muted sheet-section-label reservation-edit-only" id="reservationEditMeta"></p>
             <div class="role-editor-actions">
                 <button type="button" class="sheet-primary-btn" id="saveReservationBtn">Guardar</button>
-                <button type="button" class="sheet-primary-btn danger-outline" id="deleteReservationBtn">Eliminar</button>
+                <button type="button" class="sheet-primary-btn danger-outline reservation-edit-only" id="deleteReservationBtn">Eliminar</button>
             </div>
         </div>
     </div>

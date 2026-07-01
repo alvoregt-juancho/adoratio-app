@@ -8,6 +8,7 @@ const {
     requirePermission,
     PRIV,
 } = require('../middleware/auth');
+const { hasPermission } = require('../constants/permissions');
 const rbacRoutes = require('./rbac');
 const qrUtil = require('../utils/qr');
 const {
@@ -50,6 +51,15 @@ const {
     sortRosterRows,
     sortMembersByName,
 } = require('../utils/roster');
+const {
+    CSV_BOM,
+    getRosterTemplate,
+    parseCsvText,
+    parseCommitmentImportRow,
+    parseMemberImportRow,
+    isInstructionRow,
+} = require('../utils/rosterCsv');
+const { createAdminReservation } = require('../utils/adminReservation');
 const { attachCaptainContext, requireCaptainScopeForReservation } = require('../middleware/captainContext');
 const {
     filterReservationsForCaptain,
@@ -1389,10 +1399,142 @@ router.get('/roster/export.csv', requirePermission(PRIV.RESERVATIONS_EXPORT), as
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="lista-${section}.csv"`);
-        res.send(header + rows.join('\n'));
+        res.send(CSV_BOM + header + rows.join('\n'));
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al exportar la lista.' });
+    }
+});
+
+router.get('/roster/template.csv', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
+    try {
+        const section = req.query.section || 'commitments';
+        const template = getRosterTemplate(section);
+        if (!template) return res.status(400).json({ error: 'Sección de plantilla inválida.' });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${template.filename}"`);
+        res.send(template.content);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al generar la plantilla.' });
+    }
+});
+
+router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
+    try {
+        const section = String(req.body?.section || '').trim();
+        const csv = String(req.body?.csv || '');
+        if (!csv.trim()) return res.status(400).json({ error: 'No se recibió contenido CSV.' });
+        if (!['commitments', 'captains', 'substitutes'].includes(section)) {
+            return res.status(400).json({ error: 'Sección de importación inválida.' });
+        }
+        if (section === 'commitments' && !hasPermission(req.user.privileges ?? 0, PRIV.RESERVATIONS_CHECKIN)) {
+            return res.status(403).json({ error: 'Sin permiso para importar compromisos de adoración.' });
+        }
+
+        const { headers, rows } = parseCsvText(csv);
+        if (!headers.length) return res.status(400).json({ error: 'El archivo CSV está vacío o no tiene encabezados.' });
+
+        const created = [];
+        const errors = [];
+
+        for (const row of rows) {
+            if (isInstructionRow(headers, row.cells)) continue;
+            if (row.cells.every((c) => !String(c).trim())) continue;
+            const exampleMarker = String(row.cells[0] || '').toLowerCase();
+            if (exampleMarker.includes('ejemplo') && String(row.cells[row.cells.length - 1] || '').toLowerCase().includes('borrar')) {
+                continue;
+            }
+
+            if (section === 'commitments') {
+                const parsed = parseCommitmentImportRow(row, headers);
+                if (parsed.error) {
+                    errors.push({ row: row.rowNumber, error: parsed.error });
+                    continue;
+                }
+                try {
+                    const reservation = await createAdminReservation({
+                        slotTime: parsed.slotTime,
+                        weekday: parsed.weekday,
+                        userFirstName: parsed.firstName,
+                        userLastName: parsed.lastName,
+                        userPhone: parsed.phone,
+                        date: parsed.date,
+                        frequency: parsed.frequency,
+                        weekDays: parsed.weekDays,
+                        biweeklyWeeks: parsed.biweeklyWeeks,
+                        durationMinutes: parsed.durationMinutes,
+                        startTimeOffset: parsed.startTimeOffset,
+                        commitmentMonths: 12,
+                    }, { req });
+                    created.push(reservation.id);
+                } catch (e) {
+                    errors.push({ row: row.rowNumber, error: e.message || 'Error al crear compromiso.' });
+                }
+            } else {
+                const role = section === 'captains' ? 'captain' : 'substitute';
+                const parsed = parseMemberImportRow(row, headers, role);
+                if (parsed.error) {
+                    errors.push({ row: row.rowNumber, error: parsed.error });
+                    continue;
+                }
+                try {
+                    const member = await prisma.rosterMember.create({
+                        data: {
+                            role: parsed.role,
+                            firstName: parsed.firstName,
+                            lastName: parsed.lastName,
+                            phone: parsed.phone,
+                            email: parsed.email,
+                            internalNotes: parsed.internalNotes,
+                            weekDays: parsed.weekDays,
+                            slotTimes: parsed.slotTimes,
+                        },
+                    });
+                    created.push(member.id);
+                } catch (e) {
+                    errors.push({ row: row.rowNumber, error: 'Error al crear contacto.' });
+                }
+            }
+        }
+
+        await writeAudit({
+            action: 'roster.import',
+            entity: 'roster',
+            meta: { section, created: created.length, errors: errors.length },
+            req,
+        });
+
+        const message = created.length
+            ? `Importación completada: ${created.length} registro${created.length === 1 ? '' : 's'} creado${created.length === 1 ? '' : 's'}.`
+            : 'No se importó ningún registro.';
+
+        res.json({ message, created: created.length, errors });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al importar la lista.' });
+    }
+});
+
+router.post('/reservations', requirePermission(PRIV.RESERVATIONS_CHECKIN), async (req, res) => {
+    try {
+        const reservation = await createAdminReservation(req.body, { req });
+        await writeAudit({
+            action: 'reservation.create',
+            entity: 'reservation',
+            entityId: reservation.id,
+            reservationId: reservation.id,
+            meta: { userName: reservation.userName, source: 'admin_lista' },
+            req,
+        });
+        res.status(201).json({
+            message: 'Adorador creado.',
+            reservation: normalizeReservationNames(reservation),
+        });
+    } catch (e) {
+        console.error(e);
+        const status = e.status || 500;
+        res.status(status).json({ error: status === 500 ? 'Error al crear el compromiso.' : e.message });
     }
 });
 

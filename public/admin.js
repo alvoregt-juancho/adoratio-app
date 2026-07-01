@@ -91,7 +91,10 @@
         "turnos-config": "Configura frecuencias permitidas, horarios de turno y cupos por franja según día.",
         "cal-needs": "Cantidad de franjas horarias sin cobertura suficiente en el período.",
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
-        "roster-export": "Exporta la sección visible (turnos, capitanes o sustitutos) a CSV.",
+        "roster-export": "Exporta la sección visible a CSV (compatible con Excel).",
+        "roster-template": "Descarga plantilla CSV para llenar en Excel y volver a cargar.",
+        "roster-import": "Sube un CSV con el mismo formato que la plantilla.",
+        "new-commitment": "Crea manualmente un compromiso de adoración en la lista.",
         "new-captain": "Registra un contacto de capitán en el directorio (solo teléfono/WhatsApp, sin acceso al panel).",
         "new-captain-range": "Asigna un usuario con cuenta y perfil Capitán al bloque horario que administrará.",
         "section-capitanes-admin": "Gestión central de capitanes: usuario, día de la semana y franja horaria recurrente.",
@@ -1240,6 +1243,36 @@
         return slotsCache;
     }
 
+    function setReservationSheetMode(mode) {
+        const sheet = document.getElementById("reservationSheet");
+        if (!sheet) return;
+        sheet.classList.toggle("reservation-sheet-mode-create", mode === "create");
+        sheet.classList.toggle("reservation-sheet-mode-edit", mode === "edit");
+        document.getElementById("reservationSheetTitle").textContent =
+            mode === "create" ? "Nuevo adorador" : "Editar adorador";
+    }
+
+    async function openNewReservationEditor() {
+        if (!hasPerm("RESERVATIONS_CHECKIN")) return;
+        const slots = await ensureSlotsForReservationEdit();
+        const slotSelect = document.getElementById("reservationEditSlot");
+        slotSelect.innerHTML = slots.map(function (s) {
+            const label = TRange(s.startTime, s.endTime) + (s.label ? " (" + s.label + ")" : "");
+            return "<option value='" + s.id + "'>" + escapeHtml(label) + "</option>";
+        }).join("");
+
+        document.getElementById("reservationEditId").value = "";
+        document.getElementById("reservationEditFirst").value = "";
+        document.getElementById("reservationEditLast").value = "";
+        document.getElementById("reservationEditPhone").value = "";
+        document.getElementById("reservationEditWeekday").value = "1";
+        document.getElementById("reservationEditFrequency").value = "WEEKLY";
+        document.getElementById("reservationEditDuration").value = "60";
+        document.getElementById("reservationEditMeta").textContent = "";
+        setReservationSheetMode("create");
+        document.getElementById("reservationSheet").classList.add("active");
+    }
+
     async function openReservationEditor(reservationId) {
         if (!hasPerm("RESERVATIONS_CHECKIN")) return;
         const res = await api("/api/admin/reservations/" + reservationId);
@@ -1261,22 +1294,33 @@
         document.getElementById("reservationEditStatus").value = r.status;
         document.getElementById("reservationEditMeta").textContent =
             "Compromiso desde " + r.date + " · " + (FREQUENCY_SHORT[r.frequency] || r.frequency || "—");
+        setReservationSheetMode("edit");
         document.getElementById("reservationSheet").classList.add("active");
     }
 
     async function saveReservationEdit() {
-        const id = Number(document.getElementById("reservationEditId").value);
+        const idRaw = document.getElementById("reservationEditId").value;
+        const isCreate = !idRaw;
         const body = {
             userFirstName: document.getElementById("reservationEditFirst").value.trim(),
             userLastName: document.getElementById("reservationEditLast").value.trim(),
             userPhone: document.getElementById("reservationEditPhone").value.trim(),
             slotId: Number(document.getElementById("reservationEditSlot").value),
-            status: document.getElementById("reservationEditStatus").value,
         };
-        const res = await api("/api/admin/reservations/" + id, { method: "PUT", body: JSON.stringify(body) });
+        if (isCreate) {
+            body.weekday = Number(document.getElementById("reservationEditWeekday").value);
+            body.frequency = document.getElementById("reservationEditFrequency").value;
+            body.durationMinutes = Number(document.getElementById("reservationEditDuration").value);
+            body.commitmentMonths = 12;
+        } else {
+            body.status = document.getElementById("reservationEditStatus").value;
+        }
+        const res = isCreate
+            ? await api("/api/admin/reservations", { method: "POST", body: JSON.stringify(body) })
+            : await api("/api/admin/reservations/" + idRaw, { method: "PUT", body: JSON.stringify(body) });
         const data = await res.json();
         if (res.ok) {
-            toast("Adorador actualizado.", "success");
+            toast(isCreate ? "Adorador creado." : "Adorador actualizado.", "success");
             document.getElementById("reservationSheet").classList.remove("active");
             loadReservations();
             loadRoster();
@@ -2402,6 +2446,67 @@
         }
     }
 
+    async function downloadRosterTemplate(section) {
+        try {
+            const res = await api("/api/admin/roster/template.csv?section=" + encodeURIComponent(section));
+            if (!res.ok) {
+                const data = await res.json().catch(function () { return {}; });
+                return toast(data.error || "No se pudo descargar la plantilla.", "error");
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = section === "commitments"
+                ? "plantilla-turnos-adoracion.csv"
+                : (section === "captains" ? "plantilla-capitanes.csv" : "plantilla-sustitutos.csv");
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            toast("No se pudo descargar la plantilla.", "error");
+        }
+    }
+
+    let rosterImportSection = null;
+
+    function promptRosterImport(section) {
+        rosterImportSection = section;
+        const input = document.getElementById("rosterImportFile");
+        input.value = "";
+        input.click();
+    }
+
+    async function handleRosterImportFile(file) {
+        if (!file || !rosterImportSection) return;
+        try {
+            const csv = await file.text();
+            const res = await api("/api/admin/roster/import", {
+                method: "POST",
+                body: JSON.stringify({ section: rosterImportSection, csv: csv }),
+            });
+            const data = await res.json();
+            if (!res.ok) return toast(data.error || "Error al importar.", "error");
+            let msg = data.message || "Importación completada.";
+            if (data.errors && data.errors.length) {
+                const first = data.errors.slice(0, 3).map(function (e) {
+                    return "Fila " + e.row + ": " + e.error;
+                }).join("\n");
+                msg += " " + data.errors.length + " fila(s) con error.";
+                if (first) console.warn("Import errors:\n" + first);
+            }
+            toast(msg, data.created ? "success" : "info");
+            loadRoster();
+            loadReservations();
+            loadAdoradores();
+            loadMetrics();
+            loadActivity();
+        } catch (e) {
+            toast("Error al importar el archivo.", "error");
+        } finally {
+            rosterImportSection = null;
+        }
+    }
+
     // ── CAPITANES (cuentas + franjas) ──
     async function loadCaptainAssignableUsers() {
         if (!hasPerm("CAPTAIN_ASSIGN")) return;
@@ -3474,6 +3579,21 @@
     });
     document.getElementById("newSubstituteBtn").addEventListener("click", function () {
         openRosterMemberSheet("substitute", null);
+    });
+    document.getElementById("newCommitmentBtn").addEventListener("click", openNewReservationEditor);
+    document.querySelectorAll(".roster-template").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            downloadRosterTemplate(btn.getAttribute("data-template"));
+        });
+    });
+    document.querySelectorAll(".roster-import-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            promptRosterImport(btn.getAttribute("data-import"));
+        });
+    });
+    document.getElementById("rosterImportFile").addEventListener("change", function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (file) handleRosterImportFile(file);
     });
     document.getElementById("saveRosterMemberBtn").addEventListener("click", saveRosterMember);
     document.getElementById("deleteRosterMemberBtn").addEventListener("click", function () {
