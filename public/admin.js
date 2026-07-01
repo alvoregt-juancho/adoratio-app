@@ -434,7 +434,7 @@
     let activeMetricKey = null;
 
     const METRIC_CARDS = [
-        { key: "active-slots", detailKey: "activeSlots", label: "Turnos activos", valueKey: "totalSlots" },
+        { key: "active-slots", detailKey: "activeSlots", label: "Turnos activos semanal", valueKey: "totalSlots" },
         { key: "reservations-today", detailKey: "reservationsToday", label: "Reservas hoy", valueKey: "totalReservations" },
         { key: "checked-in", detailKey: "checkedIn", label: "Asistencias", valueKey: "checkedIn" },
         { key: "pending", detailKey: "pending", label: "Pendientes", valueKey: "pending" },
@@ -763,6 +763,12 @@
         }
         if (type === "activeSlots" || type === "criticalSlots") {
             return '<ul class="metric-detail-list">' + items.map(function (s) {
+                if (type === "activeSlots" && s.weekdayLabel) {
+                    return "<li><strong>" + escapeHtml(s.weekdayLabel) + "</strong> — " +
+                        escapeHtml(s.timeLabel || TRange(s.startTime, s.endTime)) +
+                        (s.label ? ' <span class="muted">· ' + escapeHtml(s.label) + "</span>" : "") +
+                        ' <span class="muted">cupo ' + s.capacity + "</span></li>";
+                }
                 const label = s.label ? " · " + escapeHtml(s.label) : "";
                 return "<li><strong>" + escapeHtml(TRange(s.startTime, s.endTime)) + "</strong>" +
                     label + ' <span class="muted">cupo ' + s.capacity + "</span></li>";
@@ -792,7 +798,7 @@
 
     function metricDetailIntro(key) {
         const intros = {
-            "active-slots": "Franjas horarias activas en la capilla (configuración de turnos).",
+            "active-slots": "Cada hora activa de la semana (por día y franja). Un lunes de 8 a.m. a 12 p.m. y 3 a 6 p.m., con 1–3 p.m. inactivos, cuenta 8 turnos.",
             "reservations-today": "Compromisos con fecha de hoy, cualquier estado registrado.",
             "checked-in": "Adoradores que ya validaron su visita hoy (QR o marcado manual).",
             "pending": "Guardias confirmadas de hoy que aún no registran asistencia.",
@@ -1896,23 +1902,30 @@
             return;
         }
 
-        const slotTimes = [];
-        const slotMap = {};
-        data.days.forEach(function (day) {
-            (day.slots || []).forEach(function (s) {
-                const key = s.startTime + "–" + s.endTime;
-                if (!slotMap[key]) {
-                    slotMap[key] = true;
-                    slotTimes.push({ start: s.startTime, end: s.endTime, key: key });
-                }
-            });
-        });
-        slotTimes.sort(function (a, b) { return a.start.localeCompare(b.start); });
+        const slotTimes = (data.slotTimes && data.slotTimes.length)
+            ? data.slotTimes.map(function (s) {
+                return { start: s.startTime, end: s.endTime, key: s.key || (s.startTime + "–" + s.endTime) };
+            })
+            : (function () {
+                const slotMap = {};
+                const list = [];
+                data.days.forEach(function (day) {
+                    (day.slots || []).forEach(function (s) {
+                        const key = s.startTime + "–" + s.endTime;
+                        if (!slotMap[key]) {
+                            slotMap[key] = true;
+                            list.push({ start: s.startTime, end: s.endTime, key: key });
+                        }
+                    });
+                });
+                list.sort(function (a, b) { return a.start.localeCompare(b.start); });
+                return list;
+            })();
 
         let needsCount = 0;
         data.days.forEach(function (day) {
             (day.slots || []).forEach(function (s) {
-                if (s.needsMore > 0 || s.gapAlert) needsCount++;
+                if (!s.isInactive && (s.needsMore > 0 || s.gapAlert)) needsCount++;
             });
         });
         if (needsBadge) {
@@ -1938,19 +1951,22 @@
                     });
                     let cellClass = "cal-cell";
                     if (block) {
-                        if (block.gapAlert) cellClass += " cal-cell--gap";
+                        if (block.isInactive) cellClass += " cal-cell--inactive";
+                        else if (block.gapAlert) cellClass += " cal-cell--gap";
                         else if (block.needsMore > 0) cellClass += " cal-cell--needs";
                         else if (block.taken > 0) cellClass += " cal-cell--filled";
                     }
                     html += '<td class="' + cellClass + '">';
-                    if (block && block.commitments?.length) {
+                    if (block && block.isInactive) {
+                        html += '<span class="cal-inactive-pill">Inactivo</span>';
+                    } else if (block && block.commitments?.length) {
                         block.commitments.forEach(function (c) {
                             const name = [c.userFirstName, c.userLastName].filter(Boolean).join(" ") || c.userName;
                             html += '<div class="cal-person"><span class="cal-person-name">' + escapeHtml(name) + "</span>";
                             html += '<span class="cal-person-phone">' + escapeHtml(c.userPhone) + "</span></div>";
                         });
                     }
-                    if (block && block.needsMore > 0) {
+                    if (block && !block.isInactive && block.needsMore > 0) {
                         html += '<span class="cal-needs-pill">se necesita ' + block.needsMore + "</span>";
                     }
                     html += "</td>";

@@ -60,6 +60,12 @@ const {
     isInstructionRow,
 } = require('../utils/rosterCsv');
 const { createAdminReservation } = require('../utils/adminReservation');
+const {
+    countWeeklyActiveSlotOccurrences,
+    listWeeklyActiveSlotOccurrences,
+    uniqueSlotTimeRows,
+    buildCalendarDaySlots,
+} = require('../utils/slotCalendar');
 const { attachCaptainContext, requireCaptainScopeForReservation } = require('../middleware/captainContext');
 const {
     filterReservationsForCaptain,
@@ -95,7 +101,8 @@ router.get('/metrics', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) 
         const dayStart = new Date(`${date}T00:00:00`);
         const dayEnd = new Date(`${date}T23:59:59.999`);
 
-        const [activeSlots, reservations, scansToday] = await Promise.all([
+        const [allSlots, activeSlots, reservations, scansToday] = await Promise.all([
+            prisma.slot.findMany({ orderBy: { startTime: 'asc' } }),
             prisma.slot.findMany({
                 where: { isActive: true },
                 orderBy: { startTime: 'asc' },
@@ -127,16 +134,20 @@ router.get('/metrics', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) 
         const pendingRows = reservations.filter((r) => !r.checkedInAt && r.status === 'confirmed');
         const criticalSlotRows = activeSlots.filter((s) => !slotsWithReservation.has(s.id));
 
+        const weeklyActiveSlots = countWeeklyActiveSlotOccurrences(allSlots);
+
         res.json({
             date,
-            totalSlots: activeSlots.length,
+            totalSlots: weeklyActiveSlots,
+            weeklyActiveSlots,
             totalReservations: reservations.length,
             checkedIn: checkedInRows.length,
             pending: pendingRows.length,
             criticalSlots: criticalSlotRows.length,
             scansToday: scansToday.length,
             details: {
-                activeSlots: activeSlots.map((s) => ({
+                activeSlots: listWeeklyActiveSlotOccurrences(allSlots),
+                activeSlotRecords: activeSlots.map((s) => ({
                     id: s.id,
                     label: s.label,
                     startTime: s.startTime,
@@ -1131,7 +1142,7 @@ router.get('/calendar', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => 
         const range = dateRangeForView(view, anchor);
 
         const [allSlots, reservations] = await Promise.all([
-            prisma.slot.findMany({ where: { isActive: true }, orderBy: { startTime: 'asc' } }),
+            prisma.slot.findMany({ orderBy: { startTime: 'asc' } }),
             prisma.reservation.findMany({
                 where: { status: { in: ['confirmed', 'completed'] } },
                 include: { slot: true },
@@ -1140,37 +1151,7 @@ router.get('/calendar', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => 
 
         const days = range.dates.map((dateStr) => {
             const weekday = weekdayFromDate(dateStr);
-            const { slots: eligible } = filterSlotsForDate(allSlots, dateStr);
-
-            const slotBlocks = eligible.map((slot) => {
-                const commitments = reservations
-                    .filter((r) => r.slotId === slot.id && commitmentAppliesOn(r, dateStr))
-                    .map((r) => ({
-                        id: r.id,
-                        userFirstName: r.userFirstName,
-                        userLastName: r.userLastName,
-                        userName: r.userName,
-                        userPhone: r.userPhone,
-                        frequency: r.frequency,
-                        startTimeOffset: r.startTimeOffset,
-                        durationMinutes: r.durationMinutes,
-                    }));
-
-                const gapStatus = checkTimelineGaps(commitments);
-                const taken = commitments.length;
-
-                return {
-                    slotId: slot.id,
-                    startTime: slot.startTime,
-                    endTime: slot.endTime,
-                    capacity: slot.capacity,
-                    taken,
-                    available: Math.max(0, slot.capacity - taken),
-                    needsMore: Math.max(0, slot.capacity - taken),
-                    gapAlert: gapStatus === GAP_STATUS.CRITICAL_GAP,
-                    commitments,
-                };
-            });
+            const slotBlocks = buildCalendarDaySlots(allSlots, dateStr, reservations);
 
             return {
                 date: dateStr,
@@ -1190,6 +1171,7 @@ router.get('/calendar', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => 
             label: range.label,
             start: range.start,
             end: range.end,
+            slotTimes: uniqueSlotTimeRows(allSlots),
             days: daysOut,
             scopedCaptain: !!req.isScopedCaptain,
         });

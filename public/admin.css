@@ -1022,6 +1022,22 @@ html:has(body.admin) {
     background: #fff;
 }
 
+.cal-cell--inactive {
+    background: #ececef;
+    color: var(--admin-muted);
+}
+
+.cal-inactive-pill {
+    display: inline-block;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(17, 18, 21, 0.06);
+}
+
 .cal-cell--filled {
     background: rgba(17, 18, 21, 0.03);
 }
