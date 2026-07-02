@@ -123,7 +123,7 @@ model PrayerIntention {
   reservationId           Int?      @map("reservation_id")
   assignedToReservationId Int?      @unique @map("assigned_to_reservation_id")
   createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
   statusUpdatedAt         DateTime  @default(now()) @map("status_updated_at")
   prayedAt                DateTime? @map("prayed_at")
   deletedAt               DateTime? @map("deleted_at")
