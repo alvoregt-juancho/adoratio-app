@@ -34,10 +34,16 @@ async function markIntentionPrayedById(intentionId) {
 async function restoreIntentionById(intentionId) {
     const existing = await prisma.prayerIntention.findUnique({ where: { id: intentionId } });
     if (!existing) return null;
-    if (existing.status === 'active') return existing;
+    if (existing.status === 'active' && !existing.assignedToReservationId) return existing;
     return prisma.prayerIntention.update({
         where: { id: intentionId },
-        data: { status: 'active', statusUpdatedAt: new Date(), prayedAt: null, deletedAt: null },
+        data: {
+            status: 'active',
+            statusUpdatedAt: new Date(),
+            prayedAt: null,
+            deletedAt: null,
+            assignedToReservationId: null,
+        },
     });
 }
 
