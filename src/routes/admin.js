@@ -1634,7 +1634,7 @@ router.delete('/roster-members/:id', requirePermission(PRIV.SLOTS_EDIT), async (
     }
 });
 
-// ── TIMELINE (detección de huecos de 30 min) ──────────────────────────
+// ── TIMELINE (detección de espacios de 30 min) ──────────────────────────
 router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) => {
     try {
         const date = req.query.date || todayStr();

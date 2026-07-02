@@ -77,7 +77,7 @@
         "tab-admins": "Usuarios con acceso al panel y el perfil RBAC asignado a cada uno.",
         "tab-auditoria": "Historial de acciones para trazabilidad, seguridad y revisión de cambios.",
         "section-resumen": "Resumen en tiempo real del estado de la capilla: ocupación, asistencias y alertas del día.",
-        "timeline-panel": "Línea de tiempo de guardias de hoy. Detecta huecos sin adorador asignado.",
+        "timeline-panel": "Línea de tiempo de guardias de hoy. Detecta espacios sin adorador asignado.",
         "section-reservas": "Filtra por semana o mes y exporta la lista para reportes o seguimiento pastoral.",
         "res-view-week": "Muestra adoradores con guardia en los 7 días del rango seleccionado.",
         "res-view-month": "Vista mensual: útil para planificación y cobertura a largo plazo.",
@@ -85,7 +85,7 @@
         "export-csv": "Descarga un archivo CSV con las reservas del período visible en la tabla.",
         "section-muro": "Intenciones publicadas en el muro de oración de la capilla.",
         "muro-filter": "Filtra intenciones activas, ya oradas o muestra todas.",
-        "turnos-calendario": "Cuadrícula semanal o mensual con adoradores por franja y alertas de huecos.",
+        "turnos-calendario": "Cuadrícula semanal o mensual con adoradores por franja y alertas de espacios.",
         "turnos-lista": "Lista de compromisos, contactos de capitanes/sustitutos filtrable por día y hora.",
         "turnos-directorio": "Directorio completo de adoradores con filtros por nombre, teléfono y día.",
         "turnos-config": "Configura frecuencias permitidas, horarios de turno y cupos por franja según día.",
@@ -98,7 +98,7 @@
         "new-captain": "Registra un contacto de capitán en el directorio (solo teléfono/WhatsApp, sin acceso al panel).",
         "new-captain-range": "Asigna un usuario con cuenta y perfil Capitán al bloque horario que administrará.",
         "section-capitanes-admin": "Gestión central de capitanes: usuario, día de la semana y franja horaria recurrente.",
-        "section-capitan": "Vista filtrada a tus franjas: huecos, sustitutos pendientes, asistencia y alertas urgentes.",
+        "section-capitan": "Vista filtrada a tus franjas: espacios, sustitutos pendientes, asistencia y alertas urgentes.",
         "captain-message": "Copia teléfonos de adoradores regulares de tu bloque para SMS o WhatsApp.",
         "captain-notify-block": "Prepara mensaje WhatsApp para adoradores de tu bloque (cupos libres o recordatorio).",
         "new-substitute": "Registra un sustituto disponible para cubrir ausencias.",
@@ -126,7 +126,7 @@
             introKey: "tab-resumen",
             items: [
                 { perm: "DASHBOARD_VIEW", label: "Ver métricas del día", hintKey: "section-resumen" },
-                { perm: "DASHBOARD_VIEW", label: "Timeline de guardias y huecos", hintKey: "timeline-panel" },
+                { perm: "DASHBOARD_VIEW", label: "Timeline de guardias y espacios", hintKey: "timeline-panel" },
             ],
         },
         {
@@ -920,7 +920,7 @@
                     return escapeHtml(display) + (detail.length ? " <span class=\"muted\">(" + detail.join(", ") + ")</span>" : "");
                 }).join("<br>") || '<span class="muted">Sin adoradores — Santísimo solo</span>';
                 const meta = gapStatus === "CRITICAL_GAP"
-                    ? '<span style="color:var(--apple-red-alert)">Hueco de 30 min sin custodia</span>'
+                    ? '<span style="color:var(--apple-red-alert)">Espacio de 30 min sin custodia</span>'
                     : (block.commitments?.length || 0) + " adorador" + ((block.commitments?.length || 0) !== 1 ? "es" : "");
                 return '<div class="' + cardClass + '" style="animation-delay:' + (i * 0.03) + 's">' +
                     '<div class="time-signature">' + escapeHtml(TRange(block.startTime, block.endTime)) + '</div>' +
@@ -1898,7 +1898,7 @@
 
         if (!data.days?.length) {
             wrap.innerHTML = '<div class="empty-state">Sin datos para este período.</div>';
-            if (needsBadge) needsBadge.textContent = "0 huecos";
+            if (needsBadge) needsBadge.textContent = "0 espacios";
             return;
         }
 
@@ -1929,7 +1929,7 @@
             });
         });
         if (needsBadge) {
-            needsBadge.textContent = needsCount + (needsCount === 1 ? " hueco" : " huecos");
+            needsBadge.textContent = needsCount + (needsCount === 1 ? " espacio" : " espacios");
         }
 
         const isMonth = data.view === "month";
@@ -2685,7 +2685,7 @@
         if (metricsEl) {
             metricsEl.innerHTML =
                 '<div class="metric-card"><span class="metric-value">' + (s.openSlots || 0) + '</span><span class="metric-label">Cupos libres</span></div>' +
-                '<div class="metric-card"><span class="metric-value">' + (s.gapAlerts || 0) + '</span><span class="metric-label">Huecos críticos</span></div>' +
+                '<div class="metric-card"><span class="metric-value">' + (s.gapAlerts || 0) + '</span><span class="metric-label">Espacios críticos</span></div>' +
                 '<div class="metric-card"><span class="metric-value">' + (s.adorers || 0) + '</span><span class="metric-label">Adoradores</span></div>' +
                 '<div class="metric-card metric-card--alert"><span class="metric-value">' + (s.pendingSubstitutions || 0) + '</span><span class="metric-label">Sustituciones</span></div>' +
                 '<div class="metric-card metric-card--alert"><span class="metric-value">' + (s.unreadNotifications || 0) + '</span><span class="metric-label">Alertas</span></div>';
@@ -2775,7 +2775,7 @@
             grid.innerHTML = days.length
                 ? days.map(function (day) {
                     const slots = (day.slots || []).map(function (slot) {
-                        const gap = slot.gapAlert ? ' <span class="gap-badge">Hueco</span>' : "";
+                        const gap = slot.gapAlert ? ' <span class="gap-badge">Espacio</span>' : "";
                         const open = slot.available > 0 ? ' <span class="open-badge">' + slot.available + " libre</span>" : "";
                         const commitments = slot.commitments || [];
                         const rows = commitments.length

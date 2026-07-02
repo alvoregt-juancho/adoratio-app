@@ -1,5 +1,5 @@
 /**
- * Detección de huecos de 30 minutos en bloques horarios.
+ * Detección de espacios de 30 minutos en bloques horarios.
  * Un bloque de 1 hora queda solo si falta cobertura en la primera o segunda media hora.
  */
 
