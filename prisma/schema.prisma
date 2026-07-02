@@ -123,11 +123,16 @@ model PrayerIntention {
   reservationId           Int?      @map("reservation_id")
   assignedToReservationId Int?      @unique @map("assigned_to_reservation_id")
   createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  statusUpdatedAt         DateTime  @default(now()) @map("status_updated_at")
+  prayedAt                DateTime? @map("prayed_at")
+  deletedAt               DateTime? @map("deleted_at")
 
   reservation           Reservation? @relation(fields: [reservationId], references: [id])
   assignedToReservation Reservation? @relation("AssignedPrayer", fields: [assignedToReservationId], references: [id])
 
   @@index([visibility, status])
+  @@index([status, statusUpdatedAt])
   @@map("prayer_intentions")
 }
 

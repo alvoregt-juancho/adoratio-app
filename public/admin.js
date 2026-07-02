@@ -1420,14 +1420,14 @@
         if (!hasPerm("MURO_MANAGE")) return;
         if (!(await confirmDialog({
             title: "Eliminar intención",
-            message: "¿Eliminar esta intención del muro?",
-            confirmLabel: "Eliminar",
+            message: "¿Eliminar esta intención del muro? Podrás restaurarla durante 30 días.",
+            confirmLabel: "Eliminar (archivar)",
             danger: true,
         }))) return;
         const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
-            toast("Intención eliminada.", "success");
+            toast("Intención eliminada (archivada).", "success");
             loadIntentions();
             loadActivity();
         } else {
@@ -1439,14 +1439,14 @@
         const id = Number(document.getElementById("intentionEditId").value);
         if (!(await confirmDialog({
             title: "Eliminar intención",
-            message: "¿Eliminar esta intención del muro?",
-            confirmLabel: "Eliminar",
+            message: "¿Eliminar esta intención del muro? Podrás restaurarla durante 30 días.",
+            confirmLabel: "Eliminar (archivar)",
             danger: true,
         }))) return;
         const res = await api("/api/admin/intentions/" + id, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
-            toast("Intención eliminada.", "success");
+            toast("Intención eliminada (archivada).", "success");
             document.getElementById("intentionSheet").classList.remove("active");
             loadIntentions();
             loadActivity();
@@ -1506,18 +1506,26 @@
                 const markBtn = canNotify && i.status === "active"
                     ? "<button class='mini-btn' data-prayed='" + i.id + "'>Marcar orada</button>"
                     : "";
+                const restoreBtn = canManage && (i.status === "prayed" || i.status === "deleted")
+                    ? "<button class='mini-btn' data-restore-intention='" + i.id + "'>Restaurar</button>"
+                    : "";
                 const manageBtns = canManage
                     ? "<button class='mini-btn' data-edit-intention='" + i.id + "'>Editar</button>" +
-                      "<button class='mini-btn danger' data-delete-intention='" + i.id + "'>Eliminar</button>"
+                      (i.status === "deleted" ? "" : "<button class='mini-btn danger' data-delete-intention='" + i.id + "'>Eliminar</button>")
                     : "";
+                const statusLabel = i.status === "prayed"
+                    ? "Orada"
+                    : (i.status === "deleted" ? "Eliminada" : "Activa");
+                const statusClass = i.status === "prayed"
+                    ? "completed"
+                    : (i.status === "deleted" ? "cancelled" : "confirmed");
                 return "<tr>" +
                     "<td class='muro-intention-text'>" + escapeHtml(i.text) + "</td>" +
                     "<td>" + escapeHtml(i.displayName || "Anónimo") + "</td>" +
                     "<td>" + escapeHtml(i.userPhone || "—") + "</td>" +
                     "<td>" + formatIntentionDate(i.createdAt) + "</td>" +
-                    "<td><span class='status-pill status-" + (i.status === "prayed" ? "completed" : "confirmed") + "'>" +
-                    (i.status === "prayed" ? "Orada" : "Activa") + "</span></td>" +
-                    "<td><div class='admin-actions'>" + waBtn + markBtn + manageBtns + "</div></td></tr>";
+                    "<td><span class='status-pill status-" + statusClass + "'>" + statusLabel + "</span></td>" +
+                    "<td><div class='admin-actions'>" + waBtn + markBtn + restoreBtn + manageBtns + "</div></td></tr>";
             }).join("") : "<tr><td colspan='6' class='muted'>Sin intenciones con este filtro.</td></tr>") +
             "</tbody>";
 
@@ -1535,6 +1543,11 @@
         table.querySelectorAll("[data-delete-intention]").forEach(function (b) {
             b.addEventListener("click", function () {
                 deleteIntentionById(Number(b.getAttribute("data-delete-intention")));
+            });
+        });
+        table.querySelectorAll("[data-restore-intention]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                restoreIntentionById(Number(b.getAttribute("data-restore-intention")));
             });
         });
     }
@@ -1562,6 +1575,19 @@
             loadIntentions();
         } else {
             toast(data.error || "Error.", "error");
+        }
+    }
+
+    async function restoreIntentionById(id) {
+        if (!hasPerm("MURO_MANAGE")) return;
+        const res = await api("/api/admin/intentions/" + id + "/restore", { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+            toast("Intención restaurada como activa.", "success");
+            loadIntentions();
+            loadActivity();
+        } else {
+            toast(data.error || "Error al restaurar.", "error");
         }
     }
 

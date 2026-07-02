@@ -27,7 +27,26 @@ async function markIntentionPrayedById(intentionId) {
     if (!existing || existing.status === 'prayed') return existing;
     return prisma.prayerIntention.update({
         where: { id: intentionId },
-        data: { status: 'prayed' },
+        data: { status: 'prayed', statusUpdatedAt: new Date(), prayedAt: new Date(), deletedAt: null },
+    });
+}
+
+async function restoreIntentionById(intentionId) {
+    const existing = await prisma.prayerIntention.findUnique({ where: { id: intentionId } });
+    if (!existing) return null;
+    if (existing.status === 'active') return existing;
+    return prisma.prayerIntention.update({
+        where: { id: intentionId },
+        data: { status: 'active', statusUpdatedAt: new Date(), prayedAt: null, deletedAt: null },
+    });
+}
+
+async function softDeleteIntentionById(intentionId) {
+    const existing = await prisma.prayerIntention.findUnique({ where: { id: intentionId } });
+    if (!existing) return null;
+    return prisma.prayerIntention.update({
+        where: { id: intentionId },
+        data: { status: 'deleted', statusUpdatedAt: new Date(), deletedAt: new Date(), prayedAt: null },
     });
 }
 
@@ -68,6 +87,8 @@ module.exports = {
     anonymizeName,
     formatIntentionPayload,
     markIntentionPrayedById,
+    restoreIntentionById,
+    softDeleteIntentionById,
     markAssignedIntentionPrayed,
     assignWallIntentionToReservation,
     releaseWallIntentionAssignment,

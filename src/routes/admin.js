@@ -19,7 +19,13 @@ const {
 const { writeAudit } = require('../utils/audit');
 const { normalizeReservationNames, parseParticipantNames } = require('../utils/name');
 const { normalizePhone, isValidPhone } = require('../utils/phone');
-const { releaseWallIntentionAssignment, markIntentionPrayedById, markAssignedIntentionPrayed } = require('../utils/intentions');
+const {
+    releaseWallIntentionAssignment,
+    markIntentionPrayedById,
+    markAssignedIntentionPrayed,
+    restoreIntentionById,
+    softDeleteIntentionById,
+} = require('../utils/intentions');
 const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
@@ -709,10 +715,26 @@ router.delete('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN),
 router.get('/intentions', requirePermission(PRIV.MURO_VIEW), async (req, res) => {
     try {
         const status = req.query.status || 'active';
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+        const where = (() => {
+            if (status === 'active') return { status: 'active' };
+            if (status === 'prayed') return { status: 'prayed', statusUpdatedAt: { gte: cutoff } };
+            if (status === 'deleted') return { status: 'deleted', statusUpdatedAt: { gte: cutoff } };
+            if (status === 'all') {
+                return {
+                    OR: [
+                        { status: 'active' },
+                        { status: { in: ['prayed', 'deleted'] }, statusUpdatedAt: { gte: cutoff } },
+                    ],
+                };
+            }
+            return { status: 'active' };
+        })();
 
         const intentions = await prisma.prayerIntention.findMany({
-            where: status === 'all' ? {} : { status },
-            orderBy: { createdAt: 'desc' },
+            where,
+            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
             take: 200,
             include: {
                 reservation: {
@@ -735,6 +757,7 @@ router.get('/intentions', requirePermission(PRIV.MURO_VIEW), async (req, res) =>
                 userPhone: i.userPhone || i.reservation?.userPhone || null,
                 status: i.status,
                 createdAt: i.createdAt,
+                statusUpdatedAt: i.statusUpdatedAt || i.createdAt,
                 reservation: i.reservation
                     ? {
                         id: i.reservation.id,
@@ -778,6 +801,29 @@ router.post('/intentions/:id/prayed', requirePermission(PRIV.MURO_MANAGE), async
     }
 });
 
+router.post('/intentions/:id/restore', requirePermission(PRIV.MURO_MANAGE), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const existing = await prisma.prayerIntention.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Intención no encontrada.' });
+
+        const updated = await restoreIntentionById(id);
+
+        await writeAudit({
+            action: 'intention.restore',
+            entity: 'prayer_intention',
+            entityId: id,
+            meta: { from: existing.status, text: existing.text.slice(0, 80) },
+            req,
+        });
+
+        res.json({ message: 'Intención restaurada como activa.', intention: updated });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al restaurar la intención.' });
+    }
+});
+
 router.put('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -803,10 +849,21 @@ router.put('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req, r
             data.userPhone = phone;
         }
         if (status !== undefined) {
-            if (!['active', 'prayed'].includes(status)) {
+            if (!['active', 'prayed', 'deleted'].includes(status)) {
                 return res.status(400).json({ error: 'Estado inválido.' });
             }
             data.status = status;
+            data.statusUpdatedAt = new Date();
+            if (status === 'prayed') {
+                data.prayedAt = new Date();
+                data.deletedAt = null;
+            } else if (status === 'deleted') {
+                data.deletedAt = new Date();
+                data.prayedAt = null;
+            } else {
+                data.prayedAt = null;
+                data.deletedAt = null;
+            }
         }
 
         const updated = await prisma.prayerIntention.update({ where: { id }, data });
@@ -837,7 +894,7 @@ router.delete('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req
             });
         }
 
-        await prisma.prayerIntention.delete({ where: { id } });
+        await softDeleteIntentionById(id);
         await writeAudit({
             action: 'intention.delete',
             entity: 'prayer_intention',
@@ -845,7 +902,7 @@ router.delete('/intentions/:id', requirePermission(PRIV.MURO_MANAGE), async (req
             meta: { text: existing.text.slice(0, 80) },
             req,
         });
-        res.json({ message: 'Intención eliminada.' });
+        res.json({ message: 'Intención eliminada (archivada por 30 días).' });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al eliminar la intención.' });

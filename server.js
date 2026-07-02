@@ -11,6 +11,7 @@ const adminRoutes = require('./src/routes/admin');
 const settingsRoutes = require('./src/routes/settings');
 const muroRoutes = require('./src/routes/muro');
 const kioskRoutes = require('./src/routes/kiosk');
+const { purgeOldIntentions } = require('./src/jobs/intentionsCleanup');
 
 const app = express();
 
@@ -39,6 +40,19 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint no encontr
 
 async function start() {
     await initDatabase();
+
+    async function runIntentionCleanup() {
+        try {
+            const result = await purgeOldIntentions({ days: 30 });
+            if (result?.count) {
+                console.log(`ℹ Limpieza de intenciones: ${result.count} registro${result.count === 1 ? '' : 's'} purgado${result.count === 1 ? '' : 's'}.`);
+            }
+        } catch (e) {
+            console.error('Error en limpieza de intenciones:', e);
+        }
+    }
+    runIntentionCleanup();
+    setInterval(runIntentionCleanup, 24 * 60 * 60 * 1000);
 
     app.listen(config.port, () => {
         console.log(`Servidor Adoratio corriendo en ${config.baseUrl} (puerto ${config.port})`);
