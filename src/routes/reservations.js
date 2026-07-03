@@ -72,6 +72,8 @@ router.post('/', async (req, res) => {
                 return res.status(400).json({ error: 'Selecciona al menos un día de la semana.' });
             }
             weekDays = parseWeekDays(weekDaysRaw).join(',');
+        } else if (frequency === COMMITMENT_FREQUENCY.WEEKLY) {
+            weekDays = String(weekdayFromDate(date));
         }
 
         let biweeklyWeeks = null;

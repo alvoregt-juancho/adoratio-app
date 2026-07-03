@@ -22,8 +22,11 @@ function commitmentAppliesOn(reservation, dateStr) {
         case COMMITMENT_FREQUENCY.ONCE:
             return dateStr === reservation.date;
 
-        case COMMITMENT_FREQUENCY.WEEKLY:
+        case COMMITMENT_FREQUENCY.WEEKLY: {
+            const days = parseWeekDays(reservation.weekDays);
+            if (days.length === 1) return targetWeekday === days[0];
             return targetWeekday === anchorWeekday;
+        }
 
         case COMMITMENT_FREQUENCY.DAILY: {
             const days = parseWeekDays(reservation.weekDays);
@@ -65,6 +68,8 @@ function participationWeekdays(reservation) {
         frequency === COMMITMENT_FREQUENCY.MONTHLY ||
         frequency === COMMITMENT_FREQUENCY.ONCE
     ) {
+        const explicit = parseWeekDays(reservation.weekDays);
+        if (explicit.length === 1) return explicit;
         return [weekdayFromDate(reservation.date)];
     }
 
@@ -152,11 +157,20 @@ function dateRangeForView(view, anchorDate) {
 }
 
 const WEEKDAY_SHORT = ['', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+const WEEKDAY_FULL = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 function weekdayShortLabel(dateStr) {
     const wd = weekdayFromDate(dateStr);
     const day = dateStr.split('-')[2];
     return `${WEEKDAY_SHORT[wd]} ${Number(day)}`;
+}
+
+function weekdayFullLabel(dateStr) {
+    return WEEKDAY_FULL[weekdayFromDate(dateStr)] || '';
+}
+
+function commitmentDaysLabel(reservation) {
+    return participationWeekdays(reservation).map((d) => WEEKDAY_FULL[d]).join(', ');
 }
 
 /** Todas las fechas YYYY-MM-DD entre start y end (inclusive). */
@@ -222,6 +236,8 @@ module.exports = {
     COMMITMENT_TERM_MONTHS,
     dateRangeForView,
     weekdayShortLabel,
+    weekdayFullLabel,
+    commitmentDaysLabel,
     formatDateStr,
     eachDateInRange,
     resolveReservationScope,

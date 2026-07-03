@@ -424,6 +424,7 @@
     };
     const resColFilters = {
         slot: "",
+        day: "",
         date: "",
         firstName: "",
         lastName: "",
@@ -1071,6 +1072,11 @@
             const slotStr = TRange(r.slot.startTime, r.slot.endTime);
             const f = resColFilters;
             if (f.slot && slotStr.toLowerCase().indexOf(f.slot.toLowerCase()) === -1) return false;
+            if (f.day) {
+                const dayNeedle = f.day.toLowerCase();
+                const dayHay = ((r.dayLabel || "") + " " + (r.commitmentDaysLabel || "")).toLowerCase();
+                if (dayHay.indexOf(dayNeedle) === -1) return false;
+            }
             if (f.date && r.date.indexOf(f.date) === -1) return false;
             if (f.firstName && (r.userFirstName || "").toLowerCase().indexOf(f.firstName.toLowerCase()) === -1) return false;
             if (f.lastName && (r.userLastName || "").toLowerCase().indexOf(f.lastName.toLowerCase()) === -1) return false;
@@ -1093,11 +1099,12 @@
             "<thead>" +
             "<tr>" +
             "<th class='col-num'>#</th>" +
-            "<th>Turno</th><th>Fecha</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Estado</th><th></th>" +
+            "<th>Turno</th><th>Día</th><th>Fecha</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Estado</th><th></th>" +
             "</tr>" +
             "<tr class='filter-row'>" +
             "<th></th>" +
             "<th><input type='text' class='col-filter' data-filter='slot' placeholder='ej. 10:00'></th>" +
+            "<th><input type='text' class='col-filter' data-filter='day' placeholder='ej. Vie'></th>" +
             "<th><input type='text' class='col-filter' data-filter='date' placeholder='YYYY-MM-DD'></th>" +
             "<th><input type='text' class='col-filter' data-filter='firstName' placeholder='Buscar…'></th>" +
             "<th><input type='text' class='col-filter' data-filter='lastName' placeholder='Buscar…'></th>" +
@@ -1129,14 +1136,18 @@
             const freq = FREQUENCY_SHORT[r.frequency] || r.frequency || "";
             const turnoLabel = TRange(r.slot.startTime, r.slot.endTime) +
                 (freq ? ' <span class="muted">(' + escapeHtml(freq) + ")</span>" : "");
+            const dayCell = escapeHtml(r.dayLabel || "—") +
+                (r.commitmentDaysLabel && r.commitmentDaysLabel !== r.dayLabel
+                    ? ' <span class="muted">(' + escapeHtml(r.commitmentDaysLabel) + ")</span>"
+                    : "");
             return "<tr><td class='col-num'>" + (idx + 1) + "</td>" +
-                "<td>" + turnoLabel + "</td><td>" + r.date + "</td>" +
+                "<td>" + turnoLabel + "</td><td>" + dayCell + "</td><td>" + r.date + "</td>" +
                 "<td>" + escapeHtml(r.userFirstName || "—") + "</td>" +
                 "<td>" + escapeHtml(r.userLastName || "—") + "</td>" +
                 "<td>" + escapeHtml(r.userPhone) + "</td>" +
                 "<td><span class='status-pill status-" + r.status + "'>" + statusLabel(r.status) + "</span></td>" +
                 "<td>" + reservationActionsCell(r, canCheckin, canManage) + "</td></tr>";
-        }).join("") : "<tr><td colspan='8' class='muted'>Sin participantes con estos filtros.</td></tr>";
+        }).join("") : "<tr><td colspan='9' class='muted'>Sin participantes con estos filtros.</td></tr>";
 
         updateResCount(filtered.length);
 

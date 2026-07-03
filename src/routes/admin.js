@@ -46,6 +46,8 @@ const {
     weekdayShortLabel,
     resolveReservationScope,
     expandReservationsInRange,
+    weekdayFullLabel,
+    commitmentDaysLabel,
 } = require('../utils/commitmentMatch');
 const { FREQUENCY_LABELS } = require('../constants/commitment');
 const { formatWeekDays } = require('../utils/weekDays');
@@ -531,6 +533,14 @@ function filterBySlotTime(list, slotTime) {
     );
 }
 
+function withReservationDisplayFields(list) {
+    return list.map((r) => ({
+        ...r,
+        dayLabel: weekdayFullLabel(r.date),
+        commitmentDaysLabel: commitmentDaysLabel(r),
+    }));
+}
+
 async function fetchReservationsForAdmin(query, req) {
     const scope = resolveReservationScope(query, todayStr());
     const baseWhere = buildReservationQueryFilters(query);
@@ -555,7 +565,7 @@ async function fetchReservationsForAdmin(query, req) {
         if (req?.isScopedCaptain) {
             list = filterReservationsForCaptain(list, req.captainRanges);
         }
-        return { reservations: list, total: list.length, scope };
+        return { reservations: withReservationDisplayFields(list), total: list.length, scope };
     }
 
     const where = { ...baseWhere };
@@ -573,7 +583,7 @@ async function fetchReservationsForAdmin(query, req) {
     if (req?.isScopedCaptain) {
         list = filterReservationsForCaptain(list, req.captainRanges);
     }
-    return { reservations: list, total: list.length, scope: null };
+    return { reservations: withReservationDisplayFields(list), total: list.length, scope: null };
 }
 
 router.get('/reservations', requirePermission(PRIV.RESERVATIONS_VIEW), async (req, res) => {
@@ -1750,12 +1760,14 @@ router.get('/reports/reservations.csv', requirePermission(PRIV.RESERVATIONS_EXPO
         const result = await fetchReservationsForAdmin(req.query);
         const rows = result.reservations;
 
-        const header = 'id,fecha,turno,nombre,apellido,celular,frecuencia,duracion_min,desfase_min,estado,checkin\n';
+        const header = 'id,dia,fecha,dia_compromiso,turno,nombre,apellido,celular,frecuencia,duracion_min,desfase_min,estado,checkin\n';
         const body = rows
             .map((r) =>
                 [
                     r.reservationId || r.id,
+                    `"${(r.dayLabel || weekdayFullLabel(r.date)).replace(/"/g, '""')}"`,
                     r.date,
+                    `"${(r.commitmentDaysLabel || commitmentDaysLabel(r)).replace(/"/g, '""')}"`,
                     `${r.slot.startTime}-${r.slot.endTime}`,
                     `"${(r.userFirstName || '').replace(/"/g, '""')}"`,
                     `"${(r.userLastName || '').replace(/"/g, '""')}"`,
