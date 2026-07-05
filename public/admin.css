@@ -1134,25 +1134,72 @@ html:has(body.admin) {
     margin-bottom: 24px;
 }
 
-.roster-section-toggles {
+.roster-category-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 16px;
-    margin-left: auto;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--admin-border);
 }
 
-.roster-toggle span {
+.roster-category-tabs .roster-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    font-family: var(--admin-sans);
     font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--admin-muted);
+    cursor: pointer;
+    transition: background 0.2s var(--admin-ease), color 0.2s var(--admin-ease);
+}
+
+.roster-category-tabs .roster-tab.active {
+    background: var(--admin-ink);
+    color: #fff;
+}
+
+.roster-category-tabs .roster-tab:not(.active):hover {
+    background: var(--admin-surface);
+    color: var(--admin-ink);
+}
+
+.roster-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.roster-tab:not(.active) .roster-tab-count {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    color: var(--admin-muted);
+}
+
+.roster-tab-panel {
+    display: none;
+}
+
+.roster-tab-panel.active {
+    display: block;
+    animation: adminFadeIn 0.25s var(--admin-ease) both;
 }
 
 .roster-section {
     padding: 20px 24px;
     margin-bottom: 0;
-    border-bottom: 1px solid var(--admin-border);
-}
-
-.roster-section:last-child {
-    border-bottom: none;
 }
 
 .roster-table-wrap {
@@ -1163,40 +1210,16 @@ html:has(body.admin) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 12px;
     margin-bottom: 10px;
-}
-
-.roster-section-header h3 {
-    margin: 0;
-    font-family: var(--admin-serif);
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--admin-ink);
-}
-
-.roster-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 22px;
-    padding: 0 8px;
-    margin-left: 8px;
-    border-radius: 999px;
-    font-family: var(--admin-sans);
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: var(--admin-surface);
-    border: 1px solid var(--admin-border);
-    vertical-align: middle;
 }
 
 .roster-section-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    margin-left: auto;
 }
 
 .roster-table td {

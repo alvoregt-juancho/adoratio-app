@@ -2231,16 +2231,18 @@
         }).join("");
     }
 
-    function updateRosterSectionVisibility() {
-        const showC = document.getElementById("rosterShowCommitments")?.checked;
-        const showCap = document.getElementById("rosterShowCaptains")?.checked;
-        const showSub = document.getElementById("rosterShowSubstitutes")?.checked;
-        const secC = document.getElementById("rosterCommitmentsSection");
-        const secCap = document.getElementById("rosterCaptainsSection");
-        const secSub = document.getElementById("rosterSubstitutesSection");
-        if (secC) secC.style.display = showC ? "" : "none";
-        if (secCap) secCap.style.display = showCap ? "" : "none";
-        if (secSub) secSub.style.display = showSub ? "" : "none";
+    let rosterCategoryTab = "commitments";
+
+    function setRosterCategoryTab(tab) {
+        rosterCategoryTab = tab;
+        document.querySelectorAll("#rosterCategoryTabs .roster-tab").forEach(function (btn) {
+            const active = btn.getAttribute("data-roster-tab") === tab;
+            btn.classList.toggle("active", active);
+            btn.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        document.querySelectorAll(".roster-tab-panel").forEach(function (panel) {
+            panel.classList.toggle("active", panel.getAttribute("data-roster-panel") === tab);
+        });
     }
 
     function renderRosterTables() {
@@ -2324,7 +2326,7 @@
             });
         });
 
-        updateRosterSectionVisibility();
+        setRosterCategoryTab(rosterCategoryTab);
     }
 
     function rosterPhonesFromSection(section) {
@@ -3601,8 +3603,10 @@
     document.getElementById("dirClearFilters").addEventListener("click", clearDirFilters);
     document.getElementById("rosterDayFilter").addEventListener("change", loadRoster);
     document.getElementById("rosterTimeFilter").addEventListener("change", loadRoster);
-    ["rosterShowCommitments", "rosterShowCaptains", "rosterShowSubstitutes"].forEach(function (id) {
-        document.getElementById(id).addEventListener("change", updateRosterSectionVisibility);
+    document.querySelectorAll("#rosterCategoryTabs .roster-tab").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            setRosterCategoryTab(btn.getAttribute("data-roster-tab"));
+        });
     });
     document.getElementById("newCaptainRangeBtn").addEventListener("click", function () {
         openCaptainRangeEditor(null);

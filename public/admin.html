@@ -201,17 +201,24 @@
                             <option value="">Todas</option>
                         </select>
                     </label>
-                    <div class="roster-section-toggles">
-                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowCommitments" checked><span>Turnos</span></label>
-                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowCaptains" checked><span>Capitanes</span></label>
-                        <label class="admin-check roster-toggle"><input type="checkbox" id="rosterShowSubstitutes" checked><span>Sustitutos</span></label>
-                    </div>
                 </div>
 
+                <nav class="roster-category-tabs" id="rosterCategoryTabs" aria-label="Categoría de lista">
+                    <button type="button" class="roster-tab active" data-roster-tab="commitments">
+                        Turnos de adoración <span class="roster-tab-count" id="rosterCommitmentsCount">0</span>
+                    </button>
+                    <button type="button" class="roster-tab" data-roster-tab="captains">
+                        Contactos capitanes <span class="roster-tab-count" id="rosterCaptainsCount">0</span>
+                    </button>
+                    <button type="button" class="roster-tab" data-roster-tab="substitutes">
+                        Sustitutos <span class="roster-tab-count" id="rosterSubstitutesCount">0</span>
+                    </button>
+                </nav>
+
                 <div class="roster-list-shell">
-                <div class="roster-section" id="rosterCommitmentsSection">
+                <div class="roster-section roster-tab-panel active" id="rosterCommitmentsSection" data-roster-panel="commitments">
                     <div class="roster-section-header">
-                        <h3>Turnos de adoración <span class="roster-count" id="rosterCommitmentsCount">0</span></h3>
+                        <h3 class="visually-hidden">Turnos de adoración</h3>
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="commitments" data-hint-key="roster-message">Mensaje adoradores</button>
                             <button type="button" class="ghost-btn" id="newCommitmentBtn" data-perm="RESERVATIONS_CHECKIN" data-hint-key="new-commitment">+ Adorador</button>
@@ -223,9 +230,9 @@
                     <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterCommitmentsTable"></table></div>
                 </div>
 
-                <div class="roster-section" id="rosterCaptainsSection">
+                <div class="roster-section roster-tab-panel" id="rosterCaptainsSection" data-roster-panel="captains">
                     <div class="roster-section-header">
-                        <h3>Contactos capitanes <span class="roster-count" id="rosterCaptainsCount">0</span></h3>
+                        <h3 class="visually-hidden">Contactos capitanes</h3>
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="captains">Mensaje capitanes</button>
                             <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Contacto</button>
@@ -238,9 +245,9 @@
                     <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterCaptainsTable"></table></div>
                 </div>
 
-                <div class="roster-section" id="rosterSubstitutesSection">
+                <div class="roster-section roster-tab-panel" id="rosterSubstitutesSection" data-roster-panel="substitutes">
                     <div class="roster-section-header">
-                        <h3>Sustitutos <span class="roster-count" id="rosterSubstitutesCount">0</span></h3>
+                        <h3 class="visually-hidden">Sustitutos</h3>
                         <div class="roster-section-actions">
                             <button type="button" class="ghost-btn roster-message" data-message="substitutes">Mensaje sustitutos</button>
                             <button type="button" class="ghost-btn" id="newSubstituteBtn" data-perm="SLOTS_EDIT" data-hint-key="new-substitute">+ Sustituto</button>
