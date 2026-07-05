@@ -1438,6 +1438,34 @@
             background: var(--gold-soft);
         }
 
+        .slot-time-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .substitute-section {
+            margin-bottom: 16px;
+        }
+
+        .substitute-section .section-subtitle {
+            margin-bottom: 8px;
+        }
+
+        .btn-select-all-inline {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
+            background: none;
+            border: none;
+            color: var(--sacred-gold);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+
         .modal-slot-time {
             text-align: center;
             font-weight: 600;
@@ -1576,6 +1604,15 @@
                 <div class="premium-card" onclick="openContactModal()">
                     <div class="card-flex-row">
                         <span>Contactar al coordinador</span>
+                        <div class="action-circle-icon">→</div>
+                    </div>
+                </div>
+                <div class="premium-card card-highlight" onclick="openSubstituteModal()">
+                    <div class="card-flex-row">
+                        <div>
+                            <div style="font-family: var(--font-serif); font-size: 1.15rem;">Ser sustituto</div>
+                            <div class="card-desc" style="margin-top:4px;">Ofrece cubrir turnos cuando alguien no pueda asistir.</div>
+                        </div>
                         <div class="action-circle-icon">→</div>
                     </div>
                 </div>
@@ -1732,6 +1769,53 @@
             </div>
         </div>
 
+        <div class="centered-overlay" id="substituteModal">
+            <div class="modal-box booking-modal">
+                <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 8px;">Voluntario sustituto</h3>
+                <p class="modal-subtitle">Regístrate para cubrir guardias cuando un adorador no pueda asistir. Te contactará el capitán de tu bloque.</p>
+
+                <div class="floating-group">
+                    <input type="text" id="subFirstName" class="clean-input" placeholder=" " required autocomplete="given-name">
+                    <label class="floating-label">Tu nombre</label>
+                </div>
+                <div class="floating-group">
+                    <input type="text" id="subLastName" class="clean-input" placeholder=" " autocomplete="family-name">
+                    <label class="floating-label">Tu apellido (opcional)</label>
+                </div>
+                <div class="floating-group">
+                    <input type="tel" id="subPhone" class="clean-input" placeholder=" " required maxlength="8" inputmode="numeric" autocomplete="tel-national">
+                    <label class="floating-label">Número de celular</label>
+                    <span class="input-hint">8 dígitos, solo números</span>
+                </div>
+                <div class="floating-group">
+                    <input type="email" id="subEmail" class="clean-input" placeholder=" " autocomplete="email">
+                    <label class="floating-label">Correo (opcional)</label>
+                </div>
+
+                <div class="substitute-section">
+                    <p class="section-subtitle">Días disponibles</p>
+                    <button type="button" class="btn-select-all-inline" id="subSelectAllDays">Seleccionar todos los días</button>
+                    <div class="weekday-grid" id="substituteWeekdayGrid"></div>
+                    <p class="input-hint">Si no eliges días, estarás disponible cualquier día.</p>
+                </div>
+
+                <div class="substitute-section">
+                    <p class="section-subtitle">Horarios disponibles</p>
+                    <button type="button" class="btn-select-all-inline" id="subSelectAllTimes">Seleccionar todos los horarios</button>
+                    <div class="slot-time-grid" id="substituteSlotGrid"></div>
+                    <p class="input-hint">Si no eliges horarios, estarás disponible a cualquier hora.</p>
+                </div>
+
+                <div class="floating-group">
+                    <input type="text" id="subNotes" class="clean-input" placeholder=" ">
+                    <label class="floating-label">Nota para coordinación (opcional)</label>
+                </div>
+
+                <button class="gold-action-btn primary-fill" id="confirmSubstituteBtn" onclick="confirmSubstituteRegistration()" style="margin-bottom: 0;">registrarme como sustituto</button>
+                <button class="gold-action-btn btn-ghost" onclick="closeSubstituteModal()" style="margin-top:10px;">cancelar</button>
+            </div>
+        </div>
+
         <nav class="apple-tab-bar" aria-label="Navegación principal">
             <a href="#" class="tab-item active" onclick="switchTab('home', this); return false;" aria-current="page">
                 <svg class="tab-svg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -1766,6 +1850,8 @@
         const scrollContainer = document.getElementById('masterScroll');
         const bookingModal = document.getElementById('bookingModal');
         const contactModal = document.getElementById('contactModal');
+        const substituteModal = document.getElementById('substituteModal');
+        let substituteSignupMeta = null;
         const daySelectModal = document.getElementById('daySelectModal');
         const biweeklySelectModal = document.getElementById('biweeklySelectModal');
         const modalTime = document.getElementById('modalTime');
@@ -2646,6 +2732,109 @@
             contactModal.classList.remove('active');
         }
 
+        function renderSubstituteGrids(meta) {
+            const dayGrid = document.getElementById('substituteWeekdayGrid');
+            const slotGrid = document.getElementById('substituteSlotGrid');
+            dayGrid.innerHTML = (meta.weekdays || []).map(function (d) {
+                return '<div class="weekday-toggle">' +
+                    '<input type="checkbox" id="sub-day-' + d.value + '" value="' + d.value + '">' +
+                    '<label for="sub-day-' + d.value + '">' + d.label + '</label></div>';
+            }).join('');
+            slotGrid.innerHTML = (meta.slotTimes || []).map(function (t) {
+                return '<div class="weekday-toggle">' +
+                    '<input type="checkbox" id="sub-time-' + t.value.replace(':', '') + '" value="' + t.value + '">' +
+                    '<label for="sub-time-' + t.value.replace(':', '') + '">' + t.label + '</label></div>';
+            }).join('') || '<p class="input-hint">No hay horarios activos en este momento.</p>';
+        }
+
+        async function loadSubstituteSignupMeta() {
+            if (substituteSignupMeta) return substituteSignupMeta;
+            const res = await fetch('/api/roster/signup-meta');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'No se pudo cargar el formulario.');
+            substituteSignupMeta = data;
+            renderSubstituteGrids(data);
+            return data;
+        }
+
+        async function openSubstituteModal() {
+            try {
+                await loadSubstituteSignupMeta();
+                const savedPhone = localStorage.getItem('adorahora_phone');
+                if (savedPhone && !document.getElementById('subPhone').value) {
+                    document.getElementById('subPhone').value = savedPhone;
+                }
+                substituteModal.classList.add('active');
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+
+        function closeSubstituteModal() {
+            substituteModal.classList.remove('active');
+        }
+
+        function readSubstituteSelections(selector) {
+            const values = [];
+            document.querySelectorAll(selector).forEach(function (cb) {
+                if (cb.checked) values.push(cb.value);
+            });
+            return values;
+        }
+
+        async function confirmSubstituteRegistration() {
+            const btn = document.getElementById('confirmSubstituteBtn');
+            const firstName = document.getElementById('subFirstName').value.trim();
+            const lastName = document.getElementById('subLastName').value.trim();
+            const phone = normalizePhone(document.getElementById('subPhone').value);
+            const email = document.getElementById('subEmail').value.trim();
+            const notes = document.getElementById('subNotes').value.trim();
+            const weekDays = readSubstituteSelections('#substituteWeekdayGrid input:checked');
+            const slotTimes = readSubstituteSelections('#substituteSlotGrid input:checked');
+
+            if (!firstName || !phone) {
+                return showToast('Nombre y celular son requeridos.');
+            }
+            if (phone.length !== 8) {
+                return showToast('El celular debe tener exactamente 8 dígitos.');
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'registrando…';
+            try {
+                const res = await fetch('/api/roster/substitutes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firstName,
+                        lastName,
+                        phone,
+                        email: email || null,
+                        weekDays: weekDays.length ? weekDays.join(',') : null,
+                        slotTimes: slotTimes.length ? slotTimes.join(',') : null,
+                        notes: notes || null,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'No se pudo completar el registro.');
+                localStorage.setItem('adorahora_phone', phone);
+                closeSubstituteModal();
+                document.getElementById('subFirstName').value = '';
+                document.getElementById('subLastName').value = '';
+                document.getElementById('subEmail').value = '';
+                document.getElementById('subNotes').value = '';
+                document.querySelectorAll('#substituteWeekdayGrid input, #substituteSlotGrid input').forEach(function (cb) {
+                    cb.checked = false;
+                });
+                showToast(data.message || ('✨ ¡Gracias ' + firstName + ', quedaste registrado como sustituto!'));
+            } catch (e) {
+                showToast(e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'registrarme como sustituto';
+            }
+        }
+
         bookingModal.addEventListener('click', (e) => {
             if (e.target === bookingModal) bookingModal.classList.remove('active');
         });
@@ -2654,11 +2843,26 @@
             if (e.target === contactModal) closeContactModal();
         });
 
+        substituteModal.addEventListener('click', (e) => {
+            if (e.target === substituteModal) closeSubstituteModal();
+        });
+
+        document.getElementById('subSelectAllDays')?.addEventListener('click', function () {
+            document.querySelectorAll('#substituteWeekdayGrid input').forEach(function (cb) { cb.checked = true; });
+        });
+        document.getElementById('subSelectAllTimes')?.addEventListener('click', function () {
+            document.querySelectorAll('#substituteSlotGrid input').forEach(function (cb) { cb.checked = true; });
+        });
+
         document.getElementById('uPhone')?.addEventListener('input', function () {
             this.value = normalizePhone(this.value);
         });
 
         document.getElementById('intPhone')?.addEventListener('input', function () {
+            this.value = normalizePhone(this.value);
+        });
+
+        document.getElementById('subPhone')?.addEventListener('input', function () {
             this.value = normalizePhone(this.value);
         });
 

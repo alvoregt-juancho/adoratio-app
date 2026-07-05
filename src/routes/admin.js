@@ -50,7 +50,10 @@ const {
     commitmentDaysLabel,
 } = require('../utils/commitmentMatch');
 const { FREQUENCY_LABELS } = require('../constants/commitment');
-const { formatWeekDays } = require('../utils/weekDays');
+const {
+    validateRosterMemberPayload,
+    createRosterMember,
+} = require('../utils/rosterMemberCreate');
 const {
     rosterMemberMatchesFilter,
     commitmentRowMatchesFilter,
@@ -1641,50 +1644,27 @@ router.post('/reservations', requirePermission(PRIV.RESERVATIONS_CHECKIN), async
 
 router.post('/roster-members', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
     try {
-        const body = req.body || {};
-        const role = String(body.role || '').trim();
-        const firstName = String(body.firstName || '').trim();
-        const lastName = String(body.lastName || '').trim();
-        const phone = normalizePhone(body.phone);
-        const email = body.email ? String(body.email).trim() : null;
-        const internalNotes = body.internalNotes ? String(body.internalNotes).trim() : null;
-        const weekDays = body.weekDays ? String(body.weekDays).trim() : null;
-        const slotTimes = body.slotTimes ? String(body.slotTimes).trim() : null;
-
-        if (!ROSTER_ROLES.includes(role)) {
-            return res.status(400).json({ error: 'Rol inválido (captain o substitute).' });
-        }
-        if (!firstName || !phone) {
-            return res.status(400).json({ error: 'Nombre y celular son requeridos.' });
-        }
-        if (!isValidPhone(phone)) {
-            return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
+        const validated = validateRosterMemberPayload(req.body || {});
+        if (validated.error) {
+            return res.status(400).json({ error: validated.error });
         }
 
-        const member = await prisma.rosterMember.create({
-            data: {
-                role,
-                firstName,
-                lastName,
-                phone,
-                email,
-                internalNotes,
-                weekDays: weekDays || null,
-                slotTimes: slotTimes || null,
-            },
-        });
+        const member = await createRosterMember(validated.data);
 
         await writeAudit({
             action: 'roster.create',
             entity: 'roster_member',
             entityId: member.id,
-            meta: { role, firstName, lastName },
+            meta: { role: member.role, firstName: member.firstName, lastName: member.lastName },
             req,
         });
 
         res.status(201).json({ member: rosterMemberToRow(member) });
     } catch (e) {
         console.error(e);
+        if (e.status === 409) {
+            return res.status(409).json({ error: e.message });
+        }
         res.status(500).json({ error: 'Error al crear el registro.' });
     }
 });

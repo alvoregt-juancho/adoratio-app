@@ -11,6 +11,7 @@ const adminRoutes = require('./src/routes/admin');
 const settingsRoutes = require('./src/routes/settings');
 const muroRoutes = require('./src/routes/muro');
 const kioskRoutes = require('./src/routes/kiosk');
+const rosterRoutes = require('./src/routes/roster');
 const { purgeOldIntentions } = require('./src/jobs/intentionsCleanup');
 
 const app = express();
@@ -30,6 +31,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/check-in', checkinRoutes);
 app.use('/api/muro', muroRoutes);
 app.use('/api/kiosk', kioskRoutes);
+app.use('/api/roster', rosterRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Estáticos
