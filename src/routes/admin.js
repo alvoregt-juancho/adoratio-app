@@ -61,12 +61,17 @@ const {
 } = require('../utils/roster');
 const {
     CSV_BOM,
-    getRosterTemplate,
-    parseCsvText,
     parseCommitmentImportRow,
     parseMemberImportRow,
-    isInstructionRow,
+    shouldSkipImportRow,
 } = require('../utils/rosterCsv');
+const {
+    buildRosterTemplateBuffer,
+    parseRosterExcel,
+    parseCsvTextForImport,
+    getRosterTemplateMeta,
+} = require('../utils/rosterExcel');
+const { commitmentAlreadyExists, rosterMemberAlreadyExists } = require('../utils/rosterImport');
 const { createAdminReservation } = require('../utils/adminReservation');
 const {
     countWeeklyActiveSlotOccurrences,
@@ -1455,14 +1460,30 @@ router.get('/roster/export.csv', requirePermission(PRIV.RESERVATIONS_EXPORT), as
     }
 });
 
+router.get('/roster/template.xlsx', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
+    try {
+        const section = req.query.section || 'commitments';
+        const meta = getRosterTemplateMeta(section);
+        if (!meta) return res.status(400).json({ error: 'Sección de plantilla inválida.' });
+        const buffer = await buildRosterTemplateBuffer(section);
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader('Content-Disposition', `attachment; filename="${meta.filename}"`);
+        res.send(Buffer.from(buffer));
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al generar la plantilla.' });
+    }
+});
+
 router.get('/roster/template.csv', requirePermission(PRIV.SLOTS_VIEW), async (req, res) => {
     try {
         const section = req.query.section || 'commitments';
-        const template = getRosterTemplate(section);
-        if (!template) return res.status(400).json({ error: 'Sección de plantilla inválida.' });
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${template.filename}"`);
-        res.send(template.content);
+        const meta = getRosterTemplateMeta(section);
+        if (!meta) return res.status(400).json({ error: 'Sección de plantilla inválida.' });
+        res.redirect(307, `/api/admin/roster/template.xlsx?section=${encodeURIComponent(section)}`);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al generar la plantilla.' });
@@ -1472,8 +1493,11 @@ router.get('/roster/template.csv', requirePermission(PRIV.SLOTS_VIEW), async (re
 router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, res) => {
     try {
         const section = String(req.body?.section || '').trim();
-        const csv = String(req.body?.csv || '');
-        if (!csv.trim()) return res.status(400).json({ error: 'No se recibió contenido CSV.' });
+        const csv = req.body?.csv != null ? String(req.body.csv) : '';
+        const fileBase64 = req.body?.fileBase64 ? String(req.body.fileBase64) : '';
+        if (!csv.trim() && !fileBase64.trim()) {
+            return res.status(400).json({ error: 'No se recibió contenido para importar.' });
+        }
         if (!['commitments', 'captains', 'substitutes'].includes(section)) {
             return res.status(400).json({ error: 'Sección de importación inválida.' });
         }
@@ -1481,19 +1505,24 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
             return res.status(403).json({ error: 'Sin permiso para importar compromisos de adoración.' });
         }
 
-        const { headers, rows } = parseCsvText(csv);
-        if (!headers.length) return res.status(400).json({ error: 'El archivo CSV está vacío o no tiene encabezados.' });
+        let headers = [];
+        let rows = [];
+        if (fileBase64.trim()) {
+            const buffer = Buffer.from(fileBase64, 'base64');
+            ({ headers, rows } = await parseRosterExcel(buffer));
+        } else {
+            ({ headers, rows } = parseCsvTextForImport(csv));
+        }
+        if (!headers.length) {
+            return res.status(400).json({ error: 'El archivo está vacío o no tiene encabezados válidos en la hoja «Datos».' });
+        }
 
         const created = [];
+        const skipped = [];
         const errors = [];
 
         for (const row of rows) {
-            if (isInstructionRow(headers, row.cells)) continue;
-            if (row.cells.every((c) => !String(c).trim())) continue;
-            const exampleMarker = String(row.cells[0] || '').toLowerCase();
-            if (exampleMarker.includes('ejemplo') && String(row.cells[row.cells.length - 1] || '').toLowerCase().includes('borrar')) {
-                continue;
-            }
+            if (shouldSkipImportRow(headers, row.cells)) continue;
 
             if (section === 'commitments') {
                 const parsed = parseCommitmentImportRow(row, headers);
@@ -1502,6 +1531,13 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
                     continue;
                 }
                 try {
+                    if (await commitmentAlreadyExists(parsed)) {
+                        skipped.push({
+                            row: row.rowNumber,
+                            reason: `${parsed.firstName} ${parsed.lastName}`.trim() + ' ya tiene este turno registrado.',
+                        });
+                        continue;
+                    }
                     const reservation = await createAdminReservation({
                         slotTime: parsed.slotTime,
                         weekday: parsed.weekday,
@@ -1528,6 +1564,13 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
                     continue;
                 }
                 try {
+                    if (await rosterMemberAlreadyExists(parsed)) {
+                        skipped.push({
+                            row: row.rowNumber,
+                            reason: `${parsed.firstName} ${parsed.lastName}`.trim() + ' ya está en el directorio.',
+                        });
+                        continue;
+                    }
                     const member = await prisma.rosterMember.create({
                         data: {
                             role: parsed.role,
@@ -1550,15 +1593,24 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
         await writeAudit({
             action: 'roster.import',
             entity: 'roster',
-            meta: { section, created: created.length, errors: errors.length },
+            meta: { section, created: created.length, skipped: skipped.length, errors: errors.length },
             req,
         });
 
-        const message = created.length
-            ? `Importación completada: ${created.length} registro${created.length === 1 ? '' : 's'} creado${created.length === 1 ? '' : 's'}.`
-            : 'No se importó ningún registro.';
+        let message = '';
+        if (created.length) {
+            message = `Importación completada: ${created.length} registro${created.length === 1 ? '' : 's'} creado${created.length === 1 ? '' : 's'}.`;
+        } else {
+            message = 'No se importó ningún registro nuevo.';
+        }
+        if (skipped.length) {
+            message += ` ${skipped.length} fila${skipped.length === 1 ? '' : 's'} omitida${skipped.length === 1 ? '' : 's'} (ya existían).`;
+        }
+        if (errors.length) {
+            message += ` ${errors.length} fila${errors.length === 1 ? '' : 's'} con error.`;
+        }
 
-        res.json({ message, created: created.length, errors });
+        res.json({ message, created: created.length, skipped: skipped.length, errors, skippedDetails: skipped });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al importar la lista.' });

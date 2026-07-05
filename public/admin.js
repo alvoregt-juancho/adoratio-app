@@ -93,7 +93,7 @@
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
         "roster-export": "Exporta la sección visible a CSV (compatible con Excel).",
         "roster-template": "Descarga plantilla CSV para llenar en Excel y volver a cargar.",
-        "roster-import": "Sube un CSV con el mismo formato que la plantilla.",
+        "roster-import": "Sube un archivo Excel (.xlsx) o CSV con el mismo formato que la plantilla.",
         "new-commitment": "Crea manualmente un compromiso de adoración en la lista.",
         "new-captain": "Registra un contacto de capitán en el directorio (solo teléfono/WhatsApp, sin acceso al panel).",
         "new-captain-range": "Asigna un usuario con cuenta y perfil Capitán al bloque horario que administrará.",
@@ -2503,7 +2503,7 @@
 
     async function downloadRosterTemplate(section) {
         try {
-            const res = await api("/api/admin/roster/template.csv?section=" + encodeURIComponent(section));
+            const res = await api("/api/admin/roster/template.xlsx?section=" + encodeURIComponent(section));
             if (!res.ok) {
                 const data = await res.json().catch(function () { return {}; });
                 return toast(data.error || "No se pudo descargar la plantilla.", "error");
@@ -2513,13 +2513,23 @@
             const a = document.createElement("a");
             a.href = url;
             a.download = section === "commitments"
-                ? "plantilla-turnos-adoracion.csv"
-                : (section === "captains" ? "plantilla-capitanes.csv" : "plantilla-sustitutos.csv");
+                ? "plantilla-turnos-adoracion.xlsx"
+                : (section === "captains" ? "plantilla-capitanes.xlsx" : "plantilla-sustitutos.xlsx");
             a.click();
             URL.revokeObjectURL(url);
         } catch (e) {
             toast("No se pudo descargar la plantilla.", "error");
         }
+    }
+
+    function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return btoa(binary);
     }
 
     let rosterImportSection = null;
@@ -2534,10 +2544,17 @@
     async function handleRosterImportFile(file) {
         if (!file || !rosterImportSection) return;
         try {
-            const csv = await file.text();
+            const name = (file.name || "").toLowerCase();
+            let payload = { section: rosterImportSection };
+            if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+                payload.fileBase64 = arrayBufferToBase64(await file.arrayBuffer());
+                payload.fileName = file.name;
+            } else {
+                payload.csv = await file.text();
+            }
             const res = await api("/api/admin/roster/import", {
                 method: "POST",
-                body: JSON.stringify({ section: rosterImportSection, csv: csv }),
+                body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (!res.ok) return toast(data.error || "Error al importar.", "error");
@@ -2546,7 +2563,6 @@
                 const first = data.errors.slice(0, 3).map(function (e) {
                     return "Fila " + e.row + ": " + e.error;
                 }).join("\n");
-                msg += " " + data.errors.length + " fila(s) con error.";
                 if (first) console.warn("Import errors:\n" + first);
             }
             toast(msg, data.created ? "success" : "info");

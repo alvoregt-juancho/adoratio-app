@@ -288,6 +288,30 @@ function isInstructionRow(headers, cells) {
     return first.startsWith('instrucciones') || headers[0] === 'instrucciones';
 }
 
+function findCsvHeaderIndex(lines) {
+    for (let i = 0; i < lines.length; i += 1) {
+        const cells = parseCsvLine(lines[i]).map((h) => h.toLowerCase());
+        if (cells.includes('dia') && cells.includes('hora')) return i;
+        if (cells.includes('nombre') && cells.includes('celular')) return i;
+    }
+    return 0;
+}
+
+function shouldSkipImportRow(headers, cells) {
+    if (isInstructionRow(headers, cells)) return true;
+    if (cells.every((c) => !String(c).trim())) return true;
+    const joined = cells.join(' ').toLowerCase();
+    if (joined.includes('instrucciones:')) return true;
+    const notesIdx = headers.indexOf('notas');
+    const notes = notesIdx >= 0 ? String(cells[notesIdx] || '').toLowerCase() : '';
+    if (notes.includes('ejemplo') && (notes.includes('borrar') || notes.includes('reemplazar') || notes.includes('no modificar'))) {
+        return true;
+    }
+    const first = String(cells[0] || '').toLowerCase();
+    if (first.includes('ejemplo') && notes.includes('ejemplo')) return true;
+    return false;
+}
+
 module.exports = {
     CSV_BOM,
     WEEKDAY_NAMES,
@@ -303,4 +327,6 @@ module.exports = {
     parseWeekDaysInput,
     parseSlotTimesInput,
     isInstructionRow,
+    findCsvHeaderIndex,
+    shouldSkipImportRow,
 };

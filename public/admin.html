@@ -223,7 +223,7 @@
                             <button type="button" class="ghost-btn roster-message" data-message="commitments" data-hint-key="roster-message">Mensaje adoradores</button>
                             <button type="button" class="ghost-btn" id="newCommitmentBtn" data-perm="RESERVATIONS_CHECKIN" data-hint-key="new-commitment">+ Adorador</button>
                             <button type="button" class="ghost-btn roster-template" data-template="commitments" data-hint-key="roster-template">Plantilla Excel</button>
-                            <button type="button" class="ghost-btn roster-import-btn" data-import="commitments" data-perm="SLOTS_EDIT" data-hint-key="roster-import">Cargar CSV</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="commitments" data-perm="SLOTS_EDIT" data-hint-key="roster-import">Cargar Excel</button>
                             <button type="button" class="ghost-btn roster-export" data-export="commitments" data-perm="RESERVATIONS_EXPORT" data-hint-key="roster-export">Exportar CSV</button>
                         </div>
                     </div>
@@ -237,7 +237,7 @@
                             <button type="button" class="ghost-btn roster-message" data-message="captains">Mensaje capitanes</button>
                             <button type="button" class="ghost-btn" id="newCaptainBtn" data-perm="SLOTS_EDIT" data-hint-key="new-captain">+ Contacto</button>
                             <button type="button" class="ghost-btn roster-template" data-template="captains">Plantilla Excel</button>
-                            <button type="button" class="ghost-btn roster-import-btn" data-import="captains" data-perm="SLOTS_EDIT">Cargar CSV</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="captains" data-perm="SLOTS_EDIT">Cargar Excel</button>
                             <button type="button" class="ghost-btn roster-export" data-export="captains" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
                         </div>
                     </div>
@@ -252,14 +252,14 @@
                             <button type="button" class="ghost-btn roster-message" data-message="substitutes">Mensaje sustitutos</button>
                             <button type="button" class="ghost-btn" id="newSubstituteBtn" data-perm="SLOTS_EDIT" data-hint-key="new-substitute">+ Sustituto</button>
                             <button type="button" class="ghost-btn roster-template" data-template="substitutes">Plantilla Excel</button>
-                            <button type="button" class="ghost-btn roster-import-btn" data-import="substitutes" data-perm="SLOTS_EDIT">Cargar CSV</button>
+                            <button type="button" class="ghost-btn roster-import-btn" data-import="substitutes" data-perm="SLOTS_EDIT">Cargar Excel</button>
                             <button type="button" class="ghost-btn roster-export" data-export="substitutes" data-perm="RESERVATIONS_EXPORT">Exportar CSV</button>
                         </div>
                     </div>
                     <div class="table-wrap roster-table-wrap"><table class="data-table roster-table" id="rosterSubstitutesTable"></table></div>
                 </div>
                 </div>
-                <input type="file" id="rosterImportFile" accept=".csv,text/csv" hidden>
+                <input type="file" id="rosterImportFile" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
             </div>
 
             <!-- Directorio de adoradores -->

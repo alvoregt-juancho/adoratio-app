@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCsvText, parseCommitmentImportRow, getRosterTemplate } = require('../src/utils/rosterCsv');
+const { parseCsvText, parseCommitmentImportRow, shouldSkipImportRow, findCsvHeaderIndex } = require('../src/utils/rosterCsv');
+const { buildRosterTemplateBuffer, parseRosterExcel } = require('../src/utils/rosterExcel');
 
 test('parseCsvText reads headers and rows', () => {
     const { headers, rows } = parseCsvText('nombre,celular\nAna,88881234');
@@ -20,8 +21,38 @@ test('parseCommitmentImportRow validates weekday and phone', () => {
     assert.ok(bad.error);
 });
 
-test('getRosterTemplate includes bom and headers', () => {
-    const tpl = getRosterTemplate('commitments');
-    assert.ok(tpl.content.startsWith('\uFEFF'));
-    assert.ok(tpl.content.includes('dia,hora,duracion_minutos'));
+test('shouldSkipImportRow ignores example and instruction rows', () => {
+    const headers = ['dia', 'hora', 'duracion_minutos', 'frecuencia', 'nombre', 'apellido', 'celular', 'dias_extra', 'notas'];
+    assert.equal(
+        shouldSkipImportRow(headers, ['viernes', '8:00 AM', '60', 'Semanal', 'María', 'García', '88881234', '', 'Fila de ejemplo — no modificar']),
+        true,
+    );
+    assert.equal(
+        shouldSkipImportRow(headers, ['Instrucciones: algo']),
+        true,
+    );
+    assert.equal(
+        shouldSkipImportRow(headers, ['viernes', '8:00 AM', '60', 'Semanal', 'Pedro', 'López', '88889999', '', '']),
+        false,
+    );
+});
+
+test('findCsvHeaderIndex locates header after preamble', () => {
+    const lines = [
+        'Instrucciones: borrar',
+        'dia,hora,duracion_minutos,frecuencia,nombre,apellido,celular',
+        'lunes,7:00 AM,60,Semanal,Ana,López,88881234',
+    ];
+    assert.equal(findCsvHeaderIndex(lines), 1);
+});
+
+test('buildRosterTemplateBuffer creates parseable xlsx', async () => {
+    const buffer = await buildRosterTemplateBuffer('commitments');
+    assert.ok(buffer);
+    assert.ok(buffer.byteLength > 500);
+    const parsed = await parseRosterExcel(Buffer.from(buffer));
+    assert.ok(parsed.headers.includes('dia'));
+    assert.ok(parsed.headers.includes('hora'));
+    assert.equal(parsed.rows.length, 1);
+    assert.equal(shouldSkipImportRow(parsed.headers, parsed.rows[0].cells), true);
 });
