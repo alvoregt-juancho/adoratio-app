@@ -90,6 +90,7 @@ const {
 } = require('../utils/captainScope');
 const captainRoutes = require('./captain');
 const profileRoutes = require('./profile');
+const whatsappAdminRoutes = require('./whatsappAdmin');
 
 const router = express.Router();
 
@@ -97,6 +98,7 @@ router.use(requireAuth, attachPrivileges, requireAdminAccess, attachCaptainConte
 router.use(rbacRoutes);
 router.use('/profile', profileRoutes);
 router.use('/captain', captainRoutes);
+router.use('/whatsapp', whatsappAdminRoutes);
 
 // ── MÉTRICAS / DASHBOARD ──────────────────────────────────────────────
 function formatReservationBrief(r) {

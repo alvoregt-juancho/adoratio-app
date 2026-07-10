@@ -56,6 +56,23 @@ async function migrateMuroPrivileges() {
     }
 }
 
+async function migrateWhatsAppPrivileges() {
+    const roles = await prisma.adminRole.findMany();
+    for (const role of roles) {
+        if (role.slug === 'capitan' || role.slug === 'lector') continue;
+        const isAdminLike =
+            role.slug === 'super-admin' ||
+            role.slug === 'administrador' ||
+            (role.privileges & PRIV.RESERVATIONS_CHECKIN);
+        if (isAdminLike && !(role.privileges & PRIV.WHATSAPP_VIEW)) {
+            await prisma.adminRole.update({
+                where: { id: role.id },
+                data: { privileges: role.privileges | PRIV.WHATSAPP_VIEW },
+            });
+        }
+    }
+}
+
 async function initDatabase() {
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
 
@@ -70,6 +87,7 @@ async function initDatabase() {
 
     await migrateMuroPrivileges();
     await migrateSlotsDeletePrivilege();
+    await migrateWhatsAppPrivileges();
     await migrateSystemRolePrivileges();
 
     const userCount = await prisma.user.count();

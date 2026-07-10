@@ -311,3 +311,35 @@ model AttendanceLog {
   @@index([userId, checkInAt])
   @@map("attendance_logs")
 }
+
+// direction: "inbound" | "outbound"
+// messageType: "text" | "template" | "interactive" | "button" | "status" | "system"
+model WhatsAppMessageLog {
+  id          Int      @id @default(autoincrement())
+  direction   String
+  phone       String
+  waMessageId String?  @unique @map("wa_message_id")
+  messageType String   @default("text") @map("message_type")
+  body        String
+  meta        String?
+  status      String?
+  contactName String?  @map("contact_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([phone, createdAt])
+  @@index([direction, createdAt])
+  @@index([createdAt])
+  @@map("whatsapp_message_logs")
+}
+
+// Sesión conversacional del bot (flujo de reserva, FAQ)
+model WhatsAppSession {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  step      String   @default("menu")
+  data      String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("whatsapp_sessions")
+}

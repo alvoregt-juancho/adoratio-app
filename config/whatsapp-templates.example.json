@@ -1,0 +1,38 @@
+{
+  "_comment": "Copia estos textos al crear plantillas en Meta Business Manager → WhatsApp → Plantillas de mensajes. Categoría: UTILIDAD o MARKETING según política local.",
+  "language": "es",
+  "templates": [
+    {
+      "name": "adoratio_reminder_24h",
+      "category": "UTILITY",
+      "body": "Hola {{1}},\n\nMañana tienes tu guardia de adoración al Santísimo:\n\n📅 Fecha: {{2}}\n⏰ Horario: {{3}}\n📍 {{4}}\n\n¿Podrás asistir?",
+      "buttons": [
+        { "type": "QUICK_REPLY", "text": "Sí, asistiré" },
+        { "type": "QUICK_REPLY", "text": "No podré asistir" }
+      ],
+      "variables": ["nombre", "fecha", "horario", "capilla"]
+    },
+    {
+      "name": "adoratio_reminder_3h",
+      "category": "UTILITY",
+      "body": "Hola {{1}},\n\nTu guardia de adoración es en *3 horas*:\n\n📅 Fecha: {{2}}\n⏰ Horario: {{3}}\n📍 {{4}}\n\n¿Confirmas tu asistencia?",
+      "buttons": [
+        { "type": "QUICK_REPLY", "text": "Sí, asistiré" },
+        { "type": "QUICK_REPLY", "text": "No podré asistir" }
+      ],
+      "variables": ["nombre", "fecha", "horario", "capilla"]
+    },
+    {
+      "name": "adoratio_captain_emergency",
+      "category": "UTILITY",
+      "body": "🚨 *Emergencia AdoraHora*\n\nHola {{1}}, un adorador no podrá asistir:\n\n👤 {{2}}\n📅 {{3}}\n⏰ {{4}}\n\nRevisa el panel de capitán para buscar sustituto urgente.",
+      "variables": ["nombre_capitán", "adorador", "fecha", "horario"]
+    },
+    {
+      "name": "adoratio_booking_confirmed",
+      "category": "UTILITY",
+      "body": "✅ Reserva confirmada, {{1}}.\n\n📅 {{2}}\n⏰ {{3}}\n\nTe enviaremos recordatorios 24 h y 3 h antes. ¡Dios te bendiga!",
+      "variables": ["nombre", "fecha", "horario"]
+    }
+  ]
+}

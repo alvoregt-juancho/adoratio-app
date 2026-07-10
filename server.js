@@ -12,6 +12,7 @@ const settingsRoutes = require('./src/routes/settings');
 const muroRoutes = require('./src/routes/muro');
 const kioskRoutes = require('./src/routes/kiosk');
 const rosterRoutes = require('./src/routes/roster');
+const whatsappRoutes = require('./src/routes/whatsapp');
 const { purgeOldIntentions } = require('./src/jobs/intentionsCleanup');
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/check-in', checkinRoutes);
 app.use('/api/muro', muroRoutes);
 app.use('/api/kiosk', kioskRoutes);
 app.use('/api/roster', rosterRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Estáticos

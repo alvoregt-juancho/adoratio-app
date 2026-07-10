@@ -76,6 +76,7 @@
         "tab-perfiles": "Define qué puede ver y hacer cada rol en el back-office (permisos RBAC).",
         "tab-admins": "Usuarios con acceso al panel y el perfil RBAC asignado a cada uno.",
         "tab-auditoria": "Historial de acciones para trazabilidad, seguridad y revisión de cambios.",
+        "tab-whatsapp": "Bandeja de mensajes WhatsApp: entrantes, salientes y estado de entrega.",
         "section-resumen": "Resumen en tiempo real del estado de la capilla: ocupación, asistencias y alertas del día.",
         "timeline-panel": "Línea de tiempo de guardias de hoy. Detecta espacios sin adorador asignado.",
         "section-reservas": "Filtra por semana o mes y exporta la lista para reportes o seguimiento pastoral.",
@@ -226,6 +227,16 @@
             items: [
                 { perm: "AUDIT_VIEW", label: "Revisar historial de acciones", hintKey: "tab-auditoria" },
                 { perm: "AUDIT_VIEW", label: "Filtrar y paginar registros", hintKey: "audit-refresh" },
+            ],
+        },
+        {
+            tab: "whatsapp",
+            tabPerm: "WHATSAPP_VIEW",
+            title: "WhatsApp",
+            introKey: "tab-whatsapp",
+            items: [
+                { perm: "WHATSAPP_VIEW", label: "Ver mensajes entrantes y salientes", hintKey: "tab-whatsapp" },
+                { perm: "WHATSAPP_VIEW", label: "Filtrar por celular o dirección", hintKey: "tab-whatsapp" },
             ],
         },
     ];
@@ -405,6 +416,8 @@
     let selectedRoleId = null;
     let auditOffset = 0;
     const AUDIT_LIMIT = 40;
+    let whatsappOffset = 0;
+    const WHATSAPP_LIMIT = 50;
     let slotsCache = [];
     let reservationsCache = [];
     let calendarState = { view: "week", anchor: todayStr() };
@@ -3490,6 +3503,64 @@
         }
     }
 
+    async function loadWhatsApp() {
+        if (!hasPerm("WHATSAPP_VIEW")) return;
+        try {
+            const [statsRes, msgRes] = await Promise.all([
+                api("/api/admin/whatsapp/stats"),
+                api("/api/admin/whatsapp/messages?" + new URLSearchParams({
+                    limit: WHATSAPP_LIMIT,
+                    offset: whatsappOffset,
+                    direction: document.getElementById("whatsappDirection").value || "",
+                    phone: document.getElementById("whatsappPhoneFilter").value.trim() || "",
+                    q: document.getElementById("whatsappSearch").value.trim() || "",
+                }).toString()),
+            ]);
+            const stats = await statsRes.json();
+            const data = await msgRes.json();
+            if (statsRes.ok) {
+                document.getElementById("waStatInbound").textContent = stats.inboundToday ?? "0";
+                document.getElementById("waStatOutbound").textContent = stats.outboundToday ?? "0";
+                document.getElementById("waStatContacts").textContent = stats.uniqueContacts ?? "0";
+                document.getElementById("waStatTotal").textContent = stats.totalMessages ?? "0";
+                const statusEl = document.getElementById("waApiStatus");
+                if (statusEl) {
+                    statusEl.textContent = stats.apiConnected
+                        ? "API WhatsApp conectada."
+                        : stats.enabled
+                            ? "WhatsApp habilitado; revisa credenciales en el servidor."
+                            : "WhatsApp deshabilitado en el servidor.";
+                }
+            }
+            const table = document.getElementById("whatsappTable");
+            if (!msgRes.ok) {
+                table.innerHTML = "<tbody><tr><td class='muted'>" + escapeHtml(data.error || "Error al cargar mensajes.") + "</td></tr></tbody>";
+                return;
+            }
+            table.innerHTML =
+                "<thead><tr><th>Fecha</th><th>Dirección</th><th>Celular</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead><tbody>" +
+                (data.messages.length ? data.messages.map(function (m) {
+                    const dirClass = m.direction === "inbound" ? "wa-dir-in" : "wa-dir-out";
+                    const dirLabel = m.direction === "inbound" ? "Entrante" : "Saliente";
+                    const name = m.contactName ? " · " + escapeHtml(m.contactName) : "";
+                    const body = escapeHtml(m.body || "").replace(/\n/g, "<br>");
+                    return "<tr><td>" + formatTime(m.createdAt) + "</td>" +
+                        "<td><span class='wa-dir-badge " + dirClass + "'>" + dirLabel + "</span></td>" +
+                        "<td>" + escapeHtml(m.phone) + name + "</td>" +
+                        "<td>" + escapeHtml(m.messageType || "—") + "</td>" +
+                        "<td class='wa-msg-body'>" + body + "</td>" +
+                        "<td>" + escapeHtml(m.status || "—") + "</td></tr>";
+                }).join("") : "<tr><td colspan='6' class='muted'>Sin mensajes registrados aún.</td></tr>") +
+                "</tbody>";
+            document.getElementById("whatsappPageInfo").textContent =
+                data.total
+                    ? (whatsappOffset + 1) + "–" + Math.min(whatsappOffset + WHATSAPP_LIMIT, data.total) + " de " + data.total
+                    : "0 mensajes";
+        } catch (e) {
+            toast("Error al cargar WhatsApp.", "error");
+        }
+    }
+
     async function loadAudit() {
         if (!hasPerm("AUDIT_VIEW")) return;
         const filter = document.getElementById("auditFilter").value.trim();
@@ -3548,6 +3619,7 @@
                     perfiles: loadRoles,
                     admins: function () { loadRoles().then(loadAdmins); },
                     auditoria: loadAudit,
+                    whatsapp: loadWhatsApp,
                     cuenta: loadAccountProfile,
                 };
                 if (loaders[name]) loaders[name]();
@@ -3708,6 +3780,19 @@
     document.getElementById("auditNext").addEventListener("click", function () {
         auditOffset += AUDIT_LIMIT;
         loadAudit();
+    });
+    document.getElementById("whatsappRefresh").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
+    document.getElementById("whatsappApplyFilters").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
+    document.getElementById("whatsappSearch").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { whatsappOffset = 0; loadWhatsApp(); }
+    });
+    document.getElementById("whatsappPrev").addEventListener("click", function () {
+        whatsappOffset = Math.max(0, whatsappOffset - WHATSAPP_LIMIT);
+        loadWhatsApp();
+    });
+    document.getElementById("whatsappNext").addEventListener("click", function () {
+        whatsappOffset += WHATSAPP_LIMIT;
+        loadWhatsApp();
     });
     document.querySelectorAll("[data-close]").forEach(function (b) {
         b.addEventListener("click", function () {

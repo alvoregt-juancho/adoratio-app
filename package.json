@@ -13,7 +13,9 @@
     "seed": "node prisma/seed.js",
     "setup": "prisma generate && prisma db push && node prisma/seed.js",
     "test": "node --test test/*.test.js",
-    "publish": "bash scripts/publish.sh"
+    "test:whatsapp": "node scripts/test-whatsapp.js",
+    "publish": "bash scripts/publish.sh",
+    "whatsapp:token": "bash scripts/update-whatsapp-token.sh"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

@@ -20,8 +20,20 @@ const config = {
         pass: process.env.SMTP_PASS,
         from: process.env.MAIL_FROM || 'Adoratio <no-reply@adoratio.com>',
     },
+    whatsapp: {
+        enabled: process.env.WHATSAPP_ENABLED === 'true',
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
+        verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'adoratio-verify',
+        apiVersion: process.env.WHATSAPP_API_VERSION || 'v25.0',
+        countryCode: process.env.WHATSAPP_COUNTRY_CODE || '506',
+        chapelName: process.env.CHAPEL_NAME || 'Capilla del Santísimo — Parroquia Cristo Rey',
+    },
 };
 
 config.smtpEnabled = Boolean(config.smtp.host && config.smtp.user && config.smtp.pass);
+config.whatsappEnabled = Boolean(
+    config.whatsapp.enabled && config.whatsapp.phoneNumberId && config.whatsapp.accessToken
+);
 
 module.exports = config;

@@ -55,6 +55,7 @@
             <button class="tab" data-tab="perfiles" data-perm="ROLES_VIEW" data-hint-key="tab-perfiles">Perfiles</button>
             <button class="tab" data-tab="admins" data-perm="USERS_VIEW" data-hint-key="tab-admins">Administradores</button>
             <button class="tab" data-tab="auditoria" data-perm="AUDIT_VIEW" data-hint-key="tab-auditoria">Auditoría</button>
+            <button class="tab" data-tab="whatsapp" data-perm="WHATSAPP_VIEW" data-hint-key="tab-whatsapp">WhatsApp</button>
             <button class="tab tab--account" data-tab="cuenta" data-hint-key="tab-cuenta">Mi cuenta</button>
         </nav>
 
@@ -497,6 +498,40 @@
                 <button class="ghost-btn" id="auditPrev">← Anterior</button>
                 <span class="muted" id="auditPageInfo"></span>
                 <button class="ghost-btn" id="auditNext">Siguiente →</button>
+            </div>
+        </section>
+
+        <!-- WhatsApp -->
+        <section class="tab-panel" id="tab-whatsapp" data-perm="WHATSAPP_VIEW">
+            <div class="command-header">
+                <div>
+                    <h2>Bandeja WhatsApp</h2>
+                    <p class="muted">Mensajes entrantes y salientes del bot de AdoraHora.</p>
+                </div>
+                <button type="button" class="ghost-btn" id="whatsappRefresh">Actualizar</button>
+            </div>
+            <div class="metrics-grid" id="whatsappMetrics">
+                <div class="metric-card"><span class="metric-label">Recibidos hoy</span><span class="metric-value" id="waStatInbound">—</span></div>
+                <div class="metric-card"><span class="metric-label">Enviados hoy</span><span class="metric-value" id="waStatOutbound">—</span></div>
+                <div class="metric-card"><span class="metric-label">Contactos</span><span class="metric-value" id="waStatContacts">—</span></div>
+                <div class="metric-card"><span class="metric-label">Total registrado</span><span class="metric-value" id="waStatTotal">—</span></div>
+            </div>
+            <p class="muted" id="waApiStatus" style="margin:0 0 12px;"></p>
+            <div class="audit-filters">
+                <select id="whatsappDirection" class="touch-input-field dark-input">
+                    <option value="">Todos</option>
+                    <option value="inbound">Entrantes</option>
+                    <option value="outbound">Salientes</option>
+                </select>
+                <input type="tel" id="whatsappPhoneFilter" class="touch-input-field dark-input" placeholder="Filtrar celular (8 dígitos)" maxlength="8">
+                <input type="text" id="whatsappSearch" class="touch-input-field dark-input" placeholder="Buscar en texto…">
+                <button type="button" class="ghost-btn" id="whatsappApplyFilters">Filtrar</button>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="whatsappTable"></table></div>
+            <div class="toolbar-spaced" style="margin-top:12px;">
+                <button class="ghost-btn" id="whatsappPrev">← Anterior</button>
+                <span class="muted" id="whatsappPageInfo"></span>
+                <button class="ghost-btn" id="whatsappNext">Siguiente →</button>
             </div>
         </section>
 

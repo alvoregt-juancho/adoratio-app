@@ -29,6 +29,7 @@ const PRIV = {
     CAPTAIN_ASSIGN:        1 << 22,
     MURO_VIEW:             1 << 23,
     MURO_MANAGE:           1 << 24,
+    WHATSAPP_VIEW:         1 << 25,
 };
 
 const ALL_PRIVILEGES = Object.values(PRIV).reduce((acc, bit) => acc | bit, 0);
@@ -51,7 +52,8 @@ const ADMIN_PRIVILEGES =
     PRIV.QRS_CREATE |
     PRIV.QRS_EDIT |
     PRIV.CAPTAIN_ASSIGN |
-    PRIV.MURO_MANAGE;
+    PRIV.MURO_MANAGE |
+    PRIV.WHATSAPP_VIEW;
 
 /** Perfil limitado: solo ve y gestiona su bloque asignado. */
 const CAPTAIN_PRIVILEGES =
@@ -147,6 +149,13 @@ const PERMISSION_NODES = [
         nodes: [
             { key: 'CAPTAIN_VIEW', bit: PRIV.CAPTAIN_VIEW, label: 'Panel de mi bloque' },
             { key: 'CAPTAIN_ASSIGN', bit: PRIV.CAPTAIN_ASSIGN, label: 'Asignar capitanes a franjas' },
+        ],
+    },
+    {
+        module: 'whatsapp',
+        label: 'WhatsApp',
+        nodes: [
+            { key: 'WHATSAPP_VIEW', bit: PRIV.WHATSAPP_VIEW, label: 'Ver bandeja de mensajes WhatsApp' },
         ],
     },
 ];

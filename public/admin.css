@@ -830,6 +830,32 @@ html:has(body.admin) {
     transform: translateY(-1px);
 }
 
+.wa-dir-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.wa-dir-in {
+    background: rgba(46, 125, 50, 0.15);
+    color: #81c784;
+}
+
+.wa-dir-out {
+    background: rgba(25, 118, 210, 0.15);
+    color: #64b5f6;
+}
+
+.wa-msg-body {
+    max-width: 360px;
+    white-space: normal;
+    line-height: 1.35;
+    font-size: 0.88rem;
+}
+
 .muro-intention-text {
     max-width: 280px;
     font-style: italic;
