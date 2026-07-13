@@ -14,6 +14,7 @@ const {
     serializeBotConfig,
     DEFAULT_WHATSAPP_BOT_CONFIG,
 } = require('../utils/whatsappBotConfig');
+const { testDeepSeekConnection } = require('../utils/ai/deepseekClient');
 
 const router = express.Router();
 
@@ -304,6 +305,27 @@ router.put('/bot-config', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, r
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al guardar configuración del chatbot.' });
+    }
+});
+
+router.post('/ai-test', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, res) => {
+    if (!req.user?.isSuperAdmin) {
+        return res.status(403).json({ error: 'Solo el super administrador puede probar DeepSeek.' });
+    }
+    try {
+        const botCfg = await getWhatsAppBotConfig({ fresh: true });
+        const apiKey = String(req.body?.deepseekApiKey || '').trim() || botCfg.deepseekApiKey;
+        const baseUrl = String(req.body?.aiBaseUrl || botCfg.aiBaseUrl || 'https://api.deepseek.com').trim();
+        const model = String(req.body?.aiModel || botCfg.aiModel || 'deepseek-chat').trim();
+        const result = await testDeepSeekConnection({ apiKey, baseUrl, model });
+        res.json({
+            message: 'Conexión con DeepSeek exitosa.',
+            ...result,
+            keySource: req.body?.deepseekApiKey ? 'request' : 'saved',
+        });
+    } catch (e) {
+        console.error('[WhatsApp ai-test]', e.message);
+        res.status(400).json({ error: e.message || 'No se pudo conectar con DeepSeek.' });
     }
 });
 

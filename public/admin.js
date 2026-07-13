@@ -3554,8 +3554,8 @@
                 const keyStatus = document.getElementById("waAiKeyStatus");
                 if (keyStatus) {
                     keyStatus.textContent = c.deepseekApiKeySet
-                        ? "API key configurada (" + (c.deepseekApiKeyMasked || "••••") + "). Deja el campo vacío para no cambiarla; borra con guardar vacío explícito si el backend lo permite."
-                        : "Sin API key — el bot usa reglas y herramientas locales.";
+                        ? "API key guardada (" + (c.deepseekApiKeyMasked || "••••") + "). Deja el campo vacío al guardar para mantenerla."
+                        : "Pega tu API key, marca «IA activa», guarda y usa «Probar conexión».";
                 }
                 document.getElementById("waDeepseekKey").value = "";
             }
@@ -3746,6 +3746,35 @@
             document.getElementById("waHandoffReplyBox").hidden = true;
         } catch (e) {
             toast(e.message || "Error.", "error");
+        }
+    }
+
+    async function testWhatsAppDeepSeek() {
+        if (!session.user?.isSuperAdmin) return toast("Solo super administrador.", "error");
+        const btn = document.getElementById("waAiTestBtn");
+        const resultEl = document.getElementById("waAiTestResult");
+        btn.disabled = true;
+        if (resultEl) resultEl.textContent = "Probando…";
+        try {
+            const payload = {
+                aiModel: document.getElementById("waAiModel").value.trim(),
+                aiBaseUrl: document.getElementById("waAiBaseUrl").value.trim(),
+            };
+            const keyVal = document.getElementById("waDeepseekKey").value.trim();
+            if (keyVal) payload.deepseekApiKey = keyVal;
+            const res = await api("/api/admin/whatsapp/ai-test", {
+                method: "POST",
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Falló la prueba.");
+            if (resultEl) resultEl.textContent = "✓ " + (data.reply || "OK");
+            toast(data.message || "DeepSeek conectado.", "success");
+        } catch (e) {
+            if (resultEl) resultEl.textContent = "✗ " + (e.message || "Error");
+            toast(e.message || "Error al probar DeepSeek.", "error");
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -4087,7 +4116,8 @@
     });
     document.getElementById("whatsappRefresh").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
     document.getElementById("waBotSaveBtn").addEventListener("click", saveWhatsAppBotConfig);
-    const waHandoffRefresh = document.getElementById("waHandoffRefresh");
+    const waAiTestBtn = document.getElementById("waAiTestBtn");
+    if (waAiTestBtn) waAiTestBtn.addEventListener("click", testWhatsAppDeepSeek);
     if (waHandoffRefresh) waHandoffRefresh.addEventListener("click", loadWhatsAppHandoff);
     const waHandoffSendBtn = document.getElementById("waHandoffSendBtn");
     if (waHandoffSendBtn) waHandoffSendBtn.addEventListener("click", sendWhatsAppHandoffReply);

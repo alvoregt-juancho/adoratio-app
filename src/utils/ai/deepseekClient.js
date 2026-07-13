@@ -42,4 +42,17 @@ function isDeepSeekConfigured(botCfg) {
     return Boolean(botCfg?.aiEnabled && botCfg?.deepseekApiKey);
 }
 
-module.exports = { chatCompletion, chatCompletionOnce, isDeepSeekConfigured };
+async function testDeepSeekConnection({ apiKey, baseUrl, model } = {}) {
+    if (!apiKey) throw new Error('API key requerida.');
+    const message = await chatCompletionOnce({
+        apiKey,
+        baseUrl: baseUrl || 'https://api.deepseek.com',
+        model: model || 'deepseek-chat',
+        messages: [{ role: 'user', content: 'Responde únicamente con la palabra OK.' }],
+    });
+    const reply = String(message?.content || '').trim();
+    if (!reply) throw new Error('DeepSeek no devolvió respuesta.');
+    return { ok: true, reply: reply.slice(0, 120), model: model || 'deepseek-chat' };
+}
+
+module.exports = { chatCompletion, chatCompletionOnce, isDeepSeekConfigured, testDeepSeekConnection };
