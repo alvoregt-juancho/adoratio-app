@@ -1,12 +1,14 @@
 const express = require('express');
 const prisma = require('../db');
 const { normalizePhone, isValidPhone } = require('../utils/phone');
+const { APP_LOCALE } = require('../utils/locale');
+const { muroPostLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
 function formatIntentionDate(iso) {
     const d = new Date(iso);
-    return d.toLocaleDateString('es-CR', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString(APP_LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /** personal = nombre visible en el muro; anonymous = sin nombre público */
@@ -52,7 +54,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/muro — publicar intención (siempre en el muro)
-router.post('/', async (req, res) => {
+router.post('/', muroPostLimit, async (req, res) => {
     try {
         const text = (req.body?.text || req.body?.intencion || '').trim();
         const privacy = parsePrivacyMode(req.body);

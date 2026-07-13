@@ -1764,7 +1764,7 @@
             <div class="modal-box">
                 <h3 style="font-family: var(--font-serif); font-size: 1.8rem; text-align: center; margin-bottom: 12px;">Coordinación</h3>
                 <p class="contact-detail">Para consultas sobre turnos, cambios o urgencias de custodia, comunícate con la coordinación de adoración de la Capilla Cristo Rey.</p>
-                <a id="contactPhoneLink" href="tel:+50600000000" class="gold-action-btn primary-fill" style="text-decoration: none; margin-bottom: 12px;">llamar al coordinador</a>
+                <a id="contactPhoneLink" href="tel:+50230341044" class="gold-action-btn primary-fill" style="text-decoration: none; margin-bottom: 12px;">llamar al coordinador</a>
                 <button class="gold-action-btn btn-ghost" onclick="closeContactModal()">cerrar</button>
             </div>
         </div>
@@ -1842,7 +1842,7 @@
 
     <script src="timeFormat.js"></script>
     <script>
-        const COORDINATOR_PHONE = '00000000';
+        const COORDINATOR_PHONE = '30341044';
         const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
         const DAY_SHORT = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         const BIWEEKLY_LABELS = { '1,3': 'Semana 1 y 3', '2,4': 'Semana 2 y 4' };
@@ -1880,6 +1880,33 @@
             allowOffsetStartTimes: false,
             allowThirtyMinuteDurations: false
         };
+        let appCountryCode = '502';
+        let appCoordinatorPhone = COORDINATOR_PHONE;
+        let appLocale = 'es-GT';
+
+        function getCancelTokens() {
+            try {
+                return JSON.parse(localStorage.getItem('adorahora_cancel_tokens') || '{}');
+            } catch (_) {
+                return {};
+            }
+        }
+
+        function saveCancelToken(reservationId, token) {
+            const map = getCancelTokens();
+            map[String(reservationId)] = token;
+            localStorage.setItem('adorahora_cancel_tokens', JSON.stringify(map));
+        }
+
+        function getCancelToken(reservationId) {
+            return getCancelTokens()[String(reservationId)] || '';
+        }
+
+        function updateContactPhoneLink() {
+            const link = document.getElementById('contactPhoneLink');
+            if (!link) return;
+            link.href = 'tel:+' + appCountryCode + appCoordinatorPhone;
+        }
 
         function todayISO(offsetDays = 0) {
             const d = new Date();
@@ -2330,7 +2357,7 @@
         function formatIntentionDate(iso) {
             if (!iso) return '';
             const d = new Date(iso);
-            return d.toLocaleDateString('es-CR', { day: 'numeric', month: 'short', year: 'numeric' });
+            return d.toLocaleDateString(appLocale, { day: 'numeric', month: 'short', year: 'numeric' });
         }
 
         function showPetitionModal(intention, meta, reservation) {
@@ -2409,6 +2436,9 @@
                     if (r.assignedIntention) {
                         html += '<button type="button" class="petition-link-btn" onclick="openMyShiftPetition(' + i + ')">🙏 Ver petición asignada</button>';
                     }
+                    if (r.status === 'confirmed') {
+                        html += '<button type="button" class="gold-action-btn btn-ghost" style="margin-top:8px;" onclick="cancelMyShift(' + r.id + ', this)">Cancelar esta guardia</button>';
+                    }
                     html += '</div>';
                     return html;
                 }).join('');
@@ -2419,6 +2449,36 @@
 
         function closeMyShifts() {
             document.getElementById('myShiftsModal').classList.remove('active');
+        }
+
+        async function cancelMyShift(id, btn) {
+            const phone = localStorage.getItem('adorahora_phone');
+            const cancelToken = getCancelToken(id);
+            if (!phone && !cancelToken) {
+                showToast('No encontramos tu celular guardado. Reserva de nuevo o contacta al coordinador.');
+                return;
+            }
+            if (!confirm('¿Cancelar esta guardia de adoración?')) return;
+            if (btn) btn.disabled = true;
+            try {
+                const body = {};
+                if (cancelToken) body.cancelToken = cancelToken;
+                else body.phone = phone;
+                const res = await fetch('/api/reservations/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'No se pudo cancelar.');
+                showToast('Guardia cancelada.');
+                openMyShifts();
+                refreshHome();
+                loadSlots();
+            } catch (e) {
+                showToast(e.message);
+                if (btn) btn.disabled = false;
+            }
         }
 
         async function refreshHome() {
@@ -2706,6 +2766,9 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'No se pudo reservar.');
                 localStorage.setItem('adorahora_phone', phone);
+                if (data.reservation?.id && data.reservation?.cancelToken) {
+                    saveCancelToken(data.reservation.id, data.reservation.cancelToken);
+                }
                 bookingModal.classList.remove('active');
                 document.getElementById('uFirstName').value = '';
                 document.getElementById('uLastName').value = '';
@@ -2724,7 +2787,7 @@
         }
 
         function openContactModal() {
-            document.getElementById('contactPhoneLink').href = 'tel:+506' + COORDINATOR_PHONE;
+            updateContactPhoneLink();
             contactModal.classList.add('active');
         }
 
@@ -2882,9 +2945,19 @@
 
         async function loadAppSettings() {
             try {
-                const res = await fetch('/api/slots?date=' + encodeURIComponent(todayISO()));
-                const data = await res.json();
-                if (data.settings) appSettings = data.settings;
+                const [slotsRes, settingsRes] = await Promise.all([
+                    fetch('/api/slots?date=' + encodeURIComponent(todayISO())),
+                    fetch('/api/settings')
+                ]);
+                const slotsData = await slotsRes.json();
+                if (slotsData.settings) appSettings = slotsData.settings;
+                const settingsData = await settingsRes.json();
+                if (settingsRes.ok) {
+                    if (settingsData.countryCode) appCountryCode = String(settingsData.countryCode);
+                    if (settingsData.coordinatorPhone) appCoordinatorPhone = String(settingsData.coordinatorPhone);
+                    if (settingsData.locale) appLocale = settingsData.locale;
+                    updateContactPhoneLink();
+                }
             } catch (_) {}
         }
 
@@ -2904,7 +2977,7 @@
             document.body.classList.add('view-home', 'home-hero-pinned');
             document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
-            document.getElementById('contactPhoneLink').href = 'tel:+506' + COORDINATOR_PHONE;
+            updateContactPhoneLink();
             refreshHome();
             updateHeroSafeTop();
             requestAnimationFrame(function () {
@@ -2925,6 +2998,14 @@
             }
 
             var kioskParams = new URLSearchParams(window.location.search);
+            var tabParam = kioskParams.get('tab');
+            if (tabParam && TAB_INDEX[tabParam] !== undefined) {
+                switchTab(tabParam);
+            }
+            if (kioskParams.get('manage') === 'shifts') {
+                switchTab('mas');
+                openMyShifts();
+            }
             if (kioskParams.get('kiosk') === '1') {
                 var kioskReturn = kioskParams.get('return') || '/chapel-registro-7f3c2a1b.html';
                 switchTab('turnos');

@@ -1,38 +1,61 @@
 {
-  "_comment": "Copia estos textos al crear plantillas en Meta Business Manager → WhatsApp → Plantillas de mensajes. Categoría: UTILIDAD o MARKETING según política local.",
-  "language": "es",
+  "_instructions": "Crear en Meta Business Suite → WhatsApp Manager → Plantillas de mensajes → Crear plantilla. Categoría: UTILIDAD. Idioma: Spanish (MEX). Variables con nombre ({{nombre}}, etc.). Los nombres deben coincidir exactamente con el .env.",
+  "language": "es_MX",
+  "waba_id": "1886920702000626",
   "templates": [
     {
       "name": "adoratio_reminder_24h",
       "category": "UTILITY",
-      "body": "Hola {{1}},\n\nMañana tienes tu guardia de adoración al Santísimo:\n\n📅 Fecha: {{2}}\n⏰ Horario: {{3}}\n📍 {{4}}\n\n¿Podrás asistir?",
+      "header": null,
+      "body": "Hola {{nombre}}, mañana tienes tu guardia de adoración al Santísimo.\n\nFecha: {{fecha}}\nHorario: {{horario}}\nLugar: {{lugar}}\n\n¿Podrás asistir?",
+      "footer": "AdoraHora — Capilla Cristo Rey",
       "buttons": [
         { "type": "QUICK_REPLY", "text": "Sí, asistiré" },
         { "type": "QUICK_REPLY", "text": "No podré asistir" }
       ],
-      "variables": ["nombre", "fecha", "horario", "capilla"]
+      "env_var": "WHATSAPP_TEMPLATE_REMINDER_24H",
+      "sample_values": ["María", "2026-07-11", "7:00 AM – 8:00 AM", "Capilla del Santísimo — Parroquia Cristo Rey"]
     },
     {
       "name": "adoratio_reminder_3h",
       "category": "UTILITY",
-      "body": "Hola {{1}},\n\nTu guardia de adoración es en *3 horas*:\n\n📅 Fecha: {{2}}\n⏰ Horario: {{3}}\n📍 {{4}}\n\n¿Confirmas tu asistencia?",
+      "header": null,
+      "body": "Hola {{nombre}}, tu guardia de adoración es en 3 horas.\n\nFecha: {{fecha}}\nHorario: {{horario}}\nLugar: {{lugar}}\n\n¿Confirmas tu asistencia?",
+      "footer": "AdoraHora — Capilla Cristo Rey",
       "buttons": [
         { "type": "QUICK_REPLY", "text": "Sí, asistiré" },
         { "type": "QUICK_REPLY", "text": "No podré asistir" }
       ],
-      "variables": ["nombre", "fecha", "horario", "capilla"]
+      "env_var": "WHATSAPP_TEMPLATE_REMINDER_3H",
+      "sample_values": ["María", "2026-07-11", "7:00 AM – 8:00 AM", "Capilla del Santísimo — Parroquia Cristo Rey"]
     },
     {
       "name": "adoratio_captain_emergency",
       "category": "UTILITY",
-      "body": "🚨 *Emergencia AdoraHora*\n\nHola {{1}}, un adorador no podrá asistir:\n\n👤 {{2}}\n📅 {{3}}\n⏰ {{4}}\n\nRevisa el panel de capitán para buscar sustituto urgente.",
-      "variables": ["nombre_capitán", "adorador", "fecha", "horario"]
+      "header": null,
+      "body": "Emergencia AdoraHora\n\nHola {{capitan}}, un adorador no podrá asistir:\n\nAdorador: {{adorador}}\nFecha: {{fecha}}\nHorario: {{horario}}\n\nRevisa el panel de capitán para buscar sustituto urgente.",
+      "footer": null,
+      "buttons": [],
+      "env_var": "WHATSAPP_TEMPLATE_CAPTAIN_EMERGENCY",
+      "sample_values": ["Padre Juan", "María González", "2026-07-11", "7:00 AM – 8:00 AM"]
     },
     {
       "name": "adoratio_booking_confirmed",
       "category": "UTILITY",
-      "body": "✅ Reserva confirmada, {{1}}.\n\n📅 {{2}}\n⏰ {{3}}\n\nTe enviaremos recordatorios 24 h y 3 h antes. ¡Dios te bendiga!",
-      "variables": ["nombre", "fecha", "horario"]
+      "header": null,
+      "body": "Reserva confirmada, {{nombre}}.\n\nFecha: {{fecha}}\nHorario: {{horario}}\n\nTe enviaremos recordatorios 24 h y 3 h antes. ¡Dios te bendiga!",
+      "footer": "AdoraHora",
+      "buttons": [],
+      "env_var": "WHATSAPP_TEMPLATE_BOOKING_CONFIRMED",
+      "sample_values": ["María", "2026-07-11", "7:00 AM – 8:00 AM"]
     }
+  ],
+  "env_block": [
+    "WHATSAPP_TEMPLATE_LANGUAGE=es_MX",
+    "WHATSAPP_TEMPLATE_REMINDER_24H=adoratio_reminder_24h",
+    "WHATSAPP_TEMPLATE_REMINDER_3H=adoratio_reminder_3h",
+    "WHATSAPP_TEMPLATE_CAPTAIN_EMERGENCY=adoratio_captain_emergency",
+    "WHATSAPP_TEMPLATE_BOOKING_CONFIRMED=adoratio_booking_confirmed",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID=1886920702000626"
   ]
 }

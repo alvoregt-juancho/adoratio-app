@@ -1,4 +1,5 @@
 const express = require('express');
+const config = require('../config');
 const { getSettings } = require('../utils/settings');
 const { getEnabledFrequencies } = require('../constants/commitment');
 
@@ -12,6 +13,9 @@ router.get('/', async (req, res) => {
             frequencies: getEnabledFrequencies(settings),
             allowOffsetStartTimes: settings.allowOffsetStartTimes,
             allowThirtyMinuteDurations: settings.allowThirtyMinuteDurations,
+            countryCode: config.countryCode,
+            coordinatorPhone: config.coordinatorPhone,
+            locale: config.appLocale,
         });
     } catch (e) {
         console.error(e);

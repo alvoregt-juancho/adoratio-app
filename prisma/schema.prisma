@@ -97,6 +97,7 @@ model Reservation {
   checkedInViaQrId Int?      @map("checked_in_via_qr_id")
   cancelledAt      DateTime? @map("cancelled_at")
   commitmentEndDate String?  @map("commitment_end_date") // YYYY-MM-DD último día inclusive
+  cancelToken      String?   @map("cancel_token")
   createdAt        DateTime  @default(now()) @map("created_at")
 
   slot           Slot        @relation(fields: [slotId], references: [id])
@@ -332,14 +333,102 @@ model WhatsAppMessageLog {
   @@map("whatsapp_message_logs")
 }
 
-// Sesión conversacional del bot (flujo de reserva, FAQ)
+// Sesión conversacional del bot (flujo de reserva, FAQ, IA, handoff)
+// mode: "rules" | "ai" | "handoff"
 model WhatsAppSession {
-  id        Int      @id @default(autoincrement())
-  phone     String   @unique
-  step      String   @default("menu")
-  data      String?
-  updatedAt DateTime @updatedAt @map("updated_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                 Int       @id @default(autoincrement())
+  phone              String    @unique
+  step               String    @default("menu")
+  mode               String    @default("rules")
+  handoffActive      Boolean   @default(false) @map("handoff_active")
+  assignedOperatorId Int?      @map("assigned_operator_id")
+  handoffReason      String?   @map("handoff_reason")
+  contactName        String?   @map("contact_name")
+  lastMessageAt      DateTime? @map("last_message_at")
+  data               String?
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
 
+  messages ChatMessage[]
+
+  @@index([handoffActive, lastMessageAt])
+  @@index([mode])
   @@map("whatsapp_sessions")
+}
+
+// Historial conversacional completo (IA, operador, usuario)
+// role: user | assistant | system | tool | operator
+model ChatMessage {
+  id          Int      @id @default(autoincrement())
+  sessionId   Int      @map("session_id")
+  role        String   @default("user")
+  direction   String
+  body        String
+  messageType String   @default("text") @map("message_type")
+  waMessageId String?  @map("wa_message_id")
+  toolName    String?  @map("tool_name")
+  meta        String?
+  operatorId  Int?     @map("operator_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  session WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+// Registro de recordatorios enviados (evita duplicados)
+// reminderType: "24h" | "3h"
+model WhatsAppReminderLog {
+  id             Int      @id @default(autoincrement())
+  reservationId  Int      @map("reservation_id")
+  occurrenceDate String   @map("occurrence_date")
+  reminderType   String   @map("reminder_type")
+  phone          String
+  sentAt         DateTime @default(now()) @map("sent_at")
+
+  @@unique([reservationId, occurrenceDate, reminderType])
+  @@index([occurrenceDate])
+  @@map("whatsapp_reminder_logs")
+}
+
+// Configuración del chatbot WhatsApp (singleton id=1)
+// tone: pastoral | formal | cercano | sereno
+// formality: usted | tu
+model WhatsAppBotConfig {
+  id                      Int      @id @default(1)
+  enabled                 Boolean  @default(true)
+  botName                 String   @default("AdoraHora") @map("bot_name")
+  assistantTitle          String   @default("Asistente de Adoración") @map("assistant_title")
+  language                String   @default("es")
+  locale                  String   @default("es-GT")
+  tone                    String   @default("pastoral")
+  formality               String   @default("usted")
+  useEmojis               Boolean  @default(true) @map("use_emojis")
+  welcomeTitle            String?  @map("welcome_title")
+  welcomeBody             String?  @map("welcome_body")
+  menuHelpLabel           String   @default("Cómo funciona") @map("menu_help_label")
+  personalityInstructions String?  @map("personality_instructions")
+  chapelDescription       String?  @map("chapel_description")
+  adorationHours          String?  @map("adoration_hours")
+  fallbackMessage         String?  @map("fallback_message")
+  goodbyeMessage          String?  @map("goodbye_message")
+  escalationMessage       String?  @map("escalation_message")
+  customFaqJson           String?  @map("custom_faq_json")
+  prohibitedTopics        String?  @map("prohibited_topics")
+  responseMaxChars        Int      @default(900) @map("response_max_chars")
+  aiEnabled               Boolean  @default(false) @map("ai_enabled")
+  aiProvider              String   @default("deepseek") @map("ai_provider")
+  aiModel                 String   @default("deepseek-chat") @map("ai_model")
+  aiBaseUrl               String   @default("https://api.deepseek.com") @map("ai_base_url")
+  deepseekApiKey          String?  @map("deepseek_api_key")
+  aiMaxIterations         Int      @default(6) @map("ai_max_iterations")
+  aiHistoryLimit          Int      @default(30) @map("ai_history_limit")
+  handoffRulesJson        String?  @map("handoff_rules_json")
+  enabledToolsJson        String?  @map("enabled_tools_json")
+  inviteToWebUrl          String?  @map("invite_to_web_url")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  updatedById             Int?     @map("updated_by_id")
+
+  @@map("whatsapp_bot_config")
 }

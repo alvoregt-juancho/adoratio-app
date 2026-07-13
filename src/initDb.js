@@ -64,10 +64,24 @@ async function migrateWhatsAppPrivileges() {
             role.slug === 'super-admin' ||
             role.slug === 'administrador' ||
             (role.privileges & PRIV.RESERVATIONS_CHECKIN);
-        if (isAdminLike && !(role.privileges & PRIV.WHATSAPP_VIEW)) {
+        let privileges = role.privileges;
+        let changed = false;
+        if (isAdminLike && !(privileges & PRIV.WHATSAPP_VIEW)) {
+            privileges |= PRIV.WHATSAPP_VIEW;
+            changed = true;
+        }
+        if (isAdminLike && !(privileges & PRIV.WHATSAPP_MANAGE)) {
+            privileges |= PRIV.WHATSAPP_MANAGE;
+            changed = true;
+        }
+        if (isAdminLike && !(privileges & PRIV.WHATSAPP_OPERATE)) {
+            privileges |= PRIV.WHATSAPP_OPERATE;
+            changed = true;
+        }
+        if (changed) {
             await prisma.adminRole.update({
                 where: { id: role.id },
-                data: { privileges: role.privileges | PRIV.WHATSAPP_VIEW },
+                data: { privileges },
             });
         }
     }

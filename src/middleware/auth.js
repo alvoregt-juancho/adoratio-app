@@ -85,7 +85,7 @@ function requireAdminAccess(req, res, next) {
     const privs = req.user.privileges ?? 0;
     const canEnter =
         hasPermission(privs, PRIV.DASHBOARD_VIEW) || hasPermission(privs, PRIV.CAPTAIN_VIEW);
-    if (!canEnter && privs === 0) {
+    if (!canEnter) {
         return res.status(403).json({ error: 'No tienes acceso al panel de administración.' });
     }
     next();

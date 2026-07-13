@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Horarios de Adoración | Adoratio</title>
+    <script>
+        if (!/[?&]legacy=1/.test(location.search)) {
+            location.replace('index.html?tab=mas&manage=shifts');
+        }
+    </script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="horarios.css">
 </head>

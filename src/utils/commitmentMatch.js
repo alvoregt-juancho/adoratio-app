@@ -1,3 +1,5 @@
+const { APP_LOCALE } = require('../utils/locale');
+
 const { COMMITMENT_FREQUENCY } = require('../constants/commitment');
 const { weekdayFromDate } = require('./schedule');
 const { parseWeekDays } = require('./weekDays');
@@ -135,7 +137,7 @@ function dateRangeForView(view, anchorDate) {
         }
         return {
             dates,
-            label: new Date(y, m - 1, 1).toLocaleDateString('es-CR', { month: 'long', year: 'numeric' }),
+            label: new Date(y, m - 1, 1).toLocaleDateString(APP_LOCALE, { month: 'long', year: 'numeric' }),
             start: formatDateStr(y, m, 1),
             end: formatDateStr(y, m, total),
         };
@@ -146,8 +148,8 @@ function dateRangeForView(view, anchorDate) {
     for (let i = 0; i < 7; i++) {
         dates.push(addDays(start, i));
     }
-    const startLabel = new Date(dates[0] + 'T12:00:00').toLocaleDateString('es-CR', { day: 'numeric', month: 'short' });
-    const endLabel = new Date(dates[6] + 'T12:00:00').toLocaleDateString('es-CR', { day: 'numeric', month: 'short' });
+    const startLabel = new Date(dates[0] + 'T12:00:00').toLocaleDateString(APP_LOCALE, { day: 'numeric', month: 'short' });
+    const endLabel = new Date(dates[6] + 'T12:00:00').toLocaleDateString(APP_LOCALE, { day: 'numeric', month: 'short' });
     return {
         dates,
         label: `${startLabel} – ${endLabel}`,

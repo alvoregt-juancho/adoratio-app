@@ -25,6 +25,24 @@
         return new RegExp("^\\d{" + PHONE_DIGITS + "}$").test(phone);
     }
 
+    function getCancelTokens() {
+        try {
+            return JSON.parse(localStorage.getItem("adorahora_cancel_tokens") || "{}");
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function saveCancelToken(reservationId, token) {
+        const map = getCancelTokens();
+        map[String(reservationId)] = token;
+        localStorage.setItem("adorahora_cancel_tokens", JSON.stringify(map));
+    }
+
+    function getCancelToken(reservationId) {
+        return getCancelTokens()[String(reservationId)] || "";
+    }
+
     function bindPhoneInput(input) {
         if (!input || input.dataset.phoneBound) return;
         input.dataset.phoneBound = "1";
@@ -691,6 +709,9 @@
             });
             const data = await res.json();
             if (res.ok) {
+                if (data.reservation?.id && data.reservation?.cancelToken) {
+                    saveCancelToken(data.reservation.id, data.reservation.cancelToken);
+                }
                 toast(data.message || "Reserva confirmada.", "success");
                 closeModal(reserveModal);
                 document.getElementById("resFirstName").value = "";
@@ -766,10 +787,13 @@
     async function cancelReservation(id, phone, btn) {
         btn.disabled = true;
         try {
+            const body = { phone: phone };
+            const cancelToken = getCancelToken(id);
+            if (cancelToken) body.cancelToken = cancelToken;
             const res = await fetch("/api/reservations/" + id, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: phone }),
+                body: JSON.stringify(body),
             });
             const data = await res.json();
             if (res.ok) {

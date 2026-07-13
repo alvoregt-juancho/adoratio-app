@@ -10,6 +10,11 @@ const { formatTimeRange12 } = require('./timeFormat');
 const { getUpcomingOccurrenceDates, hoursUntilOccurrence } = require('./whatsappOccurrences');
 const { notifyCaptainOccurrenceAbsence } = require('./whatsappAbsence');
 const { sendBookingConfirmedTemplate } = require('./whatsappTemplates');
+const {
+    getWhatsAppBotConfig,
+    truncateBotText,
+    tonePrefix,
+} = require('./whatsappBotConfig');
 
 const TEMPLATE_CONFIRM_TEXTS = ['sí, asistiré', 'si, asistire', 'si asistire', 'sí asistiré'];
 const TEMPLATE_ABSENCE_TEXTS = ['no podré asistir', 'no podre asistir', 'no podré', 'no podre'];
@@ -41,7 +46,7 @@ const FAQ = [
     {
         keys: ['cancelar', 'cancelación'],
         answer:
-            `Para cancelar tu compromiso completo, visita:\n${config.baseUrl}/horarios.html\n\n` +
+            `Para cancelar tu compromiso completo, visita:\n${config.baseUrl}/?tab=mas&manage=shifts\n\n` +
             `Si solo no puedes asistir a *una* guardia, escribe *no podré* o usa el botón en el recordatorio.`,
     },
 ];
@@ -72,22 +77,49 @@ async function updateSession(phone, step, data = {}) {
 }
 
 async function sendMainMenu(phone) {
+    const botCfg = await getWhatsAppBotConfig();
+    if (!botCfg.enabled) {
+        await sendText(
+            phone,
+            truncateBotText(
+                botCfg.escalationMessage ||
+                    'El asistente de WhatsApp está en pausa. Contacta a la coordinación de adoración.',
+                botCfg.responseMaxChars
+            )
+        );
+        return;
+    }
+
+    const prefix = tonePrefix(botCfg);
+    const title = botCfg.welcomeTitle || `Bienvenido a ${botCfg.botName}`;
+    const chapel = botCfg.chapelDescription || config.whatsapp.chapelName;
+    const intro = botCfg.welcomeBody
+        ? botCfg.welcomeBody
+        : `${chapel}\n\n${botCfg.assistantTitle}`;
+
     await sendButtons(
         phone,
-        `🙏 *Bienvenido a AdoraHora*\n${config.whatsapp.chapelName}\n\n¿En qué te podemos ayudar?`,
+        truncateBotText(
+            `${prefix}*${title}*\n${intro}\n\n¿En qué ${botCfg.formality === 'tu' ? 'te' : 'le'} podemos ayudar?`,
+            botCfg.responseMaxChars
+        ),
         [
             { id: 'menu_reservar', title: 'Reservar turno' },
             { id: 'menu_mis_turnos', title: 'Mis turnos' },
-            { id: 'menu_ayuda', title: 'Cómo funciona' },
+            { id: 'menu_ayuda', title: botCfg.menuHelpLabel.slice(0, 20) },
         ]
     );
     await updateSession(phone, 'menu', {});
 }
 
-function matchFaq(text) {
+async function matchFaq(text) {
+    const botCfg = await getWhatsAppBotConfig();
     const lower = text.toLowerCase().trim();
-    for (const item of FAQ) {
-        if (item.keys.some((k) => lower.includes(k))) return item.answer;
+    const allFaq = [...FAQ, ...botCfg.customFaq];
+    for (const item of allFaq) {
+        if (item.keys.some((k) => lower.includes(k))) {
+            return truncateBotText(item.answer, botCfg.responseMaxChars);
+        }
     }
     return null;
 }
@@ -408,6 +440,7 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
         return;
     }
 
+    const botCfg = await getWhatsAppBotConfig();
     const msg = (text || '').trim();
 
     if (buttonId) {
@@ -457,7 +490,12 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
         return;
     }
 
-    const faqAnswer = matchFaq(lower);
+    if (['adios', 'adiós', 'chao', 'gracias', 'bye'].includes(lower)) {
+        await sendText(phone, truncateBotText(botCfg.goodbyeMessage, botCfg.responseMaxChars));
+        return;
+    }
+
+    const faqAnswer = await matchFaq(lower);
     if (faqAnswer) {
         await sendText(phone, faqAnswer);
         return;
@@ -468,10 +506,10 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
         return;
     }
 
-    await sendText(
-        phone,
-        `No entendí tu mensaje. Escribe *menu* para ver opciones, *reservar* para un turno, o *ayuda* para saber cómo funciona.`
-    );
+    const fallback =
+        botCfg.fallbackMessage ||
+        `No entendí tu mensaje. Escribe *menu* para ver opciones, *reservar* para un turno, o *ayuda* para saber cómo funciona.`;
+    await sendText(phone, truncateBotText(fallback, botCfg.responseMaxChars));
 }
 
 module.exports = { handleIncomingMessage, sendMainMenu };

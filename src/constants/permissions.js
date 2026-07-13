@@ -30,6 +30,8 @@ const PRIV = {
     MURO_VIEW:             1 << 23,
     MURO_MANAGE:           1 << 24,
     WHATSAPP_VIEW:         1 << 25,
+    WHATSAPP_MANAGE:       1 << 26,
+    WHATSAPP_OPERATE:      1 << 27,
 };
 
 const ALL_PRIVILEGES = Object.values(PRIV).reduce((acc, bit) => acc | bit, 0);
@@ -53,7 +55,9 @@ const ADMIN_PRIVILEGES =
     PRIV.QRS_EDIT |
     PRIV.CAPTAIN_ASSIGN |
     PRIV.MURO_MANAGE |
-    PRIV.WHATSAPP_VIEW;
+    PRIV.WHATSAPP_VIEW |
+    PRIV.WHATSAPP_MANAGE |
+    PRIV.WHATSAPP_OPERATE;
 
 /** Perfil limitado: solo ve y gestiona su bloque asignado. */
 const CAPTAIN_PRIVILEGES =
@@ -156,6 +160,8 @@ const PERMISSION_NODES = [
         label: 'WhatsApp',
         nodes: [
             { key: 'WHATSAPP_VIEW', bit: PRIV.WHATSAPP_VIEW, label: 'Ver bandeja de mensajes WhatsApp' },
+            { key: 'WHATSAPP_MANAGE', bit: PRIV.WHATSAPP_MANAGE, label: 'Configurar personalidad y reglas del chatbot' },
+            { key: 'WHATSAPP_OPERATE', bit: PRIV.WHATSAPP_OPERATE, label: 'Operar handoff y responder conversaciones' },
         ],
     },
 ];

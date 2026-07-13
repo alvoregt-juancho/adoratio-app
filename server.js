@@ -14,16 +14,32 @@ const kioskRoutes = require('./src/routes/kiosk');
 const rosterRoutes = require('./src/routes/roster');
 const whatsappRoutes = require('./src/routes/whatsapp');
 const { purgeOldIntentions } = require('./src/jobs/intentionsCleanup');
+const { startWhatsAppScheduler } = require('./src/jobs/whatsappScheduler');
 
 const app = express();
 
+const { securityHeaders } = require('./src/middleware/securityHeaders');
+
 app.set('trust proxy', true);
-app.use(express.json());
+app.use(securityHeaders);
+app.use(
+    express.json({
+        verify: (req, _res, buf) => {
+            req.rawBody = buf;
+        },
+    })
+);
 app.use(express.urlencoded({ extended: true }));
 
 // API
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Servidor Adoratio operativo', smtp: config.smtpEnabled });
+    res.json({
+        status: 'OK',
+        message: 'Servidor Adoratio operativo',
+        smtp: config.smtpEnabled,
+        whatsapp: config.whatsappEnabled,
+        whatsappTemplates: config.whatsappTemplatesEnabled,
+    });
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/slots', slotRoutes);
@@ -63,6 +79,7 @@ async function start() {
         if (!config.smtpEnabled) {
             console.log('ℹ SMTP no configurado: los correos se imprimirán en consola.');
         }
+        startWhatsAppScheduler();
     });
 }
 

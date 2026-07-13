@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo | Adoratio</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="admin.css?v=2025062501">
+    <link rel="stylesheet" href="admin.css?v=2025071201">
 </head>
 <body class="admin">
     <!-- Login -->
@@ -33,12 +33,12 @@
                 </a>
                 <div>
                     <span class="page-eyebrow">Back-Office</span>
-                    <span id="whoami" class="muted"></span>
+                    <span id="whoamiLabel" class="muted"></span>
                 </div>
             </div>
             <div class="admin-topbar-actions">
                 <button type="button" class="ghost-btn whoami-btn" id="openAccountBtn" title="Mi cuenta y guía">
-                    <span id="whoami" class="muted"></span>
+                    <span id="whoamiBtnLabel" class="muted"></span>
                 </button>
                 <button class="ghost-btn" id="logoutBtn">Salir</button>
             </div>
@@ -342,7 +342,6 @@
                             <li>Asigna uno o más bloques: día de la semana (o todos) + hora inicio/fin.</li>
                             <li>El capitán inicia sesión y ve solo su bloque en <strong>Mi bloque</strong>.</li>
                         </ol>
-                        <p class="muted captain-demo-creds">Demo: <code>capitan@adoratio.com</code> / <code>capitan2026</code></p>
                     </div>
                 </div>
                 <div class="panel-card">
@@ -505,16 +504,162 @@
         <section class="tab-panel" id="tab-whatsapp" data-perm="WHATSAPP_VIEW">
             <div class="command-header">
                 <div>
-                    <h2>Bandeja WhatsApp</h2>
-                    <p class="muted">Mensajes entrantes y salientes del bot de AdoraHora.</p>
+                    <h2>WhatsApp</h2>
+                    <p class="muted">Personalidad del chatbot, plantillas Meta y bandeja de mensajes.</p>
                 </div>
                 <button type="button" class="ghost-btn" id="whatsappRefresh">Actualizar</button>
+            </div>
+
+            <div class="panel-card wa-bot-config-card" id="waBotConfigCard">
+                <div class="panel-card-header">
+                    <h3>Personalidad y reglas del chatbot</h3>
+                    <label class="wa-toggle-label"><input type="checkbox" id="waBotEnabled" checked> Bot activo</label>
+                </div>
+                <div class="panel-card-body wa-bot-form">
+                    <p class="muted wa-bot-intro">Define cómo responde el asistente cuando alguien escribe por WhatsApp. Los cambios aplican en los próximos mensajes.</p>
+
+                    <h4 class="wa-form-section">Identidad</h4>
+                    <div class="wa-form-grid">
+                        <label class="micro-label" for="waBotName">Nombre del bot</label>
+                        <input type="text" id="waBotName" class="touch-input-field dark-input" maxlength="40" placeholder="AdoraHora">
+                        <label class="micro-label" for="waAssistantTitle">Título / rol</label>
+                        <input type="text" id="waAssistantTitle" class="touch-input-field dark-input" maxlength="80" placeholder="Asistente de Adoración">
+                        <label class="micro-label" for="waLanguage">Idioma</label>
+                        <select id="waLanguage" class="touch-input-field dark-input">
+                            <option value="es">Español</option>
+                            <option value="es_MX">Español (México)</option>
+                            <option value="es_GT">Español (Guatemala)</option>
+                        </select>
+                        <label class="micro-label" for="waLocale">Locale fechas</label>
+                        <input type="text" id="waLocale" class="touch-input-field dark-input" maxlength="12" placeholder="es-GT">
+                    </div>
+
+                    <h4 class="wa-form-section">Estilo de conversación</h4>
+                    <div class="wa-form-grid">
+                        <label class="micro-label" for="waTone">Tono</label>
+                        <select id="waTone" class="touch-input-field dark-input">
+                            <option value="pastoral">Pastoral (cálido, eucarístico)</option>
+                            <option value="sereno">Sereno (contemplativo)</option>
+                            <option value="formal">Formal (institucional)</option>
+                            <option value="cercano">Cercano (amigable)</option>
+                        </select>
+                        <label class="micro-label" for="waFormality">Tratamiento</label>
+                        <select id="waFormality" class="touch-input-field dark-input">
+                            <option value="usted">Usted (formal)</option>
+                            <option value="tu">Tú (cercano)</option>
+                        </select>
+                        <label class="micro-label" for="waResponseMax">Máx. caracteres por mensaje</label>
+                        <input type="number" id="waResponseMax" class="touch-input-field dark-input" min="200" max="2000" value="900">
+                        <label class="wa-toggle-label wa-span-2"><input type="checkbox" id="waUseEmojis" checked> Usar emojis con moderación</label>
+                    </div>
+
+                    <h4 class="wa-form-section">Mensajes clave</h4>
+                    <label class="micro-label" for="waWelcomeTitle">Título de bienvenida</label>
+                    <input type="text" id="waWelcomeTitle" class="touch-input-field dark-input" maxlength="120" placeholder="Bienvenido a AdoraHora">
+                    <label class="micro-label" for="waWelcomeBody">Cuerpo de bienvenida</label>
+                    <textarea id="waWelcomeBody" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="500" placeholder="Capilla del Santísimo — Parroquia Cristo Rey"></textarea>
+                    <label class="micro-label" for="waFallback">Si no entiende al usuario</label>
+                    <textarea id="waFallback" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="500" placeholder="Escribe menu para ver opciones…"></textarea>
+                    <label class="micro-label" for="waEscalation">Derivar a coordinación</label>
+                    <textarea id="waEscalation" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="500"></textarea>
+                    <label class="micro-label" for="waGoodbye">Despedida</label>
+                    <textarea id="waGoodbye" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="300"></textarea>
+
+                    <h4 class="wa-form-section">Contexto parroquial</h4>
+                    <label class="micro-label" for="waChapelDesc">Descripción de la capilla</label>
+                    <textarea id="waChapelDesc" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="500"></textarea>
+                    <label class="micro-label" for="waAdorationHours">Horario de adoración</label>
+                    <input type="text" id="waAdorationHours" class="touch-input-field dark-input" maxlength="200" placeholder="7:00 AM – 8:00 PM todos los días">
+
+                    <h4 class="wa-form-section">Reglas y límites</h4>
+                    <label class="micro-label" for="waPersonality">Instrucciones de personalidad</label>
+                    <textarea id="waPersonality" class="touch-input-field dark-input wa-textarea" rows="4" maxlength="3000" placeholder="Cómo debe hablar el bot, qué priorizar, qué evitar…"></textarea>
+                    <label class="micro-label" for="waProhibited">Temas prohibidos / guardrails</label>
+                    <textarea id="waProhibited" class="touch-input-field dark-input wa-textarea" rows="2" maxlength="1000"></textarea>
+
+                    <h4 class="wa-form-section">FAQ personalizadas (JSON)</h4>
+                    <p class="muted wa-faq-hint">Arreglo de objetos: <code>{"keywords":["misa"],"answer":"…"}</code>. Se suman a las preguntas frecuentes del sistema.</p>
+                    <textarea id="waCustomFaq" class="touch-input-field dark-input wa-textarea wa-faq-json" rows="6" placeholder='[{"keywords":["coordinador"],"answer":"Llama al coordinador al +502 3034 1044"}]'></textarea>
+
+                    <div class="wa-bot-actions">
+                        <button type="button" class="sheet-primary-btn" id="waBotSaveBtn" data-perm="WHATSAPP_MANAGE">Guardar configuración del bot</button>
+                        <span class="muted" id="waBotUpdatedAt"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-card wa-ai-config-card" id="waAiConfigCard" data-super-admin-only>
+                <div class="panel-card-header">
+                    <h3>Inteligencia artificial (DeepSeek)</h3>
+                    <label class="wa-toggle-label"><input type="checkbox" id="waAiEnabled"> IA activa</label>
+                </div>
+                <div class="panel-card-body wa-bot-form">
+                    <p class="muted">Solo super administrador. Guarda la API key como secreto. El chatbot funciona sin IA (reglas + tools) mientras las plantillas Meta estén en revisión.</p>
+                    <div class="wa-form-grid">
+                        <label class="micro-label" for="waAiProvider">Proveedor</label>
+                        <input type="text" id="waAiProvider" class="touch-input-field dark-input" value="deepseek" readonly>
+                        <label class="micro-label" for="waAiModel">Modelo</label>
+                        <input type="text" id="waAiModel" class="touch-input-field dark-input" placeholder="deepseek-chat">
+                        <label class="micro-label" for="waAiBaseUrl">API base URL</label>
+                        <input type="text" id="waAiBaseUrl" class="touch-input-field dark-input" placeholder="https://api.deepseek.com">
+                        <label class="micro-label" for="waDeepseekKey">API Key (secreto)</label>
+                        <input type="password" id="waDeepseekKey" class="touch-input-field dark-input" placeholder="sk-…" autocomplete="new-password">
+                        <label class="micro-label" for="waAiMaxIter">Máx. iteraciones tools</label>
+                        <input type="number" id="waAiMaxIter" class="touch-input-field dark-input" min="1" max="12" value="6">
+                        <label class="micro-label" for="waAiHistory">Historial (mensajes)</label>
+                        <input type="number" id="waAiHistory" class="touch-input-field dark-input" min="5" max="60" value="30">
+                    </div>
+                    <p class="muted" id="waAiKeyStatus"></p>
+                    <label class="micro-label" for="waInviteWebUrl">URL invitación web (inscripción)</label>
+                    <input type="url" id="waInviteWebUrl" class="touch-input-field dark-input" placeholder="https://adorahora.com">
+                </div>
+            </div>
+
+            <div class="panel-card" id="waHandoffCard" data-perm="WHATSAPP_OPERATE">
+                <div class="panel-card-header">
+                    <h3>Operador — conversaciones en handoff</h3>
+                    <button type="button" class="ghost-btn" id="waHandoffRefresh">Actualizar</button>
+                </div>
+                <div class="panel-card-body">
+                    <p class="muted" id="waHandoffStatus">Cargando cola de handoff…</p>
+                    <div class="wa-handoff-layout">
+                        <div class="wa-handoff-list" id="waHandoffList"></div>
+                        <div class="wa-handoff-chat">
+                            <div class="wa-handoff-chat-header muted" id="waHandoffChatTitle">Selecciona una conversación</div>
+                            <div class="wa-handoff-messages" id="waHandoffMessages"></div>
+                            <div class="wa-handoff-reply" id="waHandoffReplyBox" hidden>
+                                <textarea id="waHandoffReplyText" class="touch-input-field dark-input wa-textarea" rows="2" placeholder="Escribe tu respuesta…"></textarea>
+                                <div class="wa-handoff-actions">
+                                    <button type="button" class="sheet-primary-btn" id="waHandoffSendBtn">Enviar</button>
+                                    <button type="button" class="ghost-btn" id="waHandoffReleaseBtn">Devolver al bot</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-card" id="waTemplatesCard">
+                <div class="panel-card-header"><h3>Plantillas Meta (recordatorios)</h3></div>
+                <div class="panel-card-body">
+                    <p class="muted" id="waTemplatesStatus">Cargando estado de plantillas…</p>
+                    <ul class="wa-template-list" id="waTemplatesList"></ul>
+                </div>
+            </div>
+
+            <div class="command-header" style="margin-top:24px;">
+                <div>
+                    <h3 style="margin:0;">Bandeja de mensajes</h3>
+                    <p class="muted">Entrantes y salientes registrados.</p>
+                </div>
             </div>
             <div class="metrics-grid" id="whatsappMetrics">
                 <div class="metric-card"><span class="metric-label">Recibidos hoy</span><span class="metric-value" id="waStatInbound">—</span></div>
                 <div class="metric-card"><span class="metric-label">Enviados hoy</span><span class="metric-value" id="waStatOutbound">—</span></div>
                 <div class="metric-card"><span class="metric-label">Contactos</span><span class="metric-value" id="waStatContacts">—</span></div>
                 <div class="metric-card"><span class="metric-label">Total registrado</span><span class="metric-value" id="waStatTotal">—</span></div>
+                <div class="metric-card"><span class="metric-label">IA conectada</span><span class="metric-value" id="waStatAi">—</span></div>
+                <div class="metric-card"><span class="metric-label">Mensajes chat hoy</span><span class="metric-value" id="waStatChatToday">—</span></div>
             </div>
             <p class="muted" id="waApiStatus" style="margin:0 0 12px;"></p>
             <div class="audit-filters">
@@ -852,6 +997,6 @@
 
     <script src="timeFormat.js"></script>
     <script src="app.js"></script>
-    <script src="admin.js?v=2025063003"></script>
+    <script src="admin.js?v=2025071001"></script>
 </body>
 </html>

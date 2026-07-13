@@ -2,6 +2,15 @@ const express = require('express');
 const prisma = require('../db');
 const { normalizePhone, isValidPhone } = require('../utils/phone');
 const { randomScripture } = require('../constants/eucharisticScriptures');
+const { requireKioskSecret } = require('../middleware/kioskAuth');
+const { rateLimit } = require('../middleware/rateLimit');
+
+const kioskCheckInLimit = rateLimit({
+    windowMs: 60 * 1000,
+    max: 40,
+    keyFn: (req) => `kiosk:${req.ip || 'unknown'}`,
+    message: 'Demasiados intentos. Espera un momento.',
+});
 const {
     resolveKioskUserByPhone,
     firstNameFromUser,
@@ -12,7 +21,7 @@ const {
 const router = express.Router();
 
 // POST /api/kiosk/check-in  { "phone_number": "########" }
-router.post('/check-in', async (req, res) => {
+router.post('/check-in', kioskCheckInLimit, requireKioskSecret, async (req, res) => {
     try {
         const phone = normalizePhone(req.body?.phone_number ?? req.body?.phoneNumber);
         if (!isValidPhone(phone)) {
@@ -21,7 +30,9 @@ router.post('/check-in', async (req, res) => {
 
         const user = await resolveKioskUserByPhone(phone);
         if (!user) {
-            return res.status(404).json({ error: 'Número celular no registrado' });
+            return res.status(404).json({
+                error: 'No se pudo completar el registro. Verifica tu número o regístrate en adorahora.com.',
+            });
         }
 
         const todayStart = startOfToday();

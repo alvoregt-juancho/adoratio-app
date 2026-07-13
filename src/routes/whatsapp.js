@@ -1,7 +1,8 @@
 const express = require('express');
 const config = require('../config');
-const { handleIncomingMessage } = require('../utils/whatsappBot');
-const { logInboundMessage, updateWhatsAppMessageStatus } = require('../utils/whatsappLog');
+const { updateWhatsAppMessageStatus } = require('../utils/whatsappLog');
+const { verifyWhatsAppWebhookSignature } = require('../utils/webhookSignature');
+const { enqueueInbound } = require('../jobs/whatsappInboundQueue');
 
 const router = express.Router();
 
@@ -19,6 +20,11 @@ router.get('/webhook', (req, res) => {
 
 // POST — mensajes entrantes y actualizaciones de estado
 router.post('/webhook', async (req, res) => {
+    const signature = req.get('X-Hub-Signature-256');
+    if (!verifyWhatsAppWebhookSignature(req.rawBody, signature)) {
+        return res.sendStatus(403);
+    }
+
     res.sendStatus(200);
 
     try {
@@ -35,45 +41,7 @@ router.post('/webhook', async (req, res) => {
 
         if (!value?.messages?.length) return;
 
-        const contactName =
-            value.contacts?.find((c) => c.wa_id === value.messages[0]?.from)?.profile?.name || null;
-
-        for (const message of value.messages) {
-            const waId = message.from;
-            let text = '';
-            let buttonId = null;
-            let messageType = message.type || 'text';
-
-            if (message.type === 'text') {
-                text = message.text?.body || '';
-            } else if (message.type === 'interactive') {
-                const interactive = message.interactive;
-                messageType = 'interactive';
-                if (interactive?.type === 'button_reply') {
-                    buttonId = interactive.button_reply?.id;
-                    text = interactive.button_reply?.title || '';
-                } else if (interactive?.type === 'list_reply') {
-                    buttonId = interactive.list_reply?.id;
-                    text = interactive.list_reply?.title || '';
-                }
-            } else if (message.type === 'button') {
-                messageType = 'button';
-                text = message.button?.text || message.button?.payload || '';
-            } else {
-                text = `[${message.type}]`;
-            }
-
-            await logInboundMessage({
-                waId,
-                text,
-                messageType,
-                waMessageId: message.id,
-                buttonId,
-                contactName,
-            });
-
-            await handleIncomingMessage(waId, text, buttonId);
-        }
+        enqueueInbound({ value, messages: value.messages });
     } catch (e) {
         console.error('[WhatsApp webhook]', e);
     }

@@ -1,21 +1,11 @@
 const config = require('../config');
 const { normalizePhone } = require('./phone');
 const { logOutboundFromApiResponse } = require('./whatsappLog');
+const { parseWaPhone } = require('./phone');
 
 function formatPhoneForWa(phone8) {
     const p = normalizePhone(phone8);
     return `${config.whatsapp.countryCode}${p}`;
-}
-
-/** Convierte wa_id de Meta (50612345678) a 8 dígitos locales. */
-function parseWaPhone(waId) {
-    const digits = String(waId || '').replace(/\D/g, '');
-    const cc = config.whatsapp.countryCode;
-    if (digits.startsWith(cc) && digits.length === cc.length + 8) {
-        return digits.slice(cc.length);
-    }
-    if (digits.length === 8) return digits;
-    return digits.slice(-8);
 }
 
 async function callWhatsAppApi(payload) {

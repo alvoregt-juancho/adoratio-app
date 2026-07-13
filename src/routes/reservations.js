@@ -11,6 +11,8 @@ const { isValidBiweeklyWeeks } = require('../utils/biweeklyWeeks');
 const { commitmentEndDateFromMonths, COMMITMENT_TERM_MONTHS } = require('../utils/commitmentMatch');
 const { formatIntentionPayload, releaseWallIntentionAssignment, assignWallIntentionToReservation, markAssignedIntentionPrayed } = require('../utils/intentions');
 const { notifyCaptainsSubstituteNeeded } = require('../utils/captainScope');
+const { generateCancelToken, tokensMatch } = require('../utils/cancelToken');
+const { reservationLookupLimit, reservationCancelLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -112,6 +114,7 @@ router.post('/', async (req, res) => {
         }
 
         const prayForWall = req.body?.prayForWall === true || req.body?.prayForWall === 'true';
+        const cancelToken = generateCancelToken();
 
         const reservation = await prisma.reservation.create({
             data: {
@@ -128,6 +131,7 @@ router.post('/', async (req, res) => {
                 startTimeOffset,
                 commitmentEndDate,
                 status: 'confirmed',
+                cancelToken,
             },
             include: { slot: true },
         });
@@ -157,6 +161,7 @@ router.post('/', async (req, res) => {
                 id: reservation.id,
                 date: reservation.date,
                 status: reservation.status,
+                cancelToken,
                 slot: { startTime: slot.startTime, endTime: slot.endTime },
                 assignedIntention: formatIntentionPayload(assignedIntention),
             },
@@ -168,7 +173,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/reservations/my?phone=...
-router.get('/my', async (req, res) => {
+router.get('/my', reservationLookupLimit, async (req, res) => {
     try {
         const phone = normalizePhone(req.query.phone);
         if (!phone) return res.status(400).json({ error: 'Celular requerido.' });
@@ -201,14 +206,18 @@ router.get('/my', async (req, res) => {
     }
 });
 
-// DELETE /api/reservations/:id  (autoriza por celular del titular)
-router.delete('/:id', async (req, res) => {
+// DELETE /api/reservations/:id  (cancelToken o celular del titular)
+router.delete('/:id', reservationCancelLimit, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const phone = normalizePhone(req.body?.phone || req.query.phone);
+        const cancelToken = String(req.body?.cancelToken || req.query.cancelToken || '').trim();
         const reservation = await prisma.reservation.findUnique({ where: { id } });
         if (!reservation) return res.status(404).json({ error: 'Reserva no encontrada.' });
-        if (!phone || reservation.userPhone !== phone) {
+
+        const authorizedByToken = tokensMatch(reservation.cancelToken, cancelToken);
+        const authorizedByPhone = phone && reservation.userPhone === phone;
+        if (!authorizedByToken && !authorizedByPhone) {
             return res.status(403).json({ error: 'No autorizado para cancelar esta reserva.' });
         }
         if (reservation.status === 'cancelled') {

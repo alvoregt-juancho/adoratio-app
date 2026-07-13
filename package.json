@@ -15,7 +15,8 @@
     "test": "node --test test/*.test.js",
     "test:whatsapp": "node scripts/test-whatsapp.js",
     "publish": "bash scripts/publish.sh",
-    "whatsapp:token": "bash scripts/update-whatsapp-token.sh"
+    "whatsapp:token": "bash scripts/update-whatsapp-token.sh",
+    "whatsapp:templates": "node scripts/list-whatsapp-templates.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

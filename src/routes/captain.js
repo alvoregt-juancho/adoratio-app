@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../db');
+const config = require('../config');
 const { requirePermission, PRIV } = require('../middleware/auth');
 const { hasPermission } = require('../constants/permissions');
 const { writeAudit } = require('../utils/audit');
@@ -488,7 +489,7 @@ router.post('/notify-block', requirePermission(PRIV.CAPTAIN_VIEW), async (req, r
         const whatsappLinks = adorers.map((a) => ({
             phone: a.phone,
             name: a.name,
-            url: `https://wa.me/506${a.phone}?text=${encodeURIComponent(message)}`,
+            url: `https://wa.me/${config.countryCode}${a.phone}?text=${encodeURIComponent(message)}`,
         }));
 
         res.json({

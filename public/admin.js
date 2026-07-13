@@ -236,7 +236,8 @@
             introKey: "tab-whatsapp",
             items: [
                 { perm: "WHATSAPP_VIEW", label: "Ver mensajes entrantes y salientes", hintKey: "tab-whatsapp" },
-                { perm: "WHATSAPP_VIEW", label: "Filtrar por celular o dirección", hintKey: "tab-whatsapp" },
+                { perm: "WHATSAPP_MANAGE", label: "Configurar personalidad y reglas del chatbot", hintKey: "tab-whatsapp" },
+                { perm: "WHATSAPP_OPERATE", label: "Operar handoff y responder conversaciones", hintKey: "tab-whatsapp" },
             ],
         },
     ];
@@ -408,6 +409,9 @@
         CAPTAIN_ASSIGN:        1 << 22,
         MURO_VIEW:             1 << 23,
         MURO_MANAGE:           1 << 24,
+        WHATSAPP_VIEW:         1 << 25,
+        WHATSAPP_MANAGE:       1 << 26,
+        WHATSAPP_OPERATE:      1 << 27,
     };
 
     let token = localStorage.getItem(TOKEN_KEY);
@@ -418,6 +422,8 @@
     const AUDIT_LIMIT = 40;
     let whatsappOffset = 0;
     const WHATSAPP_LIMIT = 50;
+    let waHandoffSelectedPhone = null;
+    let waSseSource = null;
     let slotsCache = [];
     let reservationsCache = [];
     let calendarState = { view: "week", anchor: todayStr() };
@@ -529,10 +535,12 @@
         if (!u) return;
         const badgeClass = u.isSuperAdmin ? "admin-badge super" : "admin-badge";
         const roleLabel = u.adminRoleName || u.role;
-        const el = document.getElementById("whoami");
-        if (!el) return;
-        el.innerHTML =
+        const html =
             escapeHtml(u.name) + ' <span class="' + badgeClass + '">' + escapeHtml(roleLabel) + "</span>";
+        const label = document.getElementById("whoamiLabel");
+        const btnLabel = document.getElementById("whoamiBtnLabel");
+        if (label) label.innerHTML = html;
+        if (btnLabel) btnLabel.textContent = u.name;
     }
 
     function openAccountTab() {
@@ -1494,17 +1502,20 @@
     // ── MURO DE INTENCIONES ──
     var intentionsCache = [];
 
+    const APP_COUNTRY_CODE = "502";
+    const APP_LOCALE = "es-GT";
+
     function whatsAppNotifyUrl(phone) {
         if (!phone) return null;
         const msg = encodeURIComponent(
             "Hola, queremos notificarte que tu petición ha sido orada hoy durante la Adoración."
         );
-        return "https://wa.me/506" + phone + "?text=" + msg;
+        return "https://wa.me/" + APP_COUNTRY_CODE + phone + "?text=" + msg;
     }
 
     function formatIntentionDate(iso) {
         try {
-            return new Date(iso).toLocaleDateString("es-CR", {
+            return new Date(iso).toLocaleDateString(APP_LOCALE, {
                 day: "numeric", month: "short", year: "numeric",
             });
         } catch (_) {
@@ -3503,8 +3514,279 @@
         }
     }
 
+    async function loadWhatsAppBotConfig() {
+        if (!hasPerm("WHATSAPP_VIEW")) return;
+        try {
+            const res = await api("/api/admin/whatsapp/bot-config");
+            const data = await res.json();
+            if (!res.ok) return;
+            const c = data.botConfig || {};
+            document.getElementById("waBotEnabled").checked = c.enabled !== false;
+            document.getElementById("waBotName").value = c.botName || "";
+            document.getElementById("waAssistantTitle").value = c.assistantTitle || "";
+            document.getElementById("waLanguage").value = c.language || "es";
+            document.getElementById("waLocale").value = c.locale || "es-GT";
+            document.getElementById("waTone").value = c.tone || "pastoral";
+            document.getElementById("waFormality").value = c.formality || "usted";
+            document.getElementById("waResponseMax").value = c.responseMaxChars || 900;
+            document.getElementById("waUseEmojis").checked = c.useEmojis !== false;
+            document.getElementById("waWelcomeTitle").value = c.welcomeTitle || "";
+            document.getElementById("waWelcomeBody").value = c.welcomeBody || "";
+            document.getElementById("waFallback").value = c.fallbackMessage || "";
+            document.getElementById("waEscalation").value = c.escalationMessage || "";
+            document.getElementById("waGoodbye").value = c.goodbyeMessage || "";
+            document.getElementById("waChapelDesc").value = c.chapelDescription || "";
+            document.getElementById("waAdorationHours").value = c.adorationHours || "";
+            document.getElementById("waPersonality").value = c.personalityInstructions || "";
+            document.getElementById("waProhibited").value = c.prohibitedTopics || "";
+            document.getElementById("waCustomFaq").value = c.customFaqJson || "[]";
+            const isSuper = Boolean(session.user?.isSuperAdmin);
+            const aiCard = document.getElementById("waAiConfigCard");
+            if (aiCard) aiCard.hidden = !isSuper;
+            if (isSuper) {
+                document.getElementById("waAiEnabled").checked = c.aiEnabled === true;
+                document.getElementById("waAiProvider").value = c.aiProvider || "deepseek";
+                document.getElementById("waAiModel").value = c.aiModel || "deepseek-chat";
+                document.getElementById("waAiBaseUrl").value = c.aiBaseUrl || "https://api.deepseek.com";
+                document.getElementById("waAiMaxIter").value = c.aiMaxIterations || 6;
+                document.getElementById("waAiHistory").value = c.aiHistoryLimit || 30;
+                document.getElementById("waInviteWebUrl").value = c.inviteToWebUrl || "";
+                const keyStatus = document.getElementById("waAiKeyStatus");
+                if (keyStatus) {
+                    keyStatus.textContent = c.deepseekApiKeySet
+                        ? "API key configurada (" + (c.deepseekApiKeyMasked || "••••") + "). Deja el campo vacío para no cambiarla; borra con guardar vacío explícito si el backend lo permite."
+                        : "Sin API key — el bot usa reglas y herramientas locales.";
+                }
+                document.getElementById("waDeepseekKey").value = "";
+            }
+            const updatedEl = document.getElementById("waBotUpdatedAt");
+            if (updatedEl) {
+                updatedEl.textContent = c.updatedAt ? "Última actualización: " + formatTime(c.updatedAt) : "";
+            }
+            const saveBtn = document.getElementById("waBotSaveBtn");
+            if (saveBtn) saveBtn.disabled = !hasPerm("WHATSAPP_MANAGE");
+            setFormReadonlyByPerm("#waBotConfigCard", "WHATSAPP_MANAGE");
+        } catch (_) {}
+    }
+
+    async function saveWhatsAppBotConfig() {
+        if (!hasPerm("WHATSAPP_MANAGE")) return toast("Sin permiso para editar el chatbot.", "error");
+        const btn = document.getElementById("waBotSaveBtn");
+        btn.disabled = true;
+        try {
+            const payload = {
+                enabled: document.getElementById("waBotEnabled").checked,
+                botName: document.getElementById("waBotName").value.trim(),
+                assistantTitle: document.getElementById("waAssistantTitle").value.trim(),
+                language: document.getElementById("waLanguage").value,
+                locale: document.getElementById("waLocale").value.trim(),
+                tone: document.getElementById("waTone").value,
+                formality: document.getElementById("waFormality").value,
+                responseMaxChars: Number(document.getElementById("waResponseMax").value),
+                useEmojis: document.getElementById("waUseEmojis").checked,
+                welcomeTitle: document.getElementById("waWelcomeTitle").value.trim(),
+                welcomeBody: document.getElementById("waWelcomeBody").value.trim(),
+                fallbackMessage: document.getElementById("waFallback").value.trim(),
+                escalationMessage: document.getElementById("waEscalation").value.trim(),
+                goodbyeMessage: document.getElementById("waGoodbye").value.trim(),
+                chapelDescription: document.getElementById("waChapelDesc").value.trim(),
+                adorationHours: document.getElementById("waAdorationHours").value.trim(),
+                personalityInstructions: document.getElementById("waPersonality").value.trim(),
+                prohibitedTopics: document.getElementById("waProhibited").value.trim(),
+                customFaqJson: document.getElementById("waCustomFaq").value.trim() || "[]",
+            };
+            if (session.user?.isSuperAdmin) {
+                payload.aiEnabled = document.getElementById("waAiEnabled").checked;
+                payload.aiProvider = document.getElementById("waAiProvider").value.trim();
+                payload.aiModel = document.getElementById("waAiModel").value.trim();
+                payload.aiBaseUrl = document.getElementById("waAiBaseUrl").value.trim();
+                payload.aiMaxIterations = Number(document.getElementById("waAiMaxIter").value);
+                payload.aiHistoryLimit = Number(document.getElementById("waAiHistory").value);
+                payload.inviteToWebUrl = document.getElementById("waInviteWebUrl").value.trim();
+                const keyVal = document.getElementById("waDeepseekKey").value.trim();
+                if (keyVal) payload.deepseekApiKey = keyVal;
+            }
+            const res = await api("/api/admin/whatsapp/bot-config", {
+                method: "PUT",
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+            toast(data.message || "Configuración guardada.", "success");
+            loadWhatsAppBotConfig();
+        } catch (e) {
+            toast(e.message || "Error al guardar.", "error");
+        } finally {
+            btn.disabled = !hasPerm("WHATSAPP_MANAGE");
+        }
+    }
+
+    function connectWhatsAppSse() {
+        if (!hasPerm("WHATSAPP_OPERATE") || !token || typeof EventSource === "undefined") return;
+        if (waSseSource) {
+            waSseSource.close();
+            waSseSource = null;
+        }
+        const url = "/api/admin/whatsapp/events?token=" + encodeURIComponent(token);
+        try {
+            waSseSource = new EventSource(url);
+            waSseSource.onmessage = function (ev) {
+                try {
+                    const payload = JSON.parse(ev.data);
+                    if (payload.type && payload.type.indexOf("handoff") >= 0 && hasPerm("WHATSAPP_OPERATE")) {
+                        loadWhatsAppHandoff();
+                    }
+                    if (payload.type === "handoff:message" && payload.data?.phone === waHandoffSelectedPhone) {
+                        loadWhatsAppHandoffChat(waHandoffSelectedPhone);
+                    }
+                } catch (_) {}
+            };
+        } catch (_) {}
+    }
+
+    async function loadWhatsAppHandoff() {
+        if (!hasPerm("WHATSAPP_OPERATE")) return;
+        const statusEl = document.getElementById("waHandoffStatus");
+        const listEl = document.getElementById("waHandoffList");
+        if (!listEl) return;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions?handoff=1&limit=50");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error");
+            const sessions = data.sessions || [];
+            if (statusEl) {
+                statusEl.textContent = sessions.length
+                    ? sessions.length + " conversación(es) esperando operador."
+                    : "No hay conversaciones en handoff ahora.";
+            }
+            listEl.innerHTML = sessions.length
+                ? sessions.map(function (s) {
+                    const active = s.phone === waHandoffSelectedPhone ? " wa-handoff-item-active" : "";
+                    const name = s.contactName ? escapeHtml(s.contactName) + " · " : "";
+                    return "<button type='button' class='wa-handoff-item" + active + "' data-phone='" + escapeHtml(s.phone) + "'>" +
+                        name + escapeHtml(s.phone) + "<br><span class='muted'>" + escapeHtml(s.handoffReason || "") + "</span></button>";
+                }).join("")
+                : "<p class='muted'>Sin handoffs activos.</p>";
+            listEl.querySelectorAll(".wa-handoff-item").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    waHandoffSelectedPhone = btn.getAttribute("data-phone");
+                    loadWhatsAppHandoff();
+                    loadWhatsAppHandoffChat(waHandoffSelectedPhone);
+                });
+            });
+        } catch (e) {
+            if (statusEl) statusEl.textContent = e.message || "Error al cargar handoffs.";
+        }
+    }
+
+    async function loadWhatsAppHandoffChat(phone) {
+        if (!phone || !hasPerm("WHATSAPP_OPERATE")) return;
+        const titleEl = document.getElementById("waHandoffChatTitle");
+        const msgEl = document.getElementById("waHandoffMessages");
+        const replyBox = document.getElementById("waHandoffReplyBox");
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(phone) + "/messages?limit=120");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error");
+            const session = data.session;
+            if (titleEl) {
+                titleEl.textContent = (session?.contactName ? session.contactName + " · " : "") + phone +
+                    (session?.handoffActive ? " — handoff activo" : "");
+            }
+            if (replyBox) replyBox.hidden = !session?.handoffActive;
+            if (msgEl) {
+                msgEl.innerHTML = (data.messages || []).map(function (m) {
+                    const cls = m.role === "user" ? "wa-chat-user" : (m.role === "operator" ? "wa-chat-operator" : "wa-chat-bot");
+                    return "<div class='wa-chat-bubble " + cls + "'><span class='muted'>" + escapeHtml(m.role) + " · " +
+                        formatTime(m.createdAt) + "</span><br>" + escapeHtml(m.body || "").replace(/\n/g, "<br>") + "</div>";
+                }).join("") || "<p class='muted'>Sin mensajes en esta sesión.</p>";
+                msgEl.scrollTop = msgEl.scrollHeight;
+            }
+        } catch (e) {
+            if (msgEl) msgEl.innerHTML = "<p class='muted'>" + escapeHtml(e.message || "Error") + "</p>";
+        }
+    }
+
+    async function sendWhatsAppHandoffReply() {
+        if (!waHandoffSelectedPhone) return;
+        const text = document.getElementById("waHandoffReplyText").value.trim();
+        if (!text) return toast("Escribe un mensaje.", "error");
+        const btn = document.getElementById("waHandoffSendBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waHandoffSelectedPhone) + "/reply", {
+                method: "POST",
+                body: JSON.stringify({ text }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "No se pudo enviar.");
+            document.getElementById("waHandoffReplyText").value = "";
+            loadWhatsAppHandoffChat(waHandoffSelectedPhone);
+            toast("Mensaje enviado.", "success");
+        } catch (e) {
+            toast(e.message || "Error.", "error");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function releaseWhatsAppHandoff() {
+        if (!waHandoffSelectedPhone) return;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waHandoffSelectedPhone) + "/release", {
+                method: "POST",
+                body: JSON.stringify({ mode: "rules" }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error");
+            toast("Conversación devuelta al bot.", "success");
+            waHandoffSelectedPhone = null;
+            loadWhatsAppHandoff();
+            document.getElementById("waHandoffMessages").innerHTML = "";
+            document.getElementById("waHandoffReplyBox").hidden = true;
+        } catch (e) {
+            toast(e.message || "Error.", "error");
+        }
+    }
+
+    function renderWhatsAppTemplatesStatus(stats) {
+        const statusEl = document.getElementById("waTemplatesStatus");
+        const listEl = document.getElementById("waTemplatesList");
+        if (!statusEl || !listEl) return;
+        const t = stats.templates || {};
+        const items = [
+            { key: "Recordatorio 24 h", env: t.reminder24h, required: true },
+            { key: "Recordatorio 3 h", env: t.reminder3h, required: true },
+            { key: "Emergencia capitán", env: t.captainEmergency, required: false },
+            { key: "Reserva confirmada", env: t.bookingConfirmed, required: false },
+        ];
+        const ready = stats.templatesEnabled;
+        statusEl.textContent = ready
+            ? "Plantillas configuradas en el servidor. Idioma: " + (t.language || "es_MX") + "."
+            : "Pendiente: cuando Meta apruebe las plantillas, agrega sus nombres en el .env del servidor (WHATSAPP_TEMPLATE_REMINDER_24H, etc.).";
+        listEl.innerHTML = items.map(function (item) {
+            const ok = Boolean(item.env);
+            const cls = ok ? "wa-tpl-ok" : (item.required ? "wa-tpl-warn" : "wa-tpl-muted");
+            const label = ok ? ("✓ " + item.env) : (item.required ? "Pendiente en .env" : "Opcional");
+            return "<li class='" + cls + "'><strong>" + escapeHtml(item.key) + ":</strong> " + escapeHtml(label) + "</li>";
+        }).join("");
+    }
+
+    function setFormReadonlyByPerm(containerSelector, perm) {
+        const canEdit = hasPerm(perm);
+        document.querySelectorAll(containerSelector + " input, " + containerSelector + " textarea, " + containerSelector + " select").forEach(function (el) {
+            if (el.id === "waBotSaveBtn") return;
+            el.disabled = !canEdit;
+        });
+    }
+
     async function loadWhatsApp() {
         if (!hasPerm("WHATSAPP_VIEW")) return;
+        loadWhatsAppBotConfig();
+        if (hasPerm("WHATSAPP_OPERATE")) {
+            loadWhatsAppHandoff();
+            connectWhatsAppSse();
+        }
         try {
             const [statsRes, msgRes] = await Promise.all([
                 api("/api/admin/whatsapp/stats"),
@@ -3523,14 +3805,36 @@
                 document.getElementById("waStatOutbound").textContent = stats.outboundToday ?? "0";
                 document.getElementById("waStatContacts").textContent = stats.uniqueContacts ?? "0";
                 document.getElementById("waStatTotal").textContent = stats.totalMessages ?? "0";
+                const handoffEl = document.getElementById("waStatHandoff");
+                if (handoffEl) handoffEl.textContent = stats.handoffActive ?? "0";
+                const chatEl = document.getElementById("waStatChatToday");
+                if (chatEl) chatEl.textContent = stats.chatMessagesToday ?? "0";
+                const aiEl = document.getElementById("waStatAi");
+                if (aiEl) {
+                    aiEl.textContent = stats.ai?.connected ? "Sí" : (stats.ai?.keyConfigured ? "Key OK" : "No");
+                }
                 const statusEl = document.getElementById("waApiStatus");
                 if (statusEl) {
-                    statusEl.textContent = stats.apiConnected
+                    let msg = stats.apiConnected
                         ? "API WhatsApp conectada."
                         : stats.enabled
                             ? "WhatsApp habilitado; revisa credenciales en el servidor."
                             : "WhatsApp deshabilitado en el servidor.";
+                    if (stats.templatesEnabled) {
+                        msg += " Plantillas de recordatorio activas.";
+                    } else if (stats.apiConnected) {
+                        msg += " ⚠ Sin plantillas Meta: los recordatorios proactivos no funcionarán hasta aprobar plantillas (ver config/whatsapp-templates.example.json).";
+                    }
+                    if (stats.templates) {
+                        const t = stats.templates;
+                        const configured = [t.reminder24h, t.reminder3h].filter(Boolean);
+                        if (configured.length) {
+                            msg += " Config: " + configured.join(", ") + ".";
+                        }
+                    }
+                    statusEl.textContent = msg;
                 }
+                renderWhatsAppTemplatesStatus(stats);
             }
             const table = document.getElementById("whatsappTable");
             if (!msgRes.ok) {
@@ -3782,6 +4086,13 @@
         loadAudit();
     });
     document.getElementById("whatsappRefresh").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
+    document.getElementById("waBotSaveBtn").addEventListener("click", saveWhatsAppBotConfig);
+    const waHandoffRefresh = document.getElementById("waHandoffRefresh");
+    if (waHandoffRefresh) waHandoffRefresh.addEventListener("click", loadWhatsAppHandoff);
+    const waHandoffSendBtn = document.getElementById("waHandoffSendBtn");
+    if (waHandoffSendBtn) waHandoffSendBtn.addEventListener("click", sendWhatsAppHandoffReply);
+    const waHandoffReleaseBtn = document.getElementById("waHandoffReleaseBtn");
+    if (waHandoffReleaseBtn) waHandoffReleaseBtn.addEventListener("click", releaseWhatsAppHandoff);
     document.getElementById("whatsappApplyFilters").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
     document.getElementById("whatsappSearch").addEventListener("keydown", function (e) {
         if (e.key === "Enter") { whatsappOffset = 0; loadWhatsApp(); }

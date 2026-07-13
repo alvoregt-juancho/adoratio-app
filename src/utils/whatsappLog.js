@@ -1,6 +1,5 @@
 const prisma = require('../db');
-const { normalizePhone } = require('./phone');
-const { parseWaPhone } = require('./whatsapp');
+const { normalizePhone, parseWaPhone } = require('./phone');
 
 function normalizeLogPhone(raw) {
     const fromWa = parseWaPhone(raw);
