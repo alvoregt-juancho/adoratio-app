@@ -4,8 +4,6 @@ const { sendText, sendButtons, parseWaPhone } = require('./whatsapp');
 const { normalizePhone, isValidPhone } = require('./phone');
 const { todayStr } = require('./dates');
 const { filterSlotsForDate } = require('./schedule');
-const { COMMITMENT_FREQUENCY } = require('../constants/commitment');
-const { commitmentEndDateFromMonths } = require('./commitmentMatch');
 const { formatTimeRange12 } = require('./timeFormat');
 const { getUpcomingOccurrenceDates, hoursUntilOccurrence } = require('./whatsappOccurrences');
 const { notifyCaptainOccurrenceAbsence } = require('./whatsappAbsence');
@@ -15,6 +13,17 @@ const {
     truncateBotText,
     tonePrefix,
 } = require('./whatsappBotConfig');
+const { isDeepSeekConfigured } = require('./ai/deepseekClient');
+const {
+    DAY_LABELS,
+    buildWeekdayPrompt,
+    buildTimePrompt,
+    buildFrequencyPrompt,
+    buildBiweeklyPrompt,
+    buildDurationPrompt,
+    createReservationFromWhatsApp,
+} = require('./whatsappBookingFlow');
+const { COMMITMENT_FREQUENCY, FREQUENCY_LABELS } = require('../constants/commitment');
 
 const TEMPLATE_CONFIRM_TEXTS = ['sí, asistiré', 'si, asistire', 'si asistire', 'sí asistiré'];
 const TEMPLATE_ABSENCE_TEXTS = ['no podré asistir', 'no podre asistir', 'no podré', 'no podre'];
@@ -42,6 +51,21 @@ const FAQ = [
     {
         keys: ['capilla', 'donde', 'dónde', 'ubicacion', 'ubicación'],
         answer: `📍 *${config.whatsapp.chapelName}*\n\nPuedes reservar tu turno escribiendo *reservar*.`,
+    },
+    {
+        keys: ['misa', 'misas', 'eucaristia', 'eucaristía'],
+        answer:
+            `*Horarios de misa y adoración*\n\n` +
+            `La adoración al Santísimo es de *7:00 AM a 8:00 PM*.\n` +
+            `Algunas horas se suspenden por celebración eucarística (misas).\n\n` +
+            `Para horarios exactos de misa parroquial, consulta en la parroquia o escribe *operador* para hablar con coordinación.\n\n` +
+            `Escribe *reservar* para agendar tu guardia de adoración.`,
+    },
+    {
+        keys: ['confesion', 'confesión', 'confesiones', 'penitencia'],
+        answer:
+            `Para información sobre *confesiones* y sacramentos, te recomendamos contactar directamente la parroquia.\n\n` +
+            `Escribe *operador* si deseas que la coordinación te oriente.`,
     },
     {
         keys: ['cancelar', 'cancelación'],
@@ -269,54 +293,15 @@ async function reportNextAbsence(phone) {
     await handleAbsenceButton(phone, nearest.reservation.id, nearest.dateStr);
 }
 
-async function createReservationFromWhatsApp(phone, data) {
-    const { slotId, dateStr, firstName, lastName } = data;
-    const commitmentMonths = 3;
-    const commitmentEndDate = commitmentEndDateFromMonths(dateStr, commitmentMonths);
-
-    const slot = await prisma.slot.findFirst({ where: { id: Number(slotId), isActive: true } });
-    if (!slot) throw new Error('Turno no disponible.');
-
-    const dup = await prisma.reservation.findFirst({
-        where: { slotId: slot.id, userPhone: phone, date: dateStr, status: { in: ['confirmed', 'completed'] } },
-    });
-    if (dup) throw new Error('Ya tienes una reserva para este turno.');
-
-    const taken = await prisma.reservation.count({
-        where: { slotId: slot.id, date: dateStr, status: { in: ['confirmed', 'completed'] } },
-    });
-    if (taken >= slot.capacity) throw new Error('Este turno ya está completo.');
-
-    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-
-    const reservation = await prisma.reservation.create({
-        data: {
-            slotId: slot.id,
-            userPhone: phone,
-            userFirstName: firstName,
-            userLastName: lastName || '',
-            userName: fullName,
-            date: dateStr,
-            frequency: COMMITMENT_FREQUENCY.WEEKLY,
-            durationMinutes: 60,
-            startTimeOffset: 0,
-            commitmentEndDate,
-            status: 'confirmed',
-        },
-        include: { slot: true },
-    });
-
-    await prisma.auditLog.create({
-        data: {
-            action: 'reservation.create',
-            entity: 'reservation',
-            entityId: reservation.id,
-            reservationId: reservation.id,
-            meta: JSON.stringify({ via: 'whatsapp', date: dateStr, frequency: 'WEEKLY' }),
-        },
-    });
-
-    return reservation;
+async function startBookFlow(phone) {
+    const prompt = await buildWeekdayPrompt();
+    if (!prompt) {
+        await sendText(phone, 'No hay cupos disponibles en este momento. Intenta más tarde.');
+        await updateSession(phone, 'menu', {});
+        return;
+    }
+    await sendText(phone, prompt.text);
+    await updateSession(phone, 'book_weekday', { weekdayOptions: prompt.days });
 }
 
 function isBookingEscapeMessage(text) {
@@ -346,46 +331,133 @@ async function handleBookFlow(phone, session, text) {
         return;
     }
 
+    if (session.step === 'book_weekday') {
+        const choice = Number(msg);
+        const weekday = data.weekdayOptions?.[choice - 1];
+        if (!weekday) {
+            await sendText(phone, 'Número inválido. Elige el día de la lista.');
+            return;
+        }
+        data.weekday = weekday;
+        const prompt = await buildTimePrompt(weekday);
+        if (!prompt) {
+            await sendText(phone, 'No hay horarios disponibles para ese día. Elige otro.');
+            await startBookFlow(phone);
+            return;
+        }
+        data.dateStr = prompt.dateStr;
+        data.timeOptions = prompt.options.map((o, i) => ({ index: i + 1, ...o }));
+        await sendText(phone, prompt.text);
+        await updateSession(phone, 'book_time', data);
+        return;
+    }
+
+    if (session.step === 'book_time') {
+        const choice = Number(msg);
+        const picked = data.timeOptions?.find((o) => o.index === choice);
+        if (!picked) {
+            await sendText(phone, 'Número inválido. Elige el horario de la lista.');
+            return;
+        }
+        data.slotId = picked.slotId;
+        const freq = await buildFrequencyPrompt();
+        data.frequencyOptions = freq.choices;
+        await sendText(phone, freq.text);
+        await updateSession(phone, 'book_frequency', data);
+        return;
+    }
+
+    if (session.step === 'book_frequency') {
+        const choice = Number(msg);
+        const picked = data.frequencyOptions?.find((o) => o.index === choice);
+        if (!picked) {
+            await sendText(phone, 'Número inválido. Elige la frecuencia de la lista.');
+            return;
+        }
+        data.frequency = picked.value;
+        if (picked.value === COMMITMENT_FREQUENCY.BIWEEKLY) {
+            const bi = buildBiweeklyPrompt();
+            data.biweeklyOptions = bi.choices;
+            await sendText(phone, bi.text);
+            await updateSession(phone, 'book_biweekly', data);
+            return;
+        }
+        const dur = await buildDurationPrompt();
+        if (dur.auto) {
+            data.durationMinutes = dur.auto.durationMinutes;
+            data.startTimeOffset = dur.auto.startTimeOffset;
+            await sendText(phone, '*Paso 5 — Tu nombre*\n\nEscribe tu *nombre completo* (ej: Juan Pérez).');
+            await updateSession(phone, 'book_name', data);
+            return;
+        }
+        data.durationOptions = dur.choices;
+        await sendText(phone, dur.text);
+        await updateSession(phone, 'book_duration', data);
+        return;
+    }
+
+    if (session.step === 'book_biweekly') {
+        const choice = Number(msg);
+        const picked = data.biweeklyOptions?.find((o) => o.index === choice);
+        if (!picked) {
+            await sendText(phone, 'Número inválido. Elige 1 o 2.');
+            return;
+        }
+        data.biweeklyWeeks = picked.value;
+        const dur = await buildDurationPrompt();
+        if (dur.auto) {
+            data.durationMinutes = dur.auto.durationMinutes;
+            data.startTimeOffset = dur.auto.startTimeOffset;
+            await sendText(phone, '*Paso 5 — Tu nombre*\n\nEscribe tu *nombre completo* (ej: Juan Pérez).');
+            await updateSession(phone, 'book_name', data);
+            return;
+        }
+        data.durationOptions = dur.choices;
+        await sendText(phone, dur.text);
+        await updateSession(phone, 'book_duration', data);
+        return;
+    }
+
+    if (session.step === 'book_duration') {
+        const choice = Number(msg);
+        const picked = data.durationOptions?.find((o) => o.index === choice);
+        if (!picked) {
+            await sendText(phone, 'Número inválido. Elige la duración de la lista.');
+            return;
+        }
+        data.durationMinutes = picked.durationMinutes;
+        data.startTimeOffset = picked.startTimeOffset;
+        await sendText(phone, '*Paso 5 — Tu nombre*\n\nEscribe tu *nombre completo* (ej: Juan Pérez).');
+        await updateSession(phone, 'book_name', data);
+        return;
+    }
+
     if (session.step === 'book_name') {
-        const parts = msg.split(/\s+/);
-        if (parts.length < 1 || parts[0].length < 2) {
-            await sendText(phone, 'Por favor escribe tu *nombre* (ej: María González).');
+        const parts = msg.split(/\s+/).filter(Boolean);
+        if (!parts.length || parts[0].length < 2) {
+            await sendText(phone, 'Por favor escribe tu *nombre completo* (ej: María González).');
             return;
         }
         data.firstName = parts[0];
         data.lastName = parts.slice(1).join(' ');
-        const options = await getAvailableSlotOptions(4);
-        if (!options.length) {
-            await sendText(phone, 'No hay cupos disponibles en los próximos días. Intenta más tarde.');
-            await updateSession(phone, 'menu', {});
-            return;
-        }
-        data.slotOptions = options.slice(0, 10).map((o, i) => ({
-            index: i + 1,
-            slotId: o.slot.id,
-            dateStr: o.dateStr,
-            label: o.label,
-        }));
-        const list = data.slotOptions.map((o) => `${o.index}. ${o.label}`).join('\n');
-        await sendText(phone, `Elige tu turno respondiendo con el *número*:\n\n${list}`);
-        await updateSession(phone, 'book_slot', data);
-        return;
-    }
-
-    if (session.step === 'book_slot') {
-        const choice = Number(msg);
-        const picked = data.slotOptions?.find((o) => o.index === choice);
-        if (!picked) {
-            await sendText(phone, 'Número inválido. Responde con el número del turno que deseas.');
-            return;
-        }
-        data.slotId = picked.slotId;
-        data.dateStr = picked.dateStr;
-        const slot = await prisma.slot.findUnique({ where: { id: picked.slotId } });
+        const slot = await prisma.slot.findUnique({ where: { id: Number(data.slotId) } });
         const slotLabel = formatTimeRange12(slot.startTime, slot.endTime);
+        const freqLabel = FREQUENCY_LABELS[data.frequency] || data.frequency;
+        const dayLabel = DAY_LABELS[data.weekday] || '';
+        const durLabel =
+            data.durationMinutes === 30
+                ? `30 min${data.startTimeOffset === 30 ? ' (:30)' : ''}`
+                : '1 hora';
         await sendButtons(
             phone,
-            `Confirmas tu guardia *semanal*?\n\n📅 ${picked.dateStr}\n⏰ ${slotLabel}\n👤 ${data.firstName} ${data.lastName || ''}\n📆 Compromiso: 3 meses\n\n¿Confirmar reserva?`,
+            `*Confirmar guardia*\n\n` +
+                `📅 ${dayLabel}\n` +
+                `⏰ ${slotLabel}\n` +
+                `🔁 ${freqLabel}\n` +
+                `⏱ ${durLabel}\n` +
+                `👤 ${data.firstName} ${data.lastName || ''}\n` +
+                `📆 Compromiso: 3 meses\n\n` +
+                `¿Confirmar reserva?`,
             [
                 { id: 'book_confirm_yes', title: 'Sí, confirmar' },
                 { id: 'book_confirm_no', title: 'Cancelar' },
@@ -399,8 +471,7 @@ async function handleBookFlow(phone, session, text) {
 async function handleButtonReply(phone, buttonId) {
     if (buttonId === 'menu_reservar' || buttonId === 'book_confirm_yes') {
         if (buttonId === 'menu_reservar') {
-            await sendText(phone, 'Para reservar, escribe tu *nombre completo* (ej: Juan Pérez).');
-            await updateSession(phone, 'book_name', {});
+            await startBookFlow(phone);
             return;
         }
         const session = await getSession(phone);
@@ -498,8 +569,7 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
     }
 
     if (['reservar', 'turno', 'agendar'].includes(lower)) {
-        await sendText(phone, 'Para reservar, escribe tu *nombre completo* (ej: Juan Pérez).');
-        await updateSession(phone, 'book_name', {});
+        await startBookFlow(phone);
         return;
     }
 
@@ -524,8 +594,28 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
         return;
     }
 
-    if (session.step === 'book_name' || session.step === 'book_slot') {
+    const bookSteps = [
+        'book_weekday',
+        'book_time',
+        'book_frequency',
+        'book_biweekly',
+        'book_duration',
+        'book_name',
+    ];
+    if (bookSteps.includes(session.step)) {
         await handleBookFlow(phone, session, msg);
+        return;
+    }
+
+    if (botCfg.aiEnabled && !isDeepSeekConfigured(botCfg)) {
+        await sendText(
+            phone,
+            truncateBotText(
+                'El asistente inteligente (DeepSeek) aún no está conectado: falta una API key válida (sk-…) en el admin.\n\n' +
+                    'Mientras tanto puedes escribir *menu*, *reservar*, *ayuda* o *operador* para hablar con coordinación.',
+                botCfg.responseMaxChars
+            )
+        );
         return;
     }
 
