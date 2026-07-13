@@ -67,6 +67,8 @@ function parseCustomFaq(raw) {
     }
 }
 
+const { validateDeepSeekApiKey } = require('./ai/deepseekClient');
+
 function maskApiKey(key) {
     if (!key) return null;
     const str = String(key);
@@ -109,6 +111,7 @@ function serializeBotConfig(row, { includeSecrets = false } = {}) {
         inviteToWebUrl: row.inviteToWebUrl || null,
         deepseekApiKeySet: Boolean(row.deepseekApiKey),
         deepseekApiKeyMasked: maskApiKey(row.deepseekApiKey),
+        aiConnected: Boolean(row.aiEnabled && row.deepseekApiKey && validateDeepSeekApiKey(row.deepseekApiKey).ok),
         updatedAt: row.updatedAt,
     };
     if (includeSecrets) {

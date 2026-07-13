@@ -289,6 +289,16 @@ router.put('/bot-config', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, r
             data.customFaqJson = customFaqJson;
         }
 
+        if (req.user?.isSuperAdmin && data.aiEnabled === true) {
+            const current = await prisma.whatsAppBotConfig.findUnique({ where: { id: 1 } });
+            const effectiveKey = data.deepseekApiKey ?? current?.deepseekApiKey;
+            if (!validateDeepSeekApiKey(effectiveKey).ok) {
+                return res.status(400).json({
+                    error: 'Para activar la IA guarda primero una API key válida (sk-…) con el botón «Guardar API key e IA».',
+                });
+            }
+        }
+
         const row = await prisma.whatsAppBotConfig.upsert({
             where: { id: 1 },
             create: { id: 1, ...DEFAULT_WHATSAPP_BOT_CONFIG, ...data },

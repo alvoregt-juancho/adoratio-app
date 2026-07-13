@@ -3553,9 +3553,19 @@
                 document.getElementById("waInviteWebUrl").value = c.inviteToWebUrl || "";
                 const keyStatus = document.getElementById("waAiKeyStatus");
                 if (keyStatus) {
-                    keyStatus.textContent = c.deepseekApiKeySet
-                        ? "API key guardada en servidor (" + (c.deepseekApiKeyMasked || "••••") + "). WhatsApp " + (c.aiEnabled ? "usará IA." : "tiene IA desactivada.")
-                        : "Sin API key en servidor. Pega sk-…, guarda con el botón verde, luego prueba.";
+                    if (c.aiConnected) {
+                        keyStatus.textContent = "✓ DeepSeek conectado en WhatsApp (" + (c.deepseekApiKeyMasked || "sk-…") + ").";
+                        keyStatus.style.color = "#6dd58c";
+                    } else if (c.aiEnabled && !c.deepseekApiKeySet) {
+                        keyStatus.textContent = "⚠ IA marcada activa pero SIN API key en servidor. Pega sk-… y pulsa «Guardar API key e IA».";
+                        keyStatus.style.color = "#f0b429";
+                    } else if (c.deepseekApiKeySet) {
+                        keyStatus.textContent = "API key guardada (" + (c.deepseekApiKeyMasked || "••••") + "). Activa «IA activa» y guarda.";
+                        keyStatus.style.color = "";
+                    } else {
+                        keyStatus.textContent = "Sin API key. Pega sk-… de platform.deepseek.com y pulsa «Guardar API key e IA».";
+                        keyStatus.style.color = "";
+                    }
                 }
                 document.getElementById("waDeepseekKey").value = "";
             }
@@ -3603,8 +3613,7 @@
                 payload.aiMaxIterations = Number(document.getElementById("waAiMaxIter").value);
                 payload.aiHistoryLimit = Number(document.getElementById("waAiHistory").value);
                 payload.inviteToWebUrl = document.getElementById("waInviteWebUrl").value.trim();
-                const keyVal = document.getElementById("waDeepseekKey").value.trim();
-                if (keyVal) payload.deepseekApiKey = keyVal;
+                // API key solo vía «Guardar API key e IA» para evitar guardar IA activa sin key
             }
             const res = await api("/api/admin/whatsapp/bot-config", {
                 method: "PUT",
