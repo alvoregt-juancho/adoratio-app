@@ -3554,8 +3554,8 @@
                 const keyStatus = document.getElementById("waAiKeyStatus");
                 if (keyStatus) {
                     keyStatus.textContent = c.deepseekApiKeySet
-                        ? "API key guardada (" + (c.deepseekApiKeyMasked || "••••") + "). Deja el campo vacío al guardar para mantenerla."
-                        : "Pega tu API key, marca «IA activa», guarda y usa «Probar conexión».";
+                        ? "API key guardada en servidor (" + (c.deepseekApiKeyMasked || "••••") + "). WhatsApp " + (c.aiEnabled ? "usará IA." : "tiene IA desactivada.")
+                        : "Sin API key en servidor. Pega sk-…, guarda con el botón verde, luego prueba.";
                 }
                 document.getElementById("waDeepseekKey").value = "";
             }
@@ -3749,6 +3749,42 @@
         }
     }
 
+    function buildWhatsAppAiPayload() {
+        const payload = {
+            aiEnabled: document.getElementById("waAiEnabled").checked,
+            aiProvider: document.getElementById("waAiProvider").value.trim(),
+            aiModel: document.getElementById("waAiModel").value.trim(),
+            aiBaseUrl: document.getElementById("waAiBaseUrl").value.trim(),
+            aiMaxIterations: Number(document.getElementById("waAiMaxIter").value),
+            aiHistoryLimit: Number(document.getElementById("waAiHistory").value),
+            inviteToWebUrl: document.getElementById("waInviteWebUrl").value.trim(),
+        };
+        const keyVal = document.getElementById("waDeepseekKey").value.trim();
+        if (keyVal) payload.deepseekApiKey = keyVal;
+        return payload;
+    }
+
+    async function saveWhatsAppAiConfig() {
+        if (!session.user?.isSuperAdmin) return toast("Solo super administrador.", "error");
+        const btn = document.getElementById("waAiSaveBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/whatsapp/ai-config", {
+                method: "PUT",
+                body: JSON.stringify(buildWhatsAppAiPayload()),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+            toast(data.message || "IA guardada.", "success");
+            document.getElementById("waDeepseekKey").value = "";
+            loadWhatsAppBotConfig();
+        } catch (e) {
+            toast(e.message || "Error al guardar IA.", "error");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     async function testWhatsAppDeepSeek() {
         if (!session.user?.isSuperAdmin) return toast("Solo super administrador.", "error");
         const btn = document.getElementById("waAiTestBtn");
@@ -3768,8 +3804,13 @@
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Falló la prueba.");
-            if (resultEl) resultEl.textContent = "✓ " + (data.reply || "OK");
-            toast(data.message || "DeepSeek conectado.", "success");
+            if (resultEl) {
+                resultEl.textContent = "✓ " + (data.reply || "OK");
+                if (data.keySource === "request" && !data.savedInDb) {
+                    resultEl.textContent += " — falta guardar";
+                }
+            }
+            toast(data.message || "DeepSeek conectado.", data.savedInDb ? "success" : "info");
         } catch (e) {
             if (resultEl) resultEl.textContent = "✗ " + (e.message || "Error");
             toast(e.message || "Error al probar DeepSeek.", "error");
@@ -4116,6 +4157,8 @@
     });
     document.getElementById("whatsappRefresh").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
     document.getElementById("waBotSaveBtn").addEventListener("click", saveWhatsAppBotConfig);
+    const waAiSaveBtn = document.getElementById("waAiSaveBtn");
+    if (waAiSaveBtn) waAiSaveBtn.addEventListener("click", saveWhatsAppAiConfig);
     const waAiTestBtn = document.getElementById("waAiTestBtn");
     if (waAiTestBtn) waAiTestBtn.addEventListener("click", testWhatsAppDeepSeek);
     if (waHandoffRefresh) waHandoffRefresh.addEventListener("click", loadWhatsAppHandoff);

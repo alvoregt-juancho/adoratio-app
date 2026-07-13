@@ -318,18 +318,90 @@ router.post('/ai-test', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, res
     }
     try {
         const botCfg = await getWhatsAppBotConfig({ fresh: true });
-        const apiKey = String(req.body?.deepseekApiKey || '').trim() || botCfg.deepseekApiKey;
+        const fromField = String(req.body?.deepseekApiKey || '').trim();
+        const apiKey = fromField || botCfg.deepseekApiKey;
         const baseUrl = String(req.body?.aiBaseUrl || botCfg.aiBaseUrl || 'https://api.deepseek.com').trim();
         const model = String(req.body?.aiModel || botCfg.aiModel || 'deepseek-chat').trim();
         const result = await testDeepSeekConnection({ apiKey, baseUrl, model });
+        const savedInDb = Boolean(botCfg.deepseekApiKey && validateDeepSeekApiKey(botCfg.deepseekApiKey).ok);
         res.json({
-            message: 'Conexión con DeepSeek exitosa.',
+            message: fromField && !savedInDb
+                ? 'Conexión OK con la key del campo. Guarda la API key para activarla en WhatsApp.'
+                : 'Conexión con DeepSeek exitosa.',
             ...result,
-            keySource: req.body?.deepseekApiKey ? 'request' : 'saved',
+            keySource: fromField ? 'request' : 'saved',
+            savedInDb,
+            whatsappWillUseAi: savedInDb && botCfg.aiEnabled,
         });
     } catch (e) {
         console.error('[WhatsApp ai-test]', e.message);
         res.status(400).json({ error: e.message || 'No se pudo conectar con DeepSeek.' });
+    }
+});
+
+router.put('/ai-config', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, res) => {
+    if (!req.user?.isSuperAdmin) {
+        return res.status(403).json({ error: 'Solo el super administrador puede configurar DeepSeek.' });
+    }
+    try {
+        const body = req.body || {};
+        const data = {
+            aiEnabled: body.aiEnabled === true,
+            aiProvider: String(body.aiProvider || 'deepseek').trim().slice(0, 40),
+            aiModel: String(body.aiModel || 'deepseek-chat').trim().slice(0, 80),
+            aiBaseUrl: String(body.aiBaseUrl || 'https://api.deepseek.com').trim().slice(0, 200),
+            aiMaxIterations: Math.min(12, Math.max(1, Number(body.aiMaxIterations) || 6)),
+            aiHistoryLimit: Math.min(60, Math.max(5, Number(body.aiHistoryLimit) || 30)),
+            inviteToWebUrl: body.inviteToWebUrl ? String(body.inviteToWebUrl).trim().slice(0, 300) : null,
+            updatedById: req.user?.id ?? null,
+        };
+
+        const key = body.deepseekApiKey;
+        if (key === '') {
+            data.deepseekApiKey = null;
+        } else if (key && String(key).trim()) {
+            const validated = validateDeepSeekApiKey(key);
+            if (!validated.ok) {
+                return res.status(400).json({ error: validated.error });
+            }
+            data.deepseekApiKey = validated.key;
+        }
+
+        if (data.aiEnabled) {
+            const current = await prisma.whatsAppBotConfig.findUnique({ where: { id: 1 } });
+            const effectiveKey = data.deepseekApiKey ?? current?.deepseekApiKey;
+            if (!validateDeepSeekApiKey(effectiveKey).ok) {
+                return res.status(400).json({
+                    error: 'Para activar la IA debes guardar una API key válida (sk-…) de platform.deepseek.com.',
+                });
+            }
+        }
+
+        const row = await prisma.whatsAppBotConfig.upsert({
+            where: { id: 1 },
+            create: { id: 1, ...DEFAULT_WHATSAPP_BOT_CONFIG, ...data },
+            update: data,
+        });
+
+        invalidateWhatsAppBotConfigCache();
+        await writeAudit({
+            action: 'whatsapp.ai_config.update',
+            entity: 'whatsapp_bot_config',
+            entityId: 1,
+            userId: req.user?.id ?? null,
+            meta: { aiEnabled: data.aiEnabled, keyUpdated: Boolean(data.deepseekApiKey) },
+            req,
+        });
+
+        const pub = serializeBotConfig(row);
+        res.json({
+            message: 'API key e IA guardadas. WhatsApp ya puede usar DeepSeek.',
+            botConfig: pub,
+            aiConnected: Boolean(row.aiEnabled && row.deepseekApiKey),
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al guardar configuración de IA.' });
     }
 });
 
