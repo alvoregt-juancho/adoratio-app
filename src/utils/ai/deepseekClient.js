@@ -64,7 +64,8 @@ async function chatCompletion(opts) {
 }
 
 function isDeepSeekConfigured(botCfg) {
-    return Boolean(botCfg?.aiEnabled && botCfg?.deepseekApiKey);
+    if (!botCfg?.aiEnabled || !botCfg?.deepseekApiKey) return false;
+    return validateDeepSeekApiKey(botCfg.deepseekApiKey).ok;
 }
 
 async function testDeepSeekConnection({ apiKey, baseUrl, model } = {}) {

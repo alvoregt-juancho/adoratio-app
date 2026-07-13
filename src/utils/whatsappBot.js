@@ -319,9 +319,32 @@ async function createReservationFromWhatsApp(phone, data) {
     return reservation;
 }
 
+function isBookingEscapeMessage(text) {
+    const lower = String(text || '').toLowerCase().trim();
+    if (!lower) return true;
+    if (['menu', 'menú', 'inicio', 'hola', 'hi', 'hello', 'cancelar', 'salir', 'ayuda', 'help'].includes(lower)) {
+        return true;
+    }
+    if (/^(no|stop|atrás|atras|volver)$/.test(lower)) return true;
+    return false;
+}
+
 async function handleBookFlow(phone, session, text) {
     const data = parseSessionData(session.data);
     const msg = text.trim();
+
+    if (isBookingEscapeMessage(msg)) {
+        if (['menu', 'menú', 'inicio', 'hola', 'hi', 'hello'].includes(msg.toLowerCase())) {
+            await sendMainMenu(phone);
+        } else if (msg.toLowerCase() === 'ayuda' || msg.toLowerCase() === 'help') {
+            await sendText(phone, FAQ[0].answer);
+            await updateSession(phone, 'menu', {});
+        } else {
+            await sendText(phone, 'Reserva cancelada. Escribe *menu* para volver al inicio.');
+            await updateSession(phone, 'menu', {});
+        }
+        return;
+    }
 
     if (session.step === 'book_name') {
         const parts = msg.split(/\s+/);
