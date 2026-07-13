@@ -603,7 +603,8 @@
                         <label class="micro-label" for="waAiBaseUrl">API base URL</label>
                         <input type="text" id="waAiBaseUrl" class="touch-input-field dark-input" placeholder="https://api.deepseek.com">
                         <label class="micro-label" for="waDeepseekKey">API Key (secreto)</label>
-                        <input type="password" id="waDeepseekKey" class="touch-input-field dark-input" placeholder="sk-…" autocomplete="new-password">
+                        <input type="password" id="waDeepseekKey" class="touch-input-field dark-input" placeholder="sk-xxxxxxxxxxxxxxxx" autocomplete="new-password">
+                        <p class="muted wa-span-2" style="grid-column:span 2;margin:0;">Copia el token desde <strong>platform.deepseek.com → API Keys</strong>. Debe empezar con <code>sk-</code> — no pegues un archivo .zip ni su nombre.</p>
                         <label class="micro-label" for="waAiMaxIter">Máx. iteraciones tools</label>
                         <input type="number" id="waAiMaxIter" class="touch-input-field dark-input" min="1" max="12" value="6">
                         <label class="micro-label" for="waAiHistory">Historial (mensajes)</label>

@@ -14,7 +14,7 @@ const {
     serializeBotConfig,
     DEFAULT_WHATSAPP_BOT_CONFIG,
 } = require('../utils/whatsappBotConfig');
-const { testDeepSeekConnection } = require('../utils/ai/deepseekClient');
+const { testDeepSeekConnection, validateDeepSeekApiKey } = require('../utils/ai/deepseekClient');
 
 const router = express.Router();
 
@@ -277,7 +277,11 @@ router.put('/bot-config', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, r
             if (key === '') {
                 data.deepseekApiKey = null;
             } else if (key && String(key).trim()) {
-                data.deepseekApiKey = String(key).trim();
+                const validated = validateDeepSeekApiKey(key);
+                if (!validated.ok) {
+                    return res.status(400).json({ error: validated.error });
+                }
+                data.deepseekApiKey = validated.key;
             }
         }
 
