@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo | Adoratio</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="admin.css?v=2025071201">
+    <link rel="stylesheet" href="admin.css?v=2026072001">
 </head>
 <body class="admin">
     <!-- Login -->
@@ -27,16 +27,21 @@
     <!-- Dashboard -->
     <div id="dashboard" class="dashboard hidden">
         <header class="admin-topbar">
+            <button type="button" class="admin-menu-btn" id="adminMenuBtn" aria-label="Abrir menú" aria-expanded="false" aria-controls="adminNavDrawer">
+                <span class="admin-menu-icon" aria-hidden="true"></span>
+            </button>
             <div class="admin-topbar-brand">
                 <a href="index.html" class="brand-logo-link" aria-label="adorahora.com — inicio">
                     <img src="logo-adorahora.png" alt="adorahora.com — Capilla de Adoración" class="brand-logo brand-logo--header" width="152" height="51">
                 </a>
-                <div>
+                <div class="admin-topbar-titles">
                     <span class="page-eyebrow">Back-Office</span>
-                    <span id="whoamiLabel" class="muted"></span>
+                    <span id="whoamiLabel" class="muted admin-whoami-desktop"></span>
+                    <span id="mobileSectionTitle" class="admin-section-title">Centro de Mando</span>
                 </div>
             </div>
             <div class="admin-topbar-actions">
+                <button type="button" class="ghost-btn admin-help-btn" id="sectionHelpBtn" title="Ayuda de esta sección" aria-label="Ayuda de esta sección">?</button>
                 <button type="button" class="ghost-btn whoami-btn" id="openAccountBtn" title="Mi cuenta y guía">
                     <span id="whoamiBtnLabel" class="muted"></span>
                 </button>
@@ -44,7 +49,25 @@
             </div>
         </header>
 
-        <nav class="admin-tabs" id="adminTabs">
+        <div class="admin-nav-drawer" id="adminNavDrawer" hidden>
+            <div class="admin-nav-backdrop" id="adminNavBackdrop" tabindex="-1"></div>
+            <aside class="admin-nav-panel" role="dialog" aria-modal="true" aria-label="Menú de navegación">
+                <div class="admin-nav-panel-header">
+                    <div>
+                        <p class="page-eyebrow" style="margin:0;">Menú</p>
+                        <p class="muted" id="adminNavUserLabel" style="margin:4px 0 0;font-size:0.85rem;"></p>
+                    </div>
+                    <button type="button" class="ghost-btn" id="adminNavClose" aria-label="Cerrar menú">×</button>
+                </div>
+                <nav class="admin-nav-list" id="adminNavList" aria-label="Secciones"></nav>
+                <div class="admin-nav-footer">
+                    <button type="button" class="ghost-btn" id="adminNavHelpBtn">Cómo usar el panel</button>
+                    <button type="button" class="ghost-btn" id="adminNavLogoutBtn">Salir</button>
+                </div>
+            </aside>
+        </div>
+
+        <nav class="admin-tabs admin-tabs--desktop" id="adminTabs" aria-label="Secciones del panel">
             <button class="tab" data-tab="capitan" data-perm="CAPTAIN_VIEW" data-hint-key="tab-capitan">Mi bloque</button>
             <button class="tab active" data-tab="resumen" data-perm="DASHBOARD_VIEW" data-hint-key="tab-resumen">Centro de Mando</button>
             <button class="tab" data-tab="reservas" data-perm="RESERVATIONS_VIEW" data-hint-key="tab-reservas">Reservas</button>
@@ -58,6 +81,20 @@
             <button class="tab" data-tab="whatsapp" data-perm="WHATSAPP_VIEW" data-hint-key="tab-whatsapp">WhatsApp</button>
             <button class="tab tab--account" data-tab="cuenta" data-hint-key="tab-cuenta">Mi cuenta</button>
         </nav>
+
+        <!-- Ayuda contextual (móvil y escritorio) -->
+        <div class="premium-sheet-overlay" id="helpSheet" aria-hidden="true">
+            <div class="sheet-window help-sheet-window" role="dialog" aria-labelledby="helpSheetTitle">
+                <button type="button" class="sheet-close" data-close aria-label="Cerrar">×</button>
+                <h2 class="sheet-title" id="helpSheetTitle">Ayuda</h2>
+                <p class="muted" id="helpSheetIntro"></p>
+                <ul class="help-sheet-list" id="helpSheetList"></ul>
+                <div class="help-sheet-actions">
+                    <button type="button" class="sheet-primary-btn" id="helpSheetGotoGuide">Ver guía completa</button>
+                    <button type="button" class="ghost-btn" id="helpSheetToggleHints">Alternar guía rápida</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Centro de Mando -->
         <section class="tab-panel active" id="tab-resumen" data-perm="DASHBOARD_VIEW">
@@ -725,7 +762,7 @@
                     <div class="panel-card-header account-guide-header">
                         <div>
                             <h3>Tu guía del back-office</h3>
-                            <p class="muted">Solo se muestran las secciones y acciones incluidas en tu perfil.</p>
+                            <p class="muted">En móvil: menú ☰ para navegar, botón ? para ayuda de la sección actual. La guía de abajo lista solo lo que tu perfil puede hacer.</p>
                         </div>
                         <button type="button" class="ghost-btn hints-toggle-btn" id="hintsToggleBtn" aria-pressed="true">Ocultar guía rápida</button>
                     </div>
@@ -1004,6 +1041,6 @@
 
     <script src="timeFormat.js"></script>
     <script src="app.js"></script>
-    <script src="admin.js?v=2025071001"></script>
+    <script src="admin.js?v=2026072001"></script>
 </body>
 </html>

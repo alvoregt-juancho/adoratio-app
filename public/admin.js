@@ -114,8 +114,23 @@
         "new-admin": "Da de alta un usuario con acceso al back-office y asígnale un perfil RBAC.",
         "audit-demo": "Zona temporal: elige categorías a borrar y opcionalmente carga demo (solo Super Admin).",
         "audit-refresh": "Actualiza el listado de auditoría con el filtro de acción actual.",
-        "hints-toggle": "Activa u oculta los consejos al pasar el mouse. La preferencia se guarda en este navegador.",
+        "hints-toggle": "Activa u oculta la guía rápida. En móvil: toca el botón ? o un elemento con ayuda. La preferencia se guarda en este navegador.",
         "tab-cuenta": "Tu perfil, contraseña y guía personalizada según los permisos de tu rol.",
+    };
+
+    const TAB_TITLES = {
+        capitan: "Mi bloque",
+        resumen: "Centro de Mando",
+        reservas: "Reservas",
+        muro: "Muro",
+        turnos: "Turnos",
+        capitanes: "Capitanes",
+        qrs: "QR Capilla",
+        perfiles: "Perfiles",
+        admins: "Administradores",
+        auditoria: "Auditoría",
+        whatsapp: "WhatsApp",
+        cuenta: "Mi cuenta",
     };
 
     /** Secciones del instructivo — cada ítem requiere el permiso indicado. */
@@ -273,6 +288,10 @@
             btn.textContent = on ? "Ocultar guía rápida" : "Mostrar guía rápida";
             btn.setAttribute("aria-pressed", on ? "true" : "false");
         }
+        const helpToggle = document.getElementById("helpSheetToggleHints");
+        if (helpToggle) {
+            helpToggle.textContent = on ? "Ocultar guía rápida" : "Mostrar guía rápida";
+        }
         if (!on) hideOnboardHint(true);
     }
 
@@ -284,27 +303,45 @@
             hintTooltipEl.setAttribute("role", "tooltip");
             hintTooltipEl.innerHTML =
                 '<p class="onboard-hint-text"></p>' +
-                '<button type="button" class="onboard-hint-dismiss">Desactivar guía</button>';
+                '<button type="button" class="onboard-hint-dismiss">Entendido</button>' +
+                '<button type="button" class="onboard-hint-dismiss onboard-hint-disable">Desactivar guía</button>';
             hintTooltipEl.querySelector(".onboard-hint-dismiss").addEventListener("click", function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                setHintsEnabled(false);
                 hideOnboardHint(true);
-                toast("Guía desactivada en este navegador. Reactívala con «Mostrar guía».", "success");
             });
+            const disableBtn = hintTooltipEl.querySelector(".onboard-hint-disable");
+            if (disableBtn) {
+                disableBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setHintsEnabled(false);
+                    hideOnboardHint(true);
+                    toast("Guía desactivada. Reactívala en Mi cuenta o con el botón ?.", "success");
+                });
+            }
             hintTooltipEl.addEventListener("mouseenter", function () {
                 clearTimeout(hintHideTimer);
             });
             hintTooltipEl.addEventListener("mouseleave", function () {
-                hideOnboardHint();
+                if (!isTouchLike()) hideOnboardHint();
             });
             document.body.appendChild(hintTooltipEl);
         }
         return hintTooltipEl;
     }
 
+    function isTouchLike() {
+        return window.matchMedia("(hover: none), (max-width: 900px)").matches;
+    }
+
     function positionHintTooltip(el) {
         const tip = ensureHintTooltip();
+        if (isTouchLike()) {
+            tip.style.top = "";
+            tip.style.left = "";
+            return;
+        }
         const rect = el.getBoundingClientRect();
         const margin = 10;
         let top = rect.bottom + margin;
@@ -323,7 +360,11 @@
         const text = ONBOARDING_HINTS[key];
         if (!text) return;
         clearTimeout(hintHideTimer);
+        if (hintActiveEl && hintActiveEl !== el) {
+            hintActiveEl.classList.remove("hint-pulse");
+        }
         hintActiveEl = el;
+        el.classList.add("hint-pulse");
         const tip = ensureHintTooltip();
         const textEl = tip.querySelector(".onboard-hint-text");
         if (textEl) textEl.textContent = text;
@@ -335,6 +376,7 @@
         clearTimeout(hintHideTimer);
         const run = function () {
             if (hintTooltipEl) hintTooltipEl.classList.remove("visible");
+            if (hintActiveEl) hintActiveEl.classList.remove("hint-pulse");
             hintActiveEl = null;
         };
         if (immediate) run();
@@ -353,21 +395,24 @@
                 const next = !areHintsEnabled();
                 setHintsEnabled(next);
                 toast(
-                    next ? "Guía de onboarding activada." : "Guía oculta. Puedes reactivarla con «Mostrar guía».",
+                    next ? "Guía rápida activada. Toca ? o un elemento con ayuda." : "Guía oculta. Puedes reactivarla en Mi cuenta.",
                     "success"
                 );
             });
         }
 
+        // Desktop: hover
         dashboard.addEventListener("mouseover", function (e) {
-            if (!areHintsEnabled()) return;
+            if (isTouchLike() || !areHintsEnabled()) return;
             const el = e.target.closest("[data-hint-key]");
             if (!el || !dashboard.contains(el)) return;
             if (el === hintActiveEl) return;
+            if (el.closest("button.tab, .admin-nav-item, .admin-help-btn, .admin-menu-btn")) return;
             showOnboardHint(el);
         });
 
         dashboard.addEventListener("mouseout", function (e) {
+            if (isTouchLike()) return;
             const el = e.target.closest("[data-hint-key]");
             if (!el || el !== hintActiveEl) return;
             const rel = e.relatedTarget;
@@ -375,8 +420,25 @@
             hideOnboardHint();
         });
 
+        // Mobile: tap non-interactive hint regions (headers/labels) — not primary buttons
+        dashboard.addEventListener("click", function (e) {
+            if (!areHintsEnabled() || !isTouchLike()) return;
+            if (e.target.closest(".onboard-hint-tooltip")) return;
+            const el = e.target.closest("[data-hint-key]");
+            if (!el || !dashboard.contains(el)) {
+                hideOnboardHint(true);
+                return;
+            }
+            if (el.matches("button, a, input, select, textarea, label, .admin-nav-item")) return;
+            if (hintActiveEl === el && hintTooltipEl?.classList.contains("visible")) {
+                hideOnboardHint(true);
+                return;
+            }
+            showOnboardHint(el);
+        });
+
         window.addEventListener("scroll", function () {
-            if (hintActiveEl && hintTooltipEl?.classList.contains("visible")) {
+            if (hintActiveEl && hintTooltipEl?.classList.contains("visible") && !isTouchLike()) {
                 positionHintTooltip(hintActiveEl);
             }
         }, true);
@@ -544,8 +606,233 @@
     }
 
     function openAccountTab() {
-        const tab = document.querySelector('.tab[data-tab="cuenta"]');
-        if (tab) tab.click();
+        activateTab("cuenta");
+    }
+
+    function getActiveTabName() {
+        const active = document.querySelector("#adminTabs .tab.active");
+        return active ? active.getAttribute("data-tab") : "resumen";
+    }
+
+    function updateMobileSectionTitle(name) {
+        const el = document.getElementById("mobileSectionTitle");
+        if (el) el.textContent = TAB_TITLES[name] || name || "Panel";
+    }
+
+    function syncAdminNavActive(name) {
+        document.querySelectorAll(".admin-nav-item").forEach(function (btn) {
+            btn.classList.toggle("is-active", btn.getAttribute("data-tab") === name);
+        });
+    }
+
+    function closeAdminNav() {
+        const drawer = document.getElementById("adminNavDrawer");
+        const menuBtn = document.getElementById("adminMenuBtn");
+        if (!drawer) return;
+        drawer.classList.remove("is-open");
+        drawer.setAttribute("hidden", "");
+        document.body.classList.remove("nav-open");
+        if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+    }
+
+    function openAdminNav() {
+        const drawer = document.getElementById("adminNavDrawer");
+        const menuBtn = document.getElementById("adminMenuBtn");
+        const userLabel = document.getElementById("adminNavUserLabel");
+        if (!drawer) return;
+        rebuildAdminNavList();
+        if (userLabel && session.user) {
+            userLabel.textContent = (session.user.name || "") + (session.user.adminRoleName ? " · " + session.user.adminRoleName : "");
+        }
+        drawer.removeAttribute("hidden");
+        requestAnimationFrame(function () {
+            drawer.classList.add("is-open");
+        });
+        document.body.classList.add("nav-open");
+        if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
+        syncAdminNavActive(getActiveTabName());
+    }
+
+    function rebuildAdminNavList() {
+        const list = document.getElementById("adminNavList");
+        if (!list) return;
+        const tabs = document.querySelectorAll("#adminTabs .tab");
+        list.innerHTML = "";
+        tabs.forEach(function (tab) {
+            if (tab.classList.contains("perm-denied") || tab.hidden) return;
+            const name = tab.getAttribute("data-tab");
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "admin-nav-item" + (tab.classList.contains("active") ? " is-active" : "");
+            btn.setAttribute("data-tab", name);
+            btn.textContent = tab.textContent.trim();
+            btn.addEventListener("click", function () {
+                activateTab(name);
+                closeAdminNav();
+            });
+            list.appendChild(btn);
+        });
+    }
+
+    function openSectionHelp() {
+        const name = getActiveTabName();
+        const titleEl = document.getElementById("helpSheetTitle");
+        const introEl = document.getElementById("helpSheetIntro");
+        const listEl = document.getElementById("helpSheetList");
+        const overlay = document.getElementById("helpSheet");
+        if (!overlay) return;
+
+        const section = BACKOFFICE_GUIDE.find(function (s) { return s.tab === name; });
+        const title = TAB_TITLES[name] || "Ayuda";
+        if (titleEl) titleEl.textContent = "Ayuda · " + title;
+
+        let intro = ONBOARDING_HINTS["tab-" + name] || ONBOARDING_HINTS["section-" + name] || "";
+        if (section && ONBOARDING_HINTS[section.introKey]) intro = ONBOARDING_HINTS[section.introKey];
+        if (introEl) {
+            introEl.textContent = intro || "Consejos para esta sección del panel.";
+        }
+
+        if (listEl) {
+            const items = (section?.items || []).filter(function (item) {
+                return hasPerm(item.perm);
+            });
+            if (items.length) {
+                listEl.innerHTML = items.map(function (item) {
+                    const hint = item.hintKey && ONBOARDING_HINTS[item.hintKey]
+                        ? " — " + escapeHtml(ONBOARDING_HINTS[item.hintKey])
+                        : "";
+                    return "<li><strong>" + escapeHtml(item.label) + "</strong>" + hint + "</li>";
+                }).join("");
+            } else if (name === "cuenta") {
+                listEl.innerHTML = "<li>Actualiza tu nombre, correo o contraseña.</li>" +
+                    "<li>Revisa la guía completa según tu perfil.</li>" +
+                    "<li>Activa o desactiva la guía rápida del panel.</li>";
+            } else {
+                listEl.innerHTML = "<li>Usa el menú ☰ para cambiar de sección.</li>" +
+                    "<li>En Mi cuenta encontrarás la guía completa de tu rol.</li>";
+            }
+        }
+
+        syncHintsUi();
+        overlay.classList.add("active");
+        overlay.setAttribute("aria-hidden", "false");
+        document.body.classList.add("sheet-open");
+    }
+
+    function closeHelpSheet() {
+        const overlay = document.getElementById("helpSheet");
+        if (!overlay) return;
+        overlay.classList.remove("active");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("sheet-open");
+    }
+
+    function activateTab(name) {
+        const tab = document.querySelector('#adminTabs .tab[data-tab="' + name + '"]');
+        if (!tab || tab.classList.contains("perm-denied")) return;
+        document.querySelectorAll("#adminTabs .tab").forEach(function (t) { t.classList.remove("active"); });
+        document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+        tab.classList.add("active");
+        const panel = document.getElementById("tab-" + name);
+        if (panel) panel.classList.add("active");
+        updateMobileSectionTitle(name);
+        syncAdminNavActive(name);
+        hideOnboardHint(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        const loaders = {
+            resumen: function () { loadMetrics(); loadActivity(); },
+            reservas: loadReservations,
+            muro: loadIntentions,
+            turnos: function () {
+                const activeSub = document.querySelector("#turnosSubtabs .subtab.active");
+                const view = activeSub ? activeSub.getAttribute("data-turnos-view") : "calendario";
+                if (view === "lista") loadRoster();
+                else if (view === "directorio") loadAdoradores();
+                else if (view === "config") { loadSettingsForm(); loadSlots(); }
+                else loadCalendar();
+            },
+            capitan: loadCaptainDashboard,
+            capitanes: function () { loadCaptainAssignableUsers().then(loadCaptainRanges); },
+            qrs: loadQrs,
+            perfiles: loadRoles,
+            admins: function () { loadRoles().then(loadAdmins); },
+            auditoria: loadAudit,
+            whatsapp: loadWhatsApp,
+            cuenta: loadAccountProfile,
+        };
+        if (loaders[name]) loaders[name]();
+    }
+
+    function setupMobileNav() {
+        const menuBtn = document.getElementById("adminMenuBtn");
+        const closeBtn = document.getElementById("adminNavClose");
+        const backdrop = document.getElementById("adminNavBackdrop");
+        const helpBtn = document.getElementById("sectionHelpBtn");
+        const navHelp = document.getElementById("adminNavHelpBtn");
+        const navLogout = document.getElementById("adminNavLogoutBtn");
+
+        if (menuBtn) {
+            menuBtn.addEventListener("click", function () {
+                const drawer = document.getElementById("adminNavDrawer");
+                if (drawer && !drawer.hasAttribute("hidden") && drawer.classList.contains("is-open")) {
+                    closeAdminNav();
+                } else {
+                    openAdminNav();
+                }
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener("click", closeAdminNav);
+        if (backdrop) backdrop.addEventListener("click", closeAdminNav);
+        if (helpBtn) helpBtn.addEventListener("click", openSectionHelp);
+        if (navHelp) {
+            navHelp.addEventListener("click", function () {
+                closeAdminNav();
+                activateTab("cuenta");
+                setTimeout(function () {
+                    document.getElementById("accountGuideContent")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 200);
+            });
+        }
+        if (navLogout) {
+            navLogout.addEventListener("click", function () {
+                closeAdminNav();
+                logout();
+            });
+        }
+
+        const helpGoto = document.getElementById("helpSheetGotoGuide");
+        if (helpGoto) {
+            helpGoto.addEventListener("click", function () {
+                closeHelpSheet();
+                activateTab("cuenta");
+            });
+        }
+        const helpToggle = document.getElementById("helpSheetToggleHints");
+        if (helpToggle) {
+            helpToggle.addEventListener("click", function () {
+                const next = !areHintsEnabled();
+                setHintsEnabled(next);
+                toast(next ? "Guía rápida activada." : "Guía rápida oculta.", "success");
+            });
+        }
+
+        document.querySelectorAll('#helpSheet [data-close="helpSheet"]').forEach(function (btn) {
+            btn.addEventListener("click", closeHelpSheet);
+        });
+        const helpSheet = document.getElementById("helpSheet");
+        if (helpSheet) {
+            helpSheet.addEventListener("click", function (e) {
+                if (e.target === helpSheet) closeHelpSheet();
+            });
+        }
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") {
+                closeAdminNav();
+                closeHelpSheet();
+            }
+        });
     }
 
     function renderAccountGuide() {
@@ -595,9 +882,7 @@
 
         container.querySelectorAll("[data-guide-tab]").forEach(function (btn) {
             btn.addEventListener("click", function () {
-                const name = btn.getAttribute("data-guide-tab");
-                const tab = document.querySelector('.tab[data-tab="' + name + '"]:not(.perm-denied)');
-                if (tab) tab.click();
+                activateTab(btn.getAttribute("data-guide-tab"));
             });
         });
     }
@@ -3976,38 +4261,13 @@
     }
 
     function setupTabs() {
-        document.querySelectorAll(".tab").forEach(function (tab) {
+        document.querySelectorAll("#adminTabs .tab").forEach(function (tab) {
             tab.addEventListener("click", function () {
                 if (tab.classList.contains("perm-denied")) return;
-                document.querySelectorAll(".tab").forEach(function (t) { t.classList.remove("active"); });
-                document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
-                tab.classList.add("active");
-                const name = tab.getAttribute("data-tab");
-                document.getElementById("tab-" + name).classList.add("active");
-                const loaders = {
-                    resumen: function () { loadMetrics(); loadActivity(); },
-                    reservas: loadReservations,
-                    muro: loadIntentions,
-                    turnos: function () {
-                        const activeSub = document.querySelector("#turnosSubtabs .subtab.active");
-                        const view = activeSub ? activeSub.getAttribute("data-turnos-view") : "calendario";
-                        if (view === "lista") loadRoster();
-                        else if (view === "directorio") loadAdoradores();
-                        else if (view === "config") { loadSettingsForm(); loadSlots(); }
-                        else loadCalendar();
-                    },
-                    capitan: loadCaptainDashboard,
-                    capitanes: function () { loadCaptainAssignableUsers().then(loadCaptainRanges); },
-                    qrs: loadQrs,
-                    perfiles: loadRoles,
-                    admins: function () { loadRoles().then(loadAdmins); },
-                    auditoria: loadAudit,
-                    whatsapp: loadWhatsApp,
-                    cuenta: loadAccountProfile,
-                };
-                if (loaders[name]) loaders[name]();
+                activateTab(tab.getAttribute("data-tab"));
             });
         });
+        updateMobileSectionTitle(getActiveTabName());
     }
 
     // ── Eventos ──
@@ -4193,7 +4453,7 @@
             if (!overlay) return;
             overlay.classList.remove("active");
             overlay.setAttribute("aria-hidden", "true");
-            if (overlay.id === "roleSheet") document.body.classList.remove("sheet-open");
+            document.body.classList.remove("sheet-open");
         });
     });
 
@@ -4208,6 +4468,7 @@
     });
 
     setupTabs();
+    setupMobileNav();
     setupTurnosSubtabs();
     setupOnboardingHints();
 

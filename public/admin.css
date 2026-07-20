@@ -1582,6 +1582,10 @@ body.admin.hints-enabled [data-hint-key] {
     transition: background 0.15s var(--admin-ease), border-color 0.15s var(--admin-ease);
 }
 
+.onboard-hint-dismiss + .onboard-hint-dismiss {
+    margin-top: 6px;
+}
+
 .onboard-hint-dismiss:hover {
     background: rgba(255, 255, 255, 0.16);
     border-color: rgba(255, 255, 255, 0.45);
@@ -1600,10 +1604,7 @@ body.admin.hints-enabled [data-hint-key] {
 
 @media (hover: none) {
     body.admin.hints-enabled [data-hint-key] {
-        cursor: default;
-    }
-    .onboard-hint-tooltip {
-        display: none;
+        cursor: pointer;
     }
 }
 
@@ -2020,5 +2021,367 @@ body.admin .toast.info {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* ═══════════════════════════════════════════════
+   Mobile-first back-office navigation & help
+   ═══════════════════════════════════════════════ */
+
+.admin-menu-btn {
+    display: none;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-menu-icon,
+.admin-menu-icon::before,
+.admin-menu-icon::after {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--admin-ink, #1a1510);
+    border-radius: 1px;
+    position: relative;
+}
+
+.admin-menu-icon::before,
+.admin-menu-icon::after {
+    content: "";
+    position: absolute;
+    left: 0;
+}
+
+.admin-menu-icon::before { top: -6px; }
+.admin-menu-icon::after { top: 6px; }
+
+.admin-section-title {
+    display: none;
+    font-family: var(--admin-sans, system-ui, sans-serif);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--admin-ink, #1a1510);
+    line-height: 1.2;
+}
+
+.admin-help-btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.admin-nav-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    pointer-events: none;
+}
+
+.admin-nav-drawer:not([hidden]) {
+    pointer-events: auto;
+}
+
+.admin-nav-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(19, 15, 11, 0.45);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.admin-nav-drawer.is-open .admin-nav-backdrop {
+    opacity: 1;
+}
+
+.admin-nav-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(320px, 88vw);
+    display: flex;
+    flex-direction: column;
+    background: #faf8f5;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.18);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+}
+
+.admin-nav-drawer.is-open .admin-nav-panel {
+    transform: translateX(0);
+}
+
+.admin-nav-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 16px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.admin-nav-panel-header .ghost-btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.admin-nav-list {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-nav-item {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--admin-ink, #1a1510);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+}
+
+.admin-nav-item:active,
+.admin-nav-item:hover {
+    background: rgba(138, 109, 47, 0.12);
+}
+
+.admin-nav-item.is-active {
+    background: rgba(138, 109, 47, 0.18);
+    color: #6b5420;
+    font-weight: 600;
+}
+
+.admin-nav-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.admin-nav-footer .ghost-btn {
+    width: 100%;
+    min-height: 44px;
+}
+
+.help-sheet-window {
+    max-width: 440px;
+}
+
+.help-sheet-list {
+    margin: 12px 0 0;
+    padding-left: 1.15rem;
+    line-height: 1.5;
+}
+
+.help-sheet-list li {
+    margin-bottom: 8px;
+}
+
+.help-sheet-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.help-sheet-actions .sheet-primary-btn,
+.help-sheet-actions .ghost-btn {
+    width: 100%;
+    min-height: 44px;
+}
+
+body.admin.hints-enabled [data-hint-key].hint-pulse {
+    outline: 2px solid rgba(138, 109, 47, 0.55);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Hint tooltip: tap-friendly on touch */
+@media (hover: none) {
+    body.admin.hints-enabled [data-hint-key] {
+        cursor: pointer;
+        position: relative;
+    }
+    .onboard-hint-tooltip {
+        display: block;
+        max-width: min(340px, calc(100vw - 24px));
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        top: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%) translateY(8px);
+        z-index: 210;
+    }
+    .onboard-hint-tooltip.visible {
+        transform: translateX(-50%) translateY(0);
+    }
+    .onboard-hint-tooltip::before {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .admin-menu-btn {
+        display: inline-flex;
+    }
+
+    .admin-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 80;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #faf8f5;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        align-items: center;
+    }
+
+    .admin-topbar-brand {
+        flex: 1;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .admin-topbar-brand .brand-logo--header {
+        width: 108px;
+        height: auto;
+    }
+
+    .admin-whoami-desktop,
+    .admin-topbar-titles .page-eyebrow {
+        display: none;
+    }
+
+    .admin-section-title {
+        display: block;
+    }
+
+    .admin-tabs--desktop {
+        display: none !important;
+    }
+
+    .whoami-btn {
+        display: none;
+    }
+
+    .admin-topbar-actions #logoutBtn {
+        display: none;
+    }
+
+    .admin-help-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #dashboard > .tab-panel.active {
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .command-header,
+    .toolbar-spaced,
+    .audit-filters,
+    .res-toolbar,
+    .calendar-toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    body.admin .ghost-btn {
+        min-height: 44px;
+        width: auto;
+        flex: 1 1 auto;
+    }
+
+    body.admin .sheet-primary-btn {
+        min-height: 48px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .table-wrap {
+        margin-inline: -4px;
+        border-radius: 8px;
+    }
+
+    .wa-bot-form .wa-form-section {
+        margin-top: 16px;
+    }
+
+    .account-guide-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .hints-toggle-btn {
+        width: 100%;
+        min-height: 44px;
+    }
+}
+
+@media (min-width: 901px) {
+    .admin-help-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .admin-section-title {
+        display: none;
+    }
+
+    .admin-nav-drawer {
+        display: none !important;
+    }
+}
+
+@media (max-width: 520px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.admin .ghost-btn {
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .login-card {
+        margin: 16px;
+        width: calc(100% - 32px);
+    }
+}
+
+body.admin.nav-open {
+    overflow: hidden;
 }
 
