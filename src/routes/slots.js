@@ -4,46 +4,77 @@ const { todayStr } = require('../utils/dates');
 const { filterSlotsForDate } = require('../utils/schedule');
 const { getSettings } = require('../utils/settings');
 const { getEnabledFrequencies } = require('../constants/commitment');
-const { formatTimeRange12, withSlotTimeLabels } = require('../utils/timeFormat');
+const { withSlotTimeLabels } = require('../utils/timeFormat');
 const { checkTimelineGaps, hasFractionalCoverage, GAP_STATUS } = require('../utils/timeline');
+const { commitmentAppliesOn } = require('../utils/commitmentMatch');
+const { buildPriorityWeek } = require('../utils/prioritySlots');
 
 const router = express.Router();
+
+async function loadActiveSlotsAndReservations() {
+    const [slots, reservations] = await Promise.all([
+        prisma.slot.findMany({
+            where: { isActive: true },
+            orderBy: { startTime: 'asc' },
+        }),
+        prisma.reservation.findMany({
+            where: { status: { in: ['confirmed', 'completed'] } },
+            select: {
+                id: true,
+                slotId: true,
+                date: true,
+                status: true,
+                frequency: true,
+                weekDays: true,
+                biweeklyWeeks: true,
+                commitmentEndDate: true,
+                startTimeOffset: true,
+                durationMinutes: true,
+                userName: true,
+                userFirstName: true,
+                userLastName: true,
+            },
+        }),
+    ]);
+    return { slots, reservations };
+}
+
+// GET /api/slots/priority?days=7 — turnos prioritarios de la semana (0 → 1 → 2 adoradores)
+router.get('/priority', async (req, res) => {
+    try {
+        const days = Math.min(14, Math.max(1, Number(req.query.days) || 7));
+        const startDate = req.query.date || todayStr();
+        const max = Math.min(30, Math.max(1, Number(req.query.max) || 12));
+        const { slots, reservations } = await loadActiveSlotsAndReservations();
+        const priority = buildPriorityWeek({
+            slots,
+            reservations,
+            startDate,
+            days,
+            max,
+        });
+        res.json(priority);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al obtener turnos prioritarios.' });
+    }
+});
 
 // GET /api/slots?date=YYYY-MM-DD
 router.get('/', async (req, res) => {
     try {
         const date = req.query.date || todayStr();
-        const allSlots = await prisma.slot.findMany({
-            where: { isActive: true },
-            orderBy: { startTime: 'asc' },
-        });
+        const { slots: allSlots, reservations: allReservations } = await loadActiveSlotsAndReservations();
 
         const { slots: eligible, message, note, weekday } = filterSlotsForDate(allSlots, date);
-
-        const reservations = await prisma.reservation.groupBy({
-            by: ['slotId'],
-            where: { date, status: { in: ['confirmed', 'completed'] } },
-            _count: { _all: true },
-        });
-        const countBySlot = Object.fromEntries(
-            reservations.map((r) => [r.slotId, r._count._all])
-        );
-
-        const reservationDetails = await prisma.reservation.findMany({
-            where: { date, status: { in: ['confirmed', 'completed'] } },
-            select: { slotId: true, startTimeOffset: true, durationMinutes: true },
-        });
-        const commitmentsBySlot = {};
-        for (const r of reservationDetails) {
-            if (!commitmentsBySlot[r.slotId]) commitmentsBySlot[r.slotId] = [];
-            commitmentsBySlot[r.slotId].push(r);
-        }
 
         const settings = await getSettings();
 
         const result = eligible.map((s) => {
-            const taken = countBySlot[s.id] || 0;
-            const commitments = commitmentsBySlot[s.id] || [];
+            const commitments = allReservations.filter(
+                (r) => r.slotId === s.id && commitmentAppliesOn(r, date),
+            );
+            const taken = commitments.length;
             const gapStatus = checkTimelineGaps(commitments);
             return withSlotTimeLabels({
                 id: s.id,

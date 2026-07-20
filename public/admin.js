@@ -78,7 +78,7 @@
         "tab-auditoria": "Historial de acciones para trazabilidad, seguridad y revisión de cambios.",
         "tab-whatsapp": "Bandeja WhatsApp: conversaciones, handoff operador, ficha del contacto y log de mensajes.",
         "section-resumen": "Resumen en tiempo real del estado de la capilla: ocupación, asistencias y alertas del día.",
-        "timeline-panel": "Línea de tiempo de guardias de hoy. Detecta espacios sin adorador asignado.",
+        "timeline-panel": "Prioriza franjas de la semana sin adoradores; si no hay, con 1; luego con 2. También muestra el detalle de hoy.",
         "section-reservas": "Filtra por semana o mes y exporta la lista para reportes o seguimiento pastoral.",
         "res-view-week": "Muestra adoradores con guardia en los 7 días del rango seleccionado.",
         "res-view-month": "Vista mensual: útil para planificación y cobertura a largo plazo.",
@@ -94,7 +94,7 @@
         "roster-message": "Copia al portapapeles los teléfonos del grupo para enviar un mensaje grupal.",
         "roster-export": "Exporta la sección visible a CSV (compatible con Excel).",
         "roster-template": "Descarga plantilla CSV para llenar en Excel y volver a cargar.",
-        "roster-import": "Sube un archivo Excel (.xlsx) o CSV con el mismo formato que la plantilla.",
+        "roster-import": "Sube un archivo Excel (.xlsx) o CSV con el mismo formato que la plantilla. El celular es opcional.",
         "new-commitment": "Crea manualmente un compromiso de adoración en la lista.",
         "new-captain": "Registra un contacto de capitán en el directorio (solo teléfono/WhatsApp, sin acceso al panel).",
         "new-captain-range": "Asigna un usuario con cuenta y perfil Capitán al bloque horario que administrará.",
@@ -1185,9 +1185,11 @@
     }
 
     function checkTimelineGaps(commitments) {
+        const list = commitments || [];
+        if (!list.length) return "EMPTY";
         let hasFirstHalfCoverage = false;
         let hasSecondHalfCoverage = false;
-        commitments.forEach(function (c) {
+        list.forEach(function (c) {
             const offset = c.startTimeOffset ?? c.offsetMinutes ?? 0;
             const duration = c.durationMinutes ?? 60;
             if (offset === 0 && duration >= 30) hasFirstHalfCoverage = true;
@@ -1195,8 +1197,9 @@
                 hasSecondHalfCoverage = true;
             }
         });
-        if (!hasFirstHalfCoverage || !hasSecondHalfCoverage) return "CRITICAL_GAP";
-        return "COVERED";
+        if (hasFirstHalfCoverage && hasSecondHalfCoverage) return "COVERED";
+        if (hasFirstHalfCoverage || hasSecondHalfCoverage) return "CRITICAL_GAP";
+        return "EMPTY";
     }
 
     async function loadTimeline() {
@@ -1205,41 +1208,78 @@
         const dateLabel = document.getElementById("timelineDateLabel");
         if (!feed) return;
         const date = todayStr();
-        if (dateLabel) dateLabel.textContent = date;
+        if (dateLabel) dateLabel.textContent = "Semana desde " + date;
         try {
-            const res = await api("/api/admin/timeline?date=" + encodeURIComponent(date));
+            const res = await api("/api/admin/timeline?date=" + encodeURIComponent(date) + "&days=7");
             const data = await res.json();
-            if (!data.blocks?.length) {
-                feed.innerHTML = '<div class="empty-state">Sin bloques horarios para hoy.</div>';
-                return;
+            const pw = data.priorityWeek || {};
+            const prioritySlots = pw.slots || [];
+
+            let html = "";
+            if (prioritySlots.length) {
+                html += '<div class="timeline-priority-head">' +
+                    '<strong>Turnos prioritarios</strong>' +
+                    '<span class="muted">' + escapeHtml(pw.tierLabel || "") +
+                    (pw.totalInTier > prioritySlots.length ? " · " + pw.totalInTier + " en total" : "") +
+                    "</span></div>";
+                html += prioritySlots.map(function (slot, i) {
+                    const day = escapeHtml(slot.weekdayLabel || "") +
+                        (slot.date ? " <span class=\"muted\">" + escapeHtml(slot.date) + "</span>" : "");
+                    const status = slot.reserved === 0
+                        ? '<span style="color:var(--apple-red-alert)">Sin adoradores — Santísimo solo</span>'
+                        : escapeHtml(String(slot.reserved)) + " adorador" + (slot.reserved === 1 ? "" : "es");
+                    return '<div class="chronos-card gap-alert" style="animation-delay:' + (i * 0.03) + 's">' +
+                        '<div class="time-signature">' + escapeHtml(slot.timeLabel || TRange(slot.startTime, slot.endTime)) + "</div>" +
+                        '<div class="chronos-body">' +
+                        '<div class="chronos-names"><strong>' + day + "</strong><br>" + status + "</div>" +
+                        '<div class="chronos-meta">Prioridad semanal</div></div></div>';
+                }).join("");
+            } else {
+                html += '<div class="empty-state">No hay franjas con 0–2 adoradores en los próximos 7 días. ¡Gloria a Dios!</div>';
             }
-            feed.innerHTML = data.blocks.map(function (block, i) {
-                const gapStatus = block.gapStatus || checkTimelineGaps(block.commitments || []);
-                let cardClass = "chronos-card";
-                if (block.fractional) cardClass += " fraction-30";
-                if (gapStatus === "CRITICAL_GAP" || block.gapAlert) cardClass += " gap-alert";
-                const names = (block.commitments || []).map(function (c) {
-                    const display = [c.userFirstName, c.userLastName].filter(Boolean).join(" ") || c.userName;
-                    const detail = [];
-                    if (c.startTimeOffset === 30) {
-                        const offsetLabel = window.AdoratioTime
-                            ? T12(window.AdoratioTime.addMinutes(block.startTime, 30))
-                            : ":30";
-                        detail.push("desde " + offsetLabel);
+
+            if (data.blocks?.length) {
+                html += '<div class="timeline-priority-head timeline-today-head">' +
+                    "<strong>Detalle de hoy</strong>" +
+                    '<span class="muted">' + escapeHtml(date) + "</span></div>";
+                html += data.blocks.map(function (block, i) {
+                    const gapStatus = block.gapStatus || checkTimelineGaps(block.commitments || []);
+                    const isPartialGap = gapStatus === "CRITICAL_GAP" || block.gapAlert;
+                    const isEmpty = gapStatus === "EMPTY" || !(block.commitments || []).length;
+                    let cardClass = "chronos-card";
+                    if (block.fractional) cardClass += " fraction-30";
+                    if (isPartialGap) cardClass += " gap-alert";
+                    else if (isEmpty) cardClass += " gap-empty";
+                    const names = (block.commitments || []).map(function (c) {
+                        const display = [c.userFirstName, c.userLastName].filter(Boolean).join(" ") || c.userName;
+                        const detail = [];
+                        if (c.startTimeOffset === 30) {
+                            const offsetLabel = window.AdoratioTime
+                                ? T12(window.AdoratioTime.addMinutes(block.startTime, 30))
+                                : ":30";
+                            detail.push("desde " + offsetLabel);
+                        }
+                        if (c.durationMinutes === 30) detail.push("30 min");
+                        if (c.frequency && c.frequency !== "WEEKLY") detail.push(c.frequency);
+                        return escapeHtml(display) + (detail.length ? " <span class=\"muted\">(" + detail.join(", ") + ")</span>" : "");
+                    }).join("<br>") || '<span class="muted">Sin adoradores — Santísimo solo</span>';
+                    let meta;
+                    if (isPartialGap) {
+                        meta = '<span style="color:var(--apple-red-alert)">Espacio de 30 min sin custodia</span>';
+                    } else if (isEmpty) {
+                        meta = '<span class="muted">Hora completa sin custodia</span>';
+                    } else {
+                        meta = (block.commitments?.length || 0) + " adorador" + ((block.commitments?.length || 0) !== 1 ? "es" : "");
                     }
-                    if (c.durationMinutes === 30) detail.push("30 min");
-                    if (c.frequency && c.frequency !== "WEEKLY") detail.push(c.frequency);
-                    return escapeHtml(display) + (detail.length ? " <span class=\"muted\">(" + detail.join(", ") + ")</span>" : "");
-                }).join("<br>") || '<span class="muted">Sin adoradores — Santísimo solo</span>';
-                const meta = gapStatus === "CRITICAL_GAP"
-                    ? '<span style="color:var(--apple-red-alert)">Espacio de 30 min sin custodia</span>'
-                    : (block.commitments?.length || 0) + " adorador" + ((block.commitments?.length || 0) !== 1 ? "es" : "");
-                return '<div class="' + cardClass + '" style="animation-delay:' + (i * 0.03) + 's">' +
-                    '<div class="time-signature">' + escapeHtml(TRange(block.startTime, block.endTime)) + '</div>' +
-                    '<div class="chronos-body">' +
-                    '<div class="chronos-names">' + names + '</div>' +
-                    '<div class="chronos-meta">' + meta + '</div></div></div>';
-            }).join("");
+                    return '<div class="' + cardClass + '" style="animation-delay:' + (i * 0.03) + 's">' +
+                        '<div class="time-signature">' + escapeHtml(TRange(block.startTime, block.endTime)) + "</div>" +
+                        '<div class="chronos-body">' +
+                        '<div class="chronos-names">' + names + "</div>" +
+                        '<div class="chronos-meta">' + meta + "</div></div></div>";
+                }).join("");
+            }
+
+            feed.innerHTML = html;
         } catch (e) {
             feed.innerHTML = '<div class="empty-state">No se pudo cargar el timeline.</div>';
         }
@@ -2436,7 +2476,7 @@
             return "<tr><td class='col-num'>" + (idx + 1) + "</td>" +
                 "<td>" + escapeHtml(a.firstName || "—") + "</td>" +
                 "<td>" + escapeHtml(a.lastName || "—") + "</td>" +
-                "<td>" + escapeHtml(a.phone) + "</td>" +
+                "<td>" + escapeHtml(a.phone || "—") + "</td>" +
                 "<td>" + escapeHtml(a.weekdaysLabel || "—") + "</td>" +
                 "<td class='dir-slots'>" + escapeHtml((a.slots || []).join(", ") || "—") + "</td>" +
                 actions + "</tr>";
@@ -3623,24 +3663,41 @@
     }
 
     // ── ADMINISTRADORES ──
+    let adminPasswordTargetId = null;
+
     async function loadAdmins() {
         if (!hasPerm("USERS_VIEW")) return;
         const res = await api("/api/admin/users");
         const data = await res.json();
         const canManage = hasPerm("USERS_MANAGE");
+        const isSuper = Boolean(session.user?.isSuperAdmin);
         const table = document.getElementById("adminsTable");
+        const showActions = canManage || isSuper;
         table.innerHTML =
             "<thead><tr><th>Nombre</th><th>Correo</th><th>Perfil RBAC</th><th>Desde</th>" +
-            (canManage ? "<th></th>" : "") + "</tr></thead><tbody>" +
+            (showActions ? "<th></th>" : "") + "</tr></thead><tbody>" +
             (data.users.length ? data.users.map(function (u) {
+                let actions = "";
+                if (showActions) {
+                    actions = "<td class='admins-row-actions'>";
+                    if (canManage) {
+                        actions += "<select class='touch-input-field dark-input' data-assign='" + u.id + "' style='min-width:140px;'>" +
+                            rolesCache.map(function (r) {
+                                return "<option value='" + r.id + "'" + (r.id === u.adminRoleId ? " selected" : "") + ">" +
+                                    escapeHtml(r.name) + "</option>";
+                            }).join("") + "</select>";
+                    }
+                    if (isSuper) {
+                        actions += "<button type='button' class='ghost-btn admins-set-password-btn' data-set-password='" + u.id +
+                            "' data-name='" + escapeHtml(u.name) + "' data-email='" + escapeHtml(u.email) +
+                            "'>Contraseña</button>";
+                    }
+                    actions += "</td>";
+                }
                 return "<tr><td>" + escapeHtml(u.name) + "</td><td>" + escapeHtml(u.email) + "</td>" +
                     "<td>" + escapeHtml(u.adminRoleName || u.role) + "</td>" +
                     "<td>" + formatTime(u.createdAt) + "</td>" +
-                    (canManage ? "<td><select class='touch-input-field dark-input' data-assign='" + u.id + "' style='min-width:160px;'>" +
-                        rolesCache.map(function (r) {
-                            return "<option value='" + r.id + "'" + (r.id === u.adminRoleId ? " selected" : "") + ">" +
-                                escapeHtml(r.name) + "</option>";
-                        }).join("") + "</select></td>" : "") + "</tr>";
+                    actions + "</tr>";
             }).join("") : "<tr><td colspan='5' class='muted'>Sin administradores.</td></tr>") +
             "</tbody>";
         if (canManage) {
@@ -3649,6 +3706,61 @@
                     assignRole(Number(sel.getAttribute("data-assign")), Number(sel.value));
                 });
             });
+        }
+        if (isSuper) {
+            table.querySelectorAll("[data-set-password]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    openAdminPasswordSheet(
+                        Number(btn.getAttribute("data-set-password")),
+                        btn.getAttribute("data-name"),
+                        btn.getAttribute("data-email")
+                    );
+                });
+            });
+        }
+    }
+
+    function openAdminPasswordSheet(userId, name, email) {
+        if (!session.user?.isSuperAdmin) return toast("Solo Super Admin.", "error");
+        adminPasswordTargetId = userId;
+        document.getElementById("adminPasswordNew").value = "";
+        document.getElementById("adminPasswordConfirm").value = "";
+        document.getElementById("adminPasswordSheetUser").textContent =
+            (name || "") + (email ? " · " + email : "");
+        document.getElementById("adminPasswordSheet").classList.add("active");
+        window.requestAnimationFrame(function () {
+            document.getElementById("adminPasswordNew").focus();
+        });
+    }
+
+    async function saveAdminPassword() {
+        if (!session.user?.isSuperAdmin) return toast("Solo Super Admin.", "error");
+        if (!adminPasswordTargetId) return;
+        const password = document.getElementById("adminPasswordNew").value;
+        const confirm = document.getElementById("adminPasswordConfirm").value;
+        if (!password || password.length < 6) {
+            return toast("La contraseña debe tener al menos 6 caracteres.", "error");
+        }
+        if (password !== confirm) {
+            return toast("Las contraseñas no coinciden.", "error");
+        }
+        const btn = document.getElementById("adminPasswordSaveBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/users/" + adminPasswordTargetId + "/password", {
+                method: "PUT",
+                body: JSON.stringify({ password }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error.");
+            toast(data.message || "Contraseña actualizada.", "success");
+            document.getElementById("adminPasswordSheet").classList.remove("active");
+            adminPasswordTargetId = null;
+            loadActivity();
+        } catch (e) {
+            toast(e.message || "Error.", "error");
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -4178,7 +4290,6 @@
                 "<dt>Nombre</dt><dd>" + escapeHtml(c.displayName || "—") + "</dd>" +
                 "<dt>Teléfono</dt><dd>" + escapeHtml(c.phone || phone) + "</dd>" +
                 "<dt>Email</dt><dd>" + escapeHtml(c.email || "—") + "</dd>" +
-                "<dt>Dirección</dt><dd>" + escapeHtml(c.address || "No registrada") + "</dd>" +
                 "</dl>" +
                 "<div class='wa-client-metrics'>" +
                 "<div><span class='muted'>Resp. promedio</span><strong>" + escapeHtml(avg) + "</strong></div>" +
@@ -4634,6 +4745,8 @@
     document.getElementById("saveRoleBtn").addEventListener("click", saveNewRole);
     document.getElementById("newAdminBtn").addEventListener("click", openAdminSheet);
     document.getElementById("createAdminBtn").addEventListener("click", createAdmin);
+    const adminPasswordSaveBtn = document.getElementById("adminPasswordSaveBtn");
+    if (adminPasswordSaveBtn) adminPasswordSaveBtn.addEventListener("click", saveAdminPassword);
     document.getElementById("auditRefresh").addEventListener("click", function () { auditOffset = 0; loadAudit(); });
     document.getElementById("demoResetBtn").addEventListener("click", resetDemoData);
     document.getElementById("demoWipeSelectOperational").addEventListener("click", function () {

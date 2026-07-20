@@ -1,5 +1,11 @@
-const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const { parseCsvLine, shouldSkipImportRow, findCsvHeaderIndex } = require('./rosterCsv');
+const { minutesToTime24 } = require('./timeFormat');
+
+function getExcelJS() {
+    // Carga diferida: require('exceljs') a veces se bloquea si hay procesos colgados.
+    return require('exceljs');
+}
 
 const HEADER_FILL = {
     type: 'pattern',
@@ -32,9 +38,10 @@ const TEMPLATES = {
             [''],
             ['Columnas'],
             ['• dia — lunes, martes, miércoles, jueves, viernes, sábado o domingo'],
-            ['• hora — formato 7:00 AM o 08:00'],
+            ['• hora — formato 7:00 AM o 08:00 (mejor como texto para que Excel no la convierta)'],
             ['• duracion_minutos — 30 o 60'],
             ['• frecuencia — Semanal, Diario, Quincenal, Mensual o Una sola vez'],
+            ['• celular — opcional por ahora (8 dígitos si se indica)'],
             ['• dias_extra — solo para Diario (ej. lunes,miércoles,viernes)'],
             [''],
             ['Importante'],
@@ -104,6 +111,7 @@ async function buildRosterTemplateBuffer(section) {
     const def = TEMPLATES[section];
     if (!def) return null;
 
+    const ExcelJS = getExcelJS();
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Adoratio';
     wb.created = new Date();
@@ -146,37 +154,174 @@ function normalizeHeaderCell(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+/** Excel guarda horas como fracción del día (0.333… = 08:00). */
+function excelFractionToTime(n) {
+    const totalMinutes = Math.round(Number(n) * 24 * 60);
+    if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return null;
+    return minutesToTime24(((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60));
+}
+
+function looksLikeExcelTimeDate(d) {
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return false;
+    const y = d.getFullYear();
+    // ExcelJS suele mapear horas “solo tiempo” a 1899-12-30 / 1900-01-01.
+    return y <= 1901;
+}
+
+function cellValueToString(value) {
+    let v = value;
+    if (v && typeof v === 'object' && v.text != null) v = v.text;
+    if (v && typeof v === 'object' && v.result != null) v = v.result;
+    if (v && typeof v === 'object' && Array.isArray(v.richText)) {
+        v = v.richText.map((t) => t.text || '').join('');
+    }
+    if (typeof v === 'number') {
+        if (v >= 0 && v < 1) {
+            const asTime = excelFractionToTime(v);
+            if (asTime) return asTime;
+        }
+        // Celulares largos a veces llegan como número.
+        if (Number.isInteger(v) && v >= 1e7 && v < 1e12) return String(Math.trunc(v));
+        return String(v);
+    }
+    if (v instanceof Date) {
+        if (looksLikeExcelTimeDate(v)) {
+            return minutesToTime24(v.getHours() * 60 + v.getMinutes());
+        }
+        return v.toISOString().slice(0, 10);
+    }
+    return v == null ? '' : String(v).trim();
+}
+
 function rowValuesToCells(row) {
     const cells = [];
     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         while (cells.length < colNumber - 1) cells.push('');
-        let v = cell.value;
-        if (v && typeof v === 'object' && v.text != null) v = v.text;
-        if (v instanceof Date) {
-            v = v.toISOString().slice(0, 10);
-        }
-        cells[colNumber - 1] = v == null ? '' : String(v).trim();
+        cells[colNumber - 1] = cellValueToString(cell.value);
     });
     return cells;
+}
+
+function headerMatch(cells) {
+    const normalized = cells.map(normalizeHeaderCell);
+    if (normalized.includes('dia') && normalized.includes('hora')) return normalized;
+    if (normalized.includes('nombre') && normalized.includes('celular')) return normalized;
+    return null;
 }
 
 function findExcelHeaderRow(sheet) {
     let found = null;
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
         if (found) return;
-        const cells = rowValuesToCells(row).map(normalizeHeaderCell);
-        if (cells.includes('dia') && cells.includes('hora')) {
-            found = { rowNumber, headers: cells };
-        } else if (cells.includes('nombre') && cells.includes('celular')) {
-            found = { rowNumber, headers: cells };
-        }
+        const headers = headerMatch(rowValuesToCells(row));
+        if (headers) found = { rowNumber, headers };
     });
     return found;
 }
 
-async function parseRosterExcel(buffer) {
+function decodeXmlEntities(s) {
+    return String(s || '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+function parseSharedStrings(xml) {
+    const strings = [];
+    for (const m of String(xml || '').matchAll(/<si>([\s\S]*?)<\/si>/g)) {
+        const texts = [...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((x) => decodeXmlEntities(x[1]));
+        strings.push(texts.join(''));
+    }
+    return strings;
+}
+
+function colLettersToIndex(letters) {
+    let n = 0;
+    for (const ch of String(letters || '').toUpperCase()) {
+        n = n * 26 + (ch.charCodeAt(0) - 64);
+    }
+    return Math.max(0, n - 1);
+}
+
+function parseSheetRows(xml, sharedStrings) {
+    const rows = new Map();
+    for (const rm of String(xml || '').matchAll(/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
+        const rowNumber = Number(rm[1]);
+        const cells = [];
+        for (const cm of rm[2].matchAll(/<c r="([A-Z]+)(\d+)"([^>]*)>(?:<v>([\s\S]*?)<\/v>)?<\/c>/g)) {
+            const col = colLettersToIndex(cm[1]);
+            const attrs = cm[3] || '';
+            const raw = cm[4];
+            let val = '';
+            if (raw != null) {
+                if (attrs.includes('t="s"')) val = sharedStrings[Number(raw)] || '';
+                else if (attrs.includes('t="inlineStr"')) val = decodeXmlEntities(raw);
+                else val = cellValueToString(Number(raw));
+            }
+            cells[col] = val;
+        }
+        rows.set(rowNumber, cells);
+    }
+    return rows;
+}
+
+async function parseRosterExcelWithZip(buffer) {
+    const zip = await JSZip.loadAsync(buffer);
+    const workbookXml = await zip.file('xl/workbook.xml')?.async('string');
+    const relsXml = await zip.file('xl/_rels/workbook.xml.rels')?.async('string');
+    if (!workbookXml || !relsXml) return { headers: [], rows: [] };
+
+    const rels = new Map();
+    for (const m of relsXml.matchAll(/Id="(rId\d+)"[^>]*Target="([^"]+)"/g)) {
+        rels.set(m[1], m[2].replace(/^\//, '').replace(/^xl\//, ''));
+    }
+
+    const sheets = [];
+    for (const m of workbookXml.matchAll(/<sheet[^>]*name="([^"]+)"[^>]*r:id="(rId\d+)"/g)) {
+        sheets.push({ name: m[1], path: `xl/${rels.get(m[2])}` });
+    }
+
+    const sstFile = zip.file('xl/sharedStrings.xml');
+    const sharedStrings = sstFile ? parseSharedStrings(await sstFile.async('string')) : [];
+
+    const preferred = sheets.find((s) => s.name === DATA_SHEET) || sheets[0];
+    const ordered = preferred ? [preferred, ...sheets.filter((s) => s !== preferred)] : sheets;
+
+    for (const sheet of ordered) {
+        const file = zip.file(sheet.path);
+        if (!file) continue;
+        const rowMap = parseSheetRows(await file.async('string'), sharedStrings);
+        let headerInfo = null;
+        for (const [rowNumber, cells] of [...rowMap.entries()].sort((a, b) => a[0] - b[0])) {
+            const headers = headerMatch(cells);
+            if (headers) {
+                headerInfo = { rowNumber, headers };
+                break;
+            }
+        }
+        if (!headerInfo) continue;
+
+        const rows = [];
+        for (const [rowNumber, cells] of [...rowMap.entries()].sort((a, b) => a[0] - b[0])) {
+            if (rowNumber <= headerInfo.rowNumber) continue;
+            while (cells.length < headerInfo.headers.length) cells.push('');
+            for (let i = 0; i < cells.length; i += 1) {
+                if (cells[i] == null) cells[i] = '';
+            }
+            if (cells.every((c) => !String(c).trim())) continue;
+            rows.push({ rowNumber, cells: cells.slice(0, headerInfo.headers.length) });
+        }
+        return { headers: headerInfo.headers, rows };
+    }
+
+    return { headers: [], rows: [] };
+}
+
+async function parseRosterExcelWithExcelJs(buffer) {
+    const ExcelJS = getExcelJS();
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
 
     let sheet = wb.getWorksheet(DATA_SHEET);
     if (!sheet) {
@@ -196,6 +341,22 @@ async function parseRosterExcel(buffer) {
         rows.push({ rowNumber, cells: cells.slice(0, headers.length) });
     });
     return { headers, rows };
+}
+
+async function parseRosterExcel(buffer) {
+    // Algunos .xlsx editados en Excel hacen colgar a ExcelJS (dpi inválidos, etc.).
+    // Preferimos el parser ZIP/XML, más tolerante con esos archivos.
+    try {
+        const parsed = await parseRosterExcelWithZip(buffer);
+        if (parsed.headers.length) return parsed;
+    } catch (e) {
+        // fallback below
+    }
+    try {
+        return await parseRosterExcelWithExcelJs(buffer);
+    } catch (e) {
+        return { headers: [], rows: [] };
+    }
 }
 
 function parseCsvTextForImport(text) {

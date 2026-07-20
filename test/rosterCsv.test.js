@@ -19,6 +19,20 @@ test('parseCommitmentImportRow validates weekday and phone', () => {
 
     const bad = parseCommitmentImportRow({ rowNumber: 3, cells: ['', '7:00 AM', '60', 'Semanal', 'María', 'López', '88881234'] }, headers);
     assert.ok(bad.error);
+
+    const noPhone = parseCommitmentImportRow(
+        { rowNumber: 4, cells: ['lunes', '7:00 AM', '60', 'Semanal', 'Ana', 'Pérez', ''] },
+        headers,
+    );
+    assert.equal(noPhone.firstName, 'Ana');
+    assert.equal(noPhone.phone, '');
+    assert.equal(noPhone.error, undefined);
+
+    const badPhone = parseCommitmentImportRow(
+        { rowNumber: 5, cells: ['lunes', '7:00 AM', '60', 'Semanal', 'Ana', 'Pérez', '123'] },
+        headers,
+    );
+    assert.ok(badPhone.error);
 });
 
 test('shouldSkipImportRow ignores example and instruction rows', () => {

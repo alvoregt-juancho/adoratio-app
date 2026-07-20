@@ -98,6 +98,8 @@ model Reservation {
   cancelledAt      DateTime? @map("cancelled_at")
   commitmentEndDate String?  @map("commitment_end_date") // YYYY-MM-DD último día inclusive
   cancelToken      String?   @map("cancel_token")
+  /// Preferencia de recordatorios WhatsApp: both | 24h | 3h | none
+  reminderPreference String   @default("both") @map("reminder_preference")
   createdAt        DateTime  @default(now()) @map("created_at")
 
   slot           Slot        @relation(fields: [slotId], references: [id])

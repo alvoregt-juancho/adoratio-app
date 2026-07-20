@@ -721,6 +721,27 @@ html:has(body.admin) {
     margin-bottom: 8px;
 }
 
+.timeline-priority-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 4px 0 10px;
+    font-size: 0.86rem;
+}
+
+.timeline-priority-head strong {
+    font-family: var(--admin-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.timeline-today-head {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--admin-border);
+}
+
 .chronos-feed {
     display: flex;
     flex-direction: column;
@@ -781,6 +802,15 @@ html:has(body.admin) {
 }
 
 .chronos-card.gap-alert .chronos-meta {
+    color: var(--apple-red-alert);
+}
+
+.chronos-card.gap-empty {
+    border: 1px solid rgba(173, 62, 61, 0.28);
+    background: #fffdfd;
+}
+
+.chronos-card.gap-empty .time-signature {
     color: var(--apple-red-alert);
 }
 
@@ -2780,3 +2810,15 @@ body.admin .roster-category-tabs .roster-tab.active {
     border: 1px solid var(--admin-border);
 }
 
+
+/* Administradores — acciones de fila */
+.admins-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+.admins-set-password-btn {
+    white-space: nowrap;
+}

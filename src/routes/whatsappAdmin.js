@@ -632,7 +632,6 @@ router.get('/sessions/:phone/client', requirePermission(PRIV.WHATSAPP_OPERATE), 
                 role: user?.role || null,
                 registeredAt: user?.createdAt || null,
                 bookingDraft: sessionData,
-                address: null,
             },
             reservations: reservations.map((r) => ({
                 id: r.id,

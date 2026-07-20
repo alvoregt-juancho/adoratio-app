@@ -4,6 +4,7 @@ const { sendButtons } = require('./whatsapp');
 const { sendReminderTemplate } = require('./whatsappTemplates');
 const { formatTimeRange12 } = require('./timeFormat');
 const { getUpcomingOccurrenceDates, hoursUntilOccurrence } = require('./whatsappOccurrences');
+const { shouldSendReminderType } = require('./whatsappReminderPreference');
 
 const REMINDER_WINDOWS = {
     '24h': { min: 23.5, max: 24.5 },
@@ -62,6 +63,10 @@ async function deliverReminder(reservation, occurrenceDate, reminderType) {
 }
 
 async function sendReminderIfDue(reservation, occurrenceDate, reminderType) {
+    if (!shouldSendReminderType(reservation.reminderPreference, reminderType)) {
+        return false;
+    }
+
     const hours = hoursUntilOccurrence(
         occurrenceDate,
         reservation.slot.startTime,

@@ -229,7 +229,8 @@ function parseCommitmentImportRow(row, headers) {
     if (!durationMinutes) return { error: 'Duración inválida (use 30 o 60) en fila ' + row.rowNumber + '.' };
     if (!frequency) return { error: 'Frecuencia inválida en fila ' + row.rowNumber + '.' };
     if (!firstName) return { error: 'Nombre requerido en fila ' + row.rowNumber + '.' };
-    if (!isValidPhone(phone)) return { error: 'Celular inválido (8 dígitos) en fila ' + row.rowNumber + '.' };
+    // Celular opcional por ahora; si viene, debe ser de 8 dígitos.
+    if (phone && !isValidPhone(phone)) return { error: 'Celular inválido (8 dígitos) en fila ' + row.rowNumber + '.' };
 
     let weekDays = null;
     if (frequency === COMMITMENT_FREQUENCY.DAILY) {

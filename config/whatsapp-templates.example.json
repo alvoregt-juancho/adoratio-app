@@ -43,9 +43,14 @@
       "name": "adoratio_booking_confirmed",
       "category": "UTILITY",
       "header": null,
-      "body": "Reserva confirmada, {{nombre}}.\n\nFecha: {{fecha}}\nHorario: {{horario}}\n\nTe enviaremos recordatorios 24 h y 3 h antes. ¡Dios te bendiga!",
+      "body": "Reserva confirmada, {{nombre}}.\n\nFecha: {{fecha}}\nHorario: {{horario}}\n\n¿Deseas que te recordemos antes de tu turno?\nPuedes elegir: ambos (24 h y 3 h), solo 24 h, solo 3 h, o no recordar.",
       "footer": "AdoraHora",
-      "buttons": [],
+      "buttons": [
+        { "type": "QUICK_REPLY", "text": "Ambos 24h y 3h" },
+        { "type": "QUICK_REPLY", "text": "Solo 24 horas" },
+        { "type": "QUICK_REPLY", "text": "No recordar" }
+      ],
+      "_meta_note": "Meta permite máx. 3 botones QR. La opción «Solo 3 horas» se ofrece también en el menú interactivo que envía la app justo después de confirmar.",
       "env_var": "WHATSAPP_TEMPLATE_BOOKING_CONFIRMED",
       "sample_values": ["María", "2026-07-11", "7:00 AM – 8:00 AM"]
     }

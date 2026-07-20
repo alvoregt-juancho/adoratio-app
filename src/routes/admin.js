@@ -30,6 +30,7 @@ const { todayStr } = require('../utils/dates');
 const { getSettings } = require('../utils/settings');
 const { filterSlotsForDate, weekdayFromDate } = require('../utils/schedule');
 const { normalizeWeekDaysInput, formatSlotWeekDaysLabel, slotAppliesOnSelection, parseWeekDays } = require('../utils/slotWeekDays');
+const { formatWeekDays } = require('../utils/weekDays');
 const { formatTimeRange12, withSlotTimeLabels, normalizeTimeBody } = require('../utils/timeFormat');
 const {
     findTimeConflict,
@@ -76,6 +77,7 @@ const {
 } = require('../utils/rosterExcel');
 const { commitmentAlreadyExists, rosterMemberAlreadyExists } = require('../utils/rosterImport');
 const { createAdminReservation } = require('../utils/adminReservation');
+const { buildPriorityWeek } = require('../utils/prioritySlots');
 const {
     countWeeklyActiveSlotOccurrences,
     listWeeklyActiveSlotOccurrences,
@@ -660,7 +662,7 @@ router.put('/reservations/:id', requirePermission(PRIV.RESERVATIONS_CHECKIN), as
         const status = req.body?.status;
         const slotId = req.body?.slotId !== undefined ? Number(req.body.slotId) : existing.slotId;
 
-        if (req.body?.userPhone !== undefined && !isValidPhone(userPhone)) {
+        if (req.body?.userPhone !== undefined && userPhone && !isValidPhone(userPhone)) {
             return res.status(400).json({ error: 'El celular debe tener exactamente 8 dígitos.' });
         }
         if (!first) {
@@ -1267,13 +1269,14 @@ router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) =
             orderBy: [{ userLastName: 'asc' }, { userFirstName: 'asc' }],
         });
 
-        const byPhone = new Map();
+        const byKey = new Map();
 
         for (const r of reservations) {
-            const phone = r.userPhone;
-            if (!phone) continue;
+            const phone = r.userPhone || '';
+            const key = phone
+                || `name:${String(r.userLastName || '').trim().toLowerCase()}|${String(r.userFirstName || '').trim().toLowerCase()}`;
 
-            let entry = byPhone.get(phone);
+            let entry = byKey.get(key);
             if (!entry) {
                 entry = {
                     phone,
@@ -1285,7 +1288,7 @@ router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) =
                     frequencies: new Set(),
                     reservationIds: new Set(),
                 };
-                byPhone.set(phone, entry);
+                byKey.set(key, entry);
             }
 
             entry.reservationIds.add(r.id);
@@ -1300,7 +1303,7 @@ router.get('/adoradores', requirePermission(PRIV.SLOTS_VIEW), async (req, res) =
             if (r.frequency) entry.frequencies.add(r.frequency);
         }
 
-        const adoradores = [...byPhone.values()]
+        const adoradores = [...byKey.values()]
             .map((a) => ({
                 phone: a.phone,
                 firstName: a.firstName,
@@ -1602,11 +1605,21 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
             req,
         });
 
+        let totalActive = null;
+        if (section === 'commitments') {
+            totalActive = await prisma.reservation.count({
+                where: { status: { in: ['confirmed', 'completed'] } },
+            });
+        } else {
+            const role = section === 'captains' ? 'captain' : 'substitute';
+            totalActive = await prisma.rosterMember.count({ where: { role, isActive: true } });
+        }
+
         let message = '';
         if (created.length) {
-            message = `Importación completada: ${created.length} registro${created.length === 1 ? '' : 's'} creado${created.length === 1 ? '' : 's'}.`;
+            message = `Importación completada: ${created.length} registro${created.length === 1 ? '' : 's'} nuevo${created.length === 1 ? '' : 's'} agregado${created.length === 1 ? '' : 's'} (los anteriores se conservan).`;
         } else {
-            message = 'No se importó ningún registro nuevo.';
+            message = 'No se importó ningún registro nuevo (los existentes se conservan).';
         }
         if (skipped.length) {
             message += ` ${skipped.length} fila${skipped.length === 1 ? '' : 's'} omitida${skipped.length === 1 ? '' : 's'} (ya existían).`;
@@ -1614,8 +1627,18 @@ router.post('/roster/import', requirePermission(PRIV.SLOTS_EDIT), async (req, re
         if (errors.length) {
             message += ` ${errors.length} fila${errors.length === 1 ? '' : 's'} con error.`;
         }
+        if (totalActive != null) {
+            message += ` Total activo ahora: ${totalActive}.`;
+        }
 
-        res.json({ message, created: created.length, skipped: skipped.length, errors, skippedDetails: skipped });
+        res.json({
+            message,
+            created: created.length,
+            skipped: skipped.length,
+            errors,
+            skippedDetails: skipped,
+            totalActive,
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al importar la lista.' });
@@ -1739,6 +1762,7 @@ router.delete('/roster-members/:id', requirePermission(PRIV.SLOTS_EDIT), async (
 router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res) => {
     try {
         const date = req.query.date || todayStr();
+        const days = Math.min(14, Math.max(1, Number(req.query.days) || 7));
         const allSlots = await prisma.slot.findMany({
             where: { isActive: true },
             orderBy: { startTime: 'asc' },
@@ -1746,28 +1770,24 @@ router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res)
         const { slots: eligible } = filterSlotsForDate(allSlots, date);
 
         const reservations = await prisma.reservation.findMany({
-            where: { date, status: { in: ['confirmed', 'completed'] } },
+            where: { status: { in: ['confirmed', 'completed'] } },
             include: { slot: true },
             orderBy: { createdAt: 'asc' },
         });
 
-        const bySlot = {};
-        for (const r of reservations) {
-            if (!bySlot[r.slotId]) bySlot[r.slotId] = [];
-            bySlot[r.slotId].push(r);
-        }
-
         const blocks = eligible.map((slot) => {
-            const commitments = (bySlot[slot.id] || []).map((r) => ({
-                id: r.id,
-                userName: r.userName,
-                userFirstName: r.userFirstName,
-                userLastName: r.userLastName,
-                startTimeOffset: r.startTimeOffset,
-                durationMinutes: r.durationMinutes,
-                frequency: r.frequency,
-                status: r.status,
-            }));
+            const commitments = reservations
+                .filter((r) => r.slotId === slot.id && commitmentAppliesOn(r, date))
+                .map((r) => ({
+                    id: r.id,
+                    userName: r.userName,
+                    userFirstName: r.userFirstName,
+                    userLastName: r.userLastName,
+                    startTimeOffset: r.startTimeOffset,
+                    durationMinutes: r.durationMinutes,
+                    frequency: r.frequency,
+                    status: r.status,
+                }));
             const gapStatus = checkTimelineGaps(commitments);
             const fractional = hasFractionalCoverage(commitments);
             return {
@@ -1775,13 +1795,22 @@ router.get('/timeline', requirePermission(PRIV.DASHBOARD_VIEW), async (req, res)
                 startTime: slot.startTime,
                 endTime: slot.endTime,
                 commitments,
+                reserved: commitments.length,
                 gapStatus,
                 gapAlert: gapStatus === GAP_STATUS.CRITICAL_GAP,
                 fractional,
             };
         });
 
-        res.json({ date, blocks });
+        const priorityWeek = buildPriorityWeek({
+            slots: allSlots,
+            reservations,
+            startDate: date,
+            days,
+            max: 16,
+        });
+
+        res.json({ date, blocks, priorityWeek });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al obtener timeline.' });

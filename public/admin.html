@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo | Adoratio</title>
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="stylesheet" href="style.css?v=2026072002">
-    <link rel="stylesheet" href="admin.css?v=2026072013">
+    <link rel="stylesheet" href="admin.css?v=2026072015">
 </head>
 <body class="admin">
     <!-- Login -->
@@ -716,7 +720,7 @@
                         </section>
                         <aside class="wa-inbox-client-col" id="waInboxClientCol" hidden>
                             <div class="wa-inbox-client-header">
-                                <h4>Cliente</h4>
+                                <h4>Contacto</h4>
                                 <button type="button" class="ghost-btn" id="waInboxCloseClient" aria-label="Cerrar ficha">×</button>
                             </div>
                             <div class="wa-inbox-client-body" id="waInboxClientBody"></div>
@@ -1070,6 +1074,22 @@
         </div>
     </div>
 
+    <!-- Modal asignar contraseña (Super Admin) -->
+    <div class="premium-sheet-overlay" id="adminPasswordSheet">
+        <div class="sheet-window">
+            <button class="sheet-close" data-close>×</button>
+            <h2 class="sheet-title">Asignar contraseña</h2>
+            <p class="muted" id="adminPasswordSheetUser" style="margin:0 0 12px;"></p>
+            <div class="booking-input-group">
+                <input type="password" id="adminPasswordNew" class="touch-input-field" placeholder="Nueva contraseña (mín. 6)" style="background:#fff;color:#000;" autocomplete="new-password">
+            </div>
+            <div class="booking-input-group">
+                <input type="password" id="adminPasswordConfirm" class="touch-input-field" placeholder="Confirmar contraseña" style="background:#fff;color:#000;" autocomplete="new-password">
+            </div>
+            <button class="sheet-primary-btn" id="adminPasswordSaveBtn" type="button">GUARDAR CONTRASEÑA</button>
+        </div>
+    </div>
+
     <div class="premium-sheet-overlay" id="confirmSheet" aria-hidden="true">
         <div class="sheet-window sheet-window--confirm" role="dialog" aria-labelledby="confirmSheetTitle" aria-modal="true">
             <h2 class="sheet-title sheet-title--confirm" id="confirmSheetTitle">Confirmar</h2>
@@ -1083,6 +1103,6 @@
 
     <script src="timeFormat.js"></script>
     <script src="app.js"></script>
-    <script src="admin.js?v=2026072013"></script>
+    <script src="admin.js?v=2026072015"></script>
 </body>
 </html>

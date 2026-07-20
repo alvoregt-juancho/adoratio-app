@@ -8,6 +8,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>AdoraHora — Parroquia Cristo Rey</title>
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <script>document.documentElement.classList.add('view-home');</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2522,19 +2526,32 @@
                 nextTurnReservation = null;
                 urgentSection.style.display = 'block';
                 try {
-                    const res = await fetch('/api/slots?date=' + todayISO());
+                    const res = await fetch('/api/slots/priority?days=7&max=6');
                     const data = await res.json();
-                    const urgent = (data.slots || []).filter(s => s.critical || s.reserved === 0);
+                    const urgent = data.slots || [];
                     if (!urgent.length) {
-                        urgentList.innerHTML = '<div class="slots-empty">No hay turnos prioritarios hoy. ¡Gloria a Dios!</div>';
+                        urgentList.innerHTML = '<div class="slots-empty">No hay turnos prioritarios esta semana. ¡Gloria a Dios!</div>';
                         return;
                     }
-                    urgentList.innerHTML = urgent.slice(0, 3).map(s => {
-                        const slotData = JSON.stringify({ id: s.id, startTime: s.startTime, endTime: s.endTime, date: todayISO() });
+                    const tierHint = data.tierLabel
+                        ? '<p class="status-subtext" style="margin:0 0 10px;">Prioridad: ' + data.tierLabel + '</p>'
+                        : '';
+                    urgentList.innerHTML = tierHint + urgent.slice(0, 6).map(s => {
+                        const slotData = JSON.stringify({
+                            id: s.id || s.slotId,
+                            startTime: s.startTime,
+                            endTime: s.endTime,
+                            date: s.date,
+                        });
+                        const dayLine = (s.weekdayLabel || '') + (s.date ? ' · ' + s.date : '');
+                        const alertText = s.reserved === 0
+                            ? 'Espacio sin custodia'
+                            : (s.reserved === 1 ? 'Solo 1 adorador' : 'Solo 2 adoradores');
                         return '<div class="premium-card card-urgente" data-slot=\'' + slotData + '\'>' +
                             '<div class="card-flex-row"><div><div class="time-signature">' +
                             formatSlotTime(s.startTime, s.endTime) + '</div>' +
-                            '<div class="status-subtext alert">Espacio sin custodia</div></div>' +
+                            '<div class="status-subtext">' + dayLine + '</div>' +
+                            '<div class="status-subtext alert">' + alertText + '</div></div>' +
                             '<div class="action-circle-icon">+</div></div></div>';
                     }).join('');
                     urgentList.querySelectorAll('[data-slot]').forEach(el => {

@@ -10,9 +10,17 @@ async function commitmentAlreadyExists(parsed) {
     });
     if (!slot) return false;
 
+    const identity = parsed.phone
+        ? { userPhone: parsed.phone }
+        : {
+            userPhone: '',
+            userFirstName: parsed.firstName,
+            userLastName: parsed.lastName || '',
+        };
+
     const existing = await prisma.reservation.findFirst({
         where: {
-            userPhone: parsed.phone,
+            ...identity,
             slotId: slot.id,
             frequency: parsed.frequency,
             weekDays: parsed.weekDays,

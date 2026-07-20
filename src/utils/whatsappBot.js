@@ -1,6 +1,6 @@
 const prisma = require('../db');
 const config = require('../config');
-const { sendText, sendButtons, parseWaPhone } = require('./whatsapp');
+const { sendText, sendButtons, sendList, parseWaPhone } = require('./whatsapp');
 const { normalizePhone, isValidPhone } = require('./phone');
 const { todayStr } = require('./dates');
 const { filterSlotsForDate } = require('./schedule');
@@ -8,6 +8,11 @@ const { formatTimeRange12 } = require('./timeFormat');
 const { getUpcomingOccurrenceDates, hoursUntilOccurrence } = require('./whatsappOccurrences');
 const { notifyCaptainOccurrenceAbsence } = require('./whatsappAbsence');
 const { sendBookingConfirmedTemplate } = require('./whatsappTemplates');
+const {
+    preferenceLabel,
+    parseReminderPreferenceChoice,
+    normalizeReminderPreference,
+} = require('./whatsappReminderPreference');
 const {
     getWhatsAppBotConfig,
     truncateBotText,
@@ -27,6 +32,14 @@ const { COMMITMENT_FREQUENCY, FREQUENCY_LABELS } = require('../constants/commitm
 
 const TEMPLATE_CONFIRM_TEXTS = ['sí, asistiré', 'si, asistire', 'si asistire', 'sí asistiré'];
 const TEMPLATE_ABSENCE_TEXTS = ['no podré asistir', 'no podre asistir', 'no podré', 'no podre'];
+const TEMPLATE_REMINDER_PREF_TEXTS = [
+    'ambos 24h y 3h',
+    'ambos 24 h y 3 h',
+    'solo 24 horas',
+    'solo 3 horas',
+    'no recordar',
+    'no es necesario',
+];
 
 const FAQ = [
     {
@@ -34,7 +47,7 @@ const FAQ = [
         answer:
             `*¿Cómo funciona AdoraHora?*\n\n` +
             `1️⃣ Reservas un turno de adoración al Santísimo (por web o aquí en WhatsApp)\n` +
-            `2️⃣ Te recordamos 24 h y 3 h antes de tu guardia\n` +
+            `2️⃣ Te preguntamos si deseas recordatorios (24 h, 3 h, ambos o ninguno)\n` +
             `3️⃣ Si no puedes asistir, avísanos y el capitán busca un sustituto\n` +
             `4️⃣ Al llegar a la capilla, escaneas el código QR para registrar tu asistencia\n\n` +
             `Horario de adoración: 7:00 AM – 8:00 PM todos los días.\n` +
@@ -488,9 +501,10 @@ async function handleButtonReply(phone, buttonId) {
             if (!sentTemplate) {
                 await sendText(
                     phone,
-                    `✅ *¡Reserva confirmada!*\n\n📅 ${reservation.date}\n⏰ ${slotLabel}\n\nTe enviaremos recordatorios 24 h y 3 h antes. 🙏`
+                    `✅ *¡Reserva confirmada!*\n\n📅 ${reservation.date}\n⏰ ${slotLabel}\n\n¿Deseas que te recordemos antes de tu turno?`
                 );
             }
+            await askReminderPreference(phone, reservation.id);
         } catch (e) {
             await sendText(phone, `No se pudo completar la reserva: ${e.message}`);
         }
@@ -525,6 +539,88 @@ async function handleButtonReply(phone, buttonId) {
         await handleConfirmButton(phone, Number(confirmMatch[1]), confirmMatch[2]);
         return;
     }
+
+    if (await tryApplyReminderPreference(phone, buttonId)) return;
+}
+
+async function askReminderPreference(phone, reservationId) {
+    await sendList(
+        phone,
+        '¿Deseas que te recordemos antes de tu guardia?\n\n' +
+            '• Ambos: 24 h y 3 h antes\n' +
+            '• Solo 24 horas\n' +
+            '• Solo 3 horas\n' +
+            '• No recordar',
+        'Elegir opción',
+        [
+            {
+                title: 'Recordatorios',
+                rows: [
+                    {
+                        id: `remindpref_${reservationId}_both`,
+                        title: 'Ambos 24h y 3h',
+                        description: 'Te avisamos dos veces',
+                    },
+                    {
+                        id: `remindpref_${reservationId}_24h`,
+                        title: 'Solo 24 horas',
+                        description: 'Un aviso el día anterior',
+                    },
+                    {
+                        id: `remindpref_${reservationId}_3h`,
+                        title: 'Solo 3 horas',
+                        description: 'Un aviso el mismo día',
+                    },
+                    {
+                        id: `remindpref_${reservationId}_none`,
+                        title: 'No recordar',
+                        description: 'Sin mensajes de recordatorio',
+                    },
+                ],
+            },
+        ]
+    );
+}
+
+async function tryApplyReminderPreference(phone, rawChoice) {
+    const parsed = parseReminderPreferenceChoice(rawChoice);
+    if (!parsed) return false;
+
+    let reservation = null;
+    if (parsed.reservationId) {
+        reservation = await prisma.reservation.findFirst({
+            where: { id: parsed.reservationId, userPhone: phone, status: 'confirmed' },
+        });
+    }
+    if (!reservation) {
+        reservation = await prisma.reservation.findFirst({
+            where: { userPhone: phone, status: 'confirmed' },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+    if (!reservation) {
+        await sendText(phone, 'No encontré una reserva reciente para guardar esa preferencia.');
+        return true;
+    }
+
+    const preference = normalizeReminderPreference(parsed.preference);
+    await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { reminderPreference: preference },
+    });
+
+    if (preference === 'none') {
+        await sendText(
+            phone,
+            'Listo: no te enviaremos recordatorios de esta reserva. Si cambias de opinión, escribe *menu*. 🙏'
+        );
+    } else {
+        await sendText(
+            phone,
+            `Perfecto: te recordaremos *${preferenceLabel(preference)}*. ¡Dios te bendiga! 🙏`
+        );
+    }
+    return true;
 }
 
 async function handleIncomingMessage(waId, text, buttonId = null) {
@@ -539,6 +635,17 @@ async function handleIncomingMessage(waId, text, buttonId = null) {
 
     if (buttonId) {
         await handleButtonReply(phone, buttonId);
+        return;
+    }
+
+    const prefFromText = parseReminderPreferenceChoice(msg);
+    const looksLikePrefButton = TEMPLATE_REMINDER_PREF_TEXTS.some(
+        (t) => msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
+            t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        )
+    );
+    if (prefFromText && looksLikePrefButton) {
+        await tryApplyReminderPreference(phone, msg);
         return;
     }
 

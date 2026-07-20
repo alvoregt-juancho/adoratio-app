@@ -53,12 +53,13 @@ async function createAdminReservation(body, { req } = {}) {
     const startTimeOffset = Number(body?.startTimeOffset ?? 0);
     const commitmentMonths = Number(body?.commitmentMonths ?? 12);
 
-    if ((!slotId && !body?.slotTime) || !first || !userPhone) {
-        const err = new Error('Turno, nombre y celular son requeridos.');
+    if ((!slotId && !body?.slotTime) || !first) {
+        const err = new Error('Turno y nombre son requeridos.');
         err.status = 400;
         throw err;
     }
-    if (!isValidPhone(userPhone)) {
+    // Celular opcional; si se indica, debe ser de 8 dígitos.
+    if (userPhone && !isValidPhone(userPhone)) {
         const err = new Error('El celular debe tener exactamente 8 dígitos.');
         err.status = 400;
         throw err;

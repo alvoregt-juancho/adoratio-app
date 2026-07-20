@@ -1,22 +1,28 @@
 /**
  * Detección de espacios de 30 minutos en bloques horarios.
- * Un bloque de 1 hora queda solo si falta cobertura en la primera o segunda media hora.
+ * CRITICAL_GAP solo aplica cuando hay cobertura parcial:
+ * una media hora cubierta y la otra vacía.
+ * Una hora completamente vacía no es un “hueco de 30 min”.
  */
 
 const GAP_STATUS = {
     COVERED: 'COVERED',
+    EMPTY: 'EMPTY',
     CRITICAL_GAP: 'CRITICAL_GAP',
 };
 
 /**
  * @param {Array<{ startTimeOffset: number, durationMinutes: number }>} commitments
- * @returns {'COVERED' | 'CRITICAL_GAP'}
+ * @returns {'COVERED' | 'EMPTY' | 'CRITICAL_GAP'}
  */
 function checkTimelineGaps(commitments) {
+    const list = Array.isArray(commitments) ? commitments : [];
+    if (!list.length) return GAP_STATUS.EMPTY;
+
     let hasFirstHalfCoverage = false;
     let hasSecondHalfCoverage = false;
 
-    for (const c of commitments) {
+    for (const c of list) {
         const offset = c.startTimeOffset ?? c.offsetMinutes ?? 0;
         const duration = c.durationMinutes ?? 60;
 
@@ -26,15 +32,19 @@ function checkTimelineGaps(commitments) {
         }
     }
 
-    if (!hasFirstHalfCoverage || !hasSecondHalfCoverage) {
+    if (hasFirstHalfCoverage && hasSecondHalfCoverage) {
+        return GAP_STATUS.COVERED;
+    }
+    // Solo es hueco de 30 min si una mitad está cubierta y la otra no.
+    if (hasFirstHalfCoverage || hasSecondHalfCoverage) {
         return GAP_STATUS.CRITICAL_GAP;
     }
-    return GAP_STATUS.COVERED;
+    return GAP_STATUS.EMPTY;
 }
 
 /** Indica si algún compromiso usa duración u offset no estándar (30 min). */
 function hasFractionalCoverage(commitments) {
-    return commitments.some((c) => {
+    return (Array.isArray(commitments) ? commitments : []).some((c) => {
         const offset = c.startTimeOffset ?? c.offsetMinutes ?? 0;
         const duration = c.durationMinutes ?? 60;
         return offset === 30 || duration === 30;

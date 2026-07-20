@@ -304,6 +304,57 @@ router.put('/users/:id/role', attachPrivileges, requirePermission(PRIV.USERS_MAN
     }
 });
 
+/** Solo Super Admin: asigna una nueva contraseña a un administrador (sin pedir la actual). */
+router.put('/users/:id/password', attachPrivileges, async (req, res) => {
+    try {
+        if (!req.user?.isSuperAdmin && req.user?.adminRoleSlug !== 'super-admin') {
+            return res.status(403).json({ error: 'Solo Super Admin puede asignar contraseñas.' });
+        }
+
+        const id = Number(req.params.id);
+        const password = String(req.body?.password || '');
+        if (!id) return res.status(400).json({ error: 'Usuario inválido.' });
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+        }
+        if (password.length > 128) {
+            return res.status(400).json({ error: 'La contraseña es demasiado larga.' });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id },
+            include: { adminRole: true },
+        });
+        if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+        const isPanelUser = Boolean(user.adminRoleId) || ['lector', 'admin', 'superadmin'].includes(user.role);
+        if (!isPanelUser) {
+            return res.status(400).json({ error: 'Solo se pueden asignar contraseñas a usuarios del panel.' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+        await prisma.user.update({
+            where: { id },
+            data: { passwordHash },
+        });
+
+        await writeAudit({
+            action: 'user.password.set',
+            entity: 'user',
+            entityId: id,
+            targetUserId: id,
+            userId: req.user.id,
+            meta: { email: user.email, bySuperAdmin: true },
+            req,
+        });
+
+        res.json({ message: 'Contraseña actualizada.' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al asignar contraseña.' });
+    }
+});
+
 // ── AUDITORÍA ─────────────────────────────────────────────────────────
 router.get('/audit-logs', attachPrivileges, requirePermission(PRIV.AUDIT_VIEW), async (req, res) => {
     try {
