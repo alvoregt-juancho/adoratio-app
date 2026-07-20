@@ -1087,7 +1087,7 @@ body.admin .login-overlay {
 
 body.admin .login-card {
     background: #ffffff;
-    border: 1px solid #e5e5ea;
+    border: 1px solid rgba(17, 18, 21, 0.09);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
 }
 
@@ -1137,7 +1137,7 @@ body.admin .tab.active {
 
 body.admin .metric-card {
     background: #fafafa;
-    border: 1px solid #e5e5ea;
+    border: 1px solid var(--admin-border, rgba(17, 18, 21, 0.09));
     width: 100%;
     appearance: none;
     -webkit-appearance: none;
@@ -1166,7 +1166,7 @@ body.admin .metric-label {
 }
 
 body.admin .table-wrap {
-    border: 1px solid #e5e5ea;
+    border: 1px solid rgba(17, 18, 21, 0.09);
     background: #ffffff;
 }
 
