@@ -72,9 +72,9 @@ const adminRoutes = read('src/routes/whatsappAdmin.js');
 if (adminRoutes.includes('/sessions') && adminRoutes.includes('/reply') && adminRoutes.includes('/handoff')) {
     ok('API handoff operador');
 } else fail('API handoff');
-if (read('public/admin.html').includes('waHandoffCard')) {
-    ok('UI panel handoff');
-} else fail('UI handoff');
+if (read('public/admin.html').includes('waInboxCard') && read('public/admin.js').includes('loadWhatsAppInbox')) {
+    ok('UI bandeja WhatsApp (inbox)');
+} else fail('UI inbox');
 
 // Fase 5
 console.log('\nFase 5 — Tiempo real + métricas');

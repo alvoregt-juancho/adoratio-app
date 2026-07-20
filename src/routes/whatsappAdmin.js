@@ -9,6 +9,12 @@ const { appendChatMessage } = require('../utils/chatMessages');
 const { startHandoff, endHandoff } = require('../utils/chatSession');
 const { subscribeWhatsAppSse, getSseClientCount, broadcastWhatsAppEvent } = require('../ws/adminWhatsAppHub');
 const {
+    funnelFromSession,
+    channelFromSession,
+    initialsFromSession,
+    truncatePreview,
+} = require('../utils/whatsappInboxMeta');
+const {
     getWhatsAppBotConfig,
     invalidateWhatsAppBotConfigCache,
     serializeBotConfig,
@@ -415,7 +421,9 @@ router.put('/ai-config', requirePermission(PRIV.WHATSAPP_MANAGE), async (req, re
     }
 });
 
-function serializeSession(row) {
+function serializeSession(row, extras = {}) {
+    const funnel = funnelFromSession(row);
+    const channel = channelFromSession(row);
     return {
         id: row.id,
         phone: row.phone,
@@ -427,20 +435,84 @@ function serializeSession(row) {
         contactName: row.contactName,
         lastMessageAt: row.lastMessageAt,
         updatedAt: row.updatedAt,
+        createdAt: row.createdAt,
+        initials: initialsFromSession(row),
+        funnelKey: funnel.key,
+        funnelLabel: funnel.label,
+        channelKey: channel.key,
+        channelLabel: channel.label,
+        ...extras,
     };
+}
+
+async function enrichSessionRow(row) {
+    const last = await prisma.chatMessage.findFirst({
+        where: {
+            sessionId: row.id,
+            role: { in: ['user', 'assistant', 'operator'] },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+    const lastOutbound = await prisma.chatMessage.findFirst({
+        where: { sessionId: row.id, role: { in: ['assistant', 'operator'] } },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+    });
+    const unreadWhere = {
+        sessionId: row.id,
+        role: 'user',
+        ...(lastOutbound?.createdAt ? { createdAt: { gt: lastOutbound.createdAt } } : {}),
+    };
+    const unreadCount = await prisma.chatMessage.count({ where: unreadWhere });
+    return serializeSession(row, {
+        lastMessagePreview: truncatePreview(last?.body || ''),
+        lastMessageRole: last?.role || null,
+        unreadCount: Math.min(unreadCount, 99),
+        needsAttention: row.handoffActive || unreadCount > 0,
+    });
 }
 
 router.get('/sessions', requirePermission(PRIV.WHATSAPP_OPERATE), async (req, res) => {
     try {
         const handoffOnly = req.query.handoff === '1' || req.query.handoff === 'true';
-        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 40));
-        const where = handoffOnly ? { handoffActive: true } : {};
-        const sessions = await prisma.whatsAppSession.findMany({
-            where,
-            orderBy: { lastMessageAt: 'desc' },
-            take: limit,
-        });
-        res.json({ sessions: sessions.map(serializeSession) });
+        const mode = String(req.query.mode || 'all'); // all | ai | rules | handoff | human
+        const q = String(req.query.q || '').trim();
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+        const offset = Math.max(0, Number(req.query.offset) || 0);
+
+        const where = {};
+        if (handoffOnly || mode === 'handoff' || mode === 'human') {
+            where.handoffActive = true;
+        } else if (mode === 'ai') {
+            where.handoffActive = false;
+            where.mode = 'ai';
+        } else if (mode === 'rules') {
+            where.handoffActive = false;
+            where.mode = 'rules';
+        }
+        if (q) {
+            where.OR = [
+                { phone: { contains: normalizePhone(q) || q } },
+                { contactName: { contains: q } },
+            ];
+        }
+
+        const [rows, total] = await Promise.all([
+            prisma.whatsAppSession.findMany({
+                where,
+                orderBy: [{ lastMessageAt: 'desc' }, { updatedAt: 'desc' }],
+                skip: offset,
+                take: limit,
+            }),
+            prisma.whatsAppSession.count({ where }),
+        ]);
+
+        const sessions = [];
+        for (const row of rows) {
+            sessions.push(await enrichSessionRow(row));
+        }
+
+        res.json({ sessions, total, limit, offset });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al listar sesiones.' });
@@ -453,16 +525,168 @@ router.get('/sessions/:phone/messages', requirePermission(PRIV.WHATSAPP_OPERATE)
         if (!phone) return res.status(400).json({ error: 'Teléfono inválido.' });
         const session = await prisma.whatsAppSession.findUnique({ where: { phone } });
         if (!session) return res.json({ messages: [], session: null });
-        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 80));
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 120));
         const messages = await prisma.chatMessage.findMany({
             where: { sessionId: session.id },
             orderBy: { createdAt: 'asc' },
             take: limit,
         });
-        res.json({ session: serializeSession(session), messages });
+        res.json({
+            session: await enrichSessionRow(session),
+            messages: messages.map((m) => ({
+                id: m.id,
+                role: m.role,
+                direction: m.direction,
+                body: m.body,
+                toolName: m.toolName,
+                messageType: m.messageType,
+                operatorId: m.operatorId,
+                createdAt: m.createdAt,
+            })),
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al cargar historial.' });
+    }
+});
+
+router.get('/sessions/:phone/client', requirePermission(PRIV.WHATSAPP_OPERATE), async (req, res) => {
+    try {
+        const phone = normalizePhone(req.params.phone);
+        if (!phone) return res.status(400).json({ error: 'Teléfono inválido.' });
+        const session = await prisma.whatsAppSession.findUnique({ where: { phone } });
+        if (!session) return res.status(404).json({ error: 'Sesión no encontrada.' });
+
+        const user = await prisma.user.findFirst({
+            where: { OR: [{ phoneNumber: phone }, { phoneNumber: { endsWith: phone } }] },
+            select: { id: true, name: true, email: true, phoneNumber: true, role: true, createdAt: true },
+        });
+
+        const reservations = await prisma.reservation.findMany({
+            where: { userPhone: phone, status: { in: ['confirmed', 'completed'] } },
+            include: { slot: { select: { startTime: true, endTime: true } } },
+            orderBy: { date: 'desc' },
+            take: 8,
+        });
+
+        const messages = await prisma.chatMessage.findMany({
+            where: { sessionId: session.id, role: { in: ['user', 'assistant', 'operator'] } },
+            orderBy: { createdAt: 'asc' },
+            select: { role: true, createdAt: true },
+        });
+
+        let responseSumMs = 0;
+        let responseCount = 0;
+        for (let i = 0; i < messages.length - 1; i++) {
+            if (messages[i].role === 'user' && ['assistant', 'operator'].includes(messages[i + 1].role)) {
+                const delta = new Date(messages[i + 1].createdAt) - new Date(messages[i].createdAt);
+                if (delta > 0 && delta < 30 * 60 * 1000) {
+                    responseSumMs += delta;
+                    responseCount += 1;
+                }
+            }
+        }
+
+        let sessionData = null;
+        try {
+            sessionData = session.data ? JSON.parse(session.data) : null;
+        } catch {
+            sessionData = null;
+        }
+
+        const auditRows = await prisma.auditLog.findMany({
+            where: {
+                entity: 'whatsapp_session',
+                entityId: session.id,
+                action: { in: ['whatsapp.handoff.start', 'whatsapp.handoff.release', 'whatsapp.session.clear'] },
+            },
+            include: { user: { select: { id: true, name: true, email: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+        });
+
+        const assignments = auditRows.map((a) => {
+            let meta = null;
+            try {
+                meta = a.meta ? JSON.parse(a.meta) : null;
+            } catch {
+                meta = null;
+            }
+            return {
+                action: a.action,
+                at: a.createdAt,
+                operatorName: a.user?.name || a.user?.email || null,
+                operatorId: a.userId,
+                reason: meta?.reason || null,
+                mode: meta?.mode || null,
+            };
+        });
+
+        res.json({
+            session: await enrichSessionRow(session),
+            client: {
+                displayName: session.contactName || user?.name || null,
+                phone,
+                email: user?.email || null,
+                userId: user?.id || null,
+                role: user?.role || null,
+                registeredAt: user?.createdAt || null,
+                bookingDraft: sessionData,
+                address: null,
+            },
+            reservations: reservations.map((r) => ({
+                id: r.id,
+                date: r.date,
+                status: r.status,
+                frequency: r.frequency,
+                userName: r.userName,
+                startTime: r.slot?.startTime,
+                endTime: r.slot?.endTime,
+            })),
+            assignments,
+            metrics: {
+                messageCount: messages.length,
+                avgResponseMs: responseCount ? Math.round(responseSumMs / responseCount) : null,
+                avgResponseSeconds: responseCount ? Math.round(responseSumMs / responseCount / 1000) : null,
+                hasReservation: reservations.length > 0,
+                conversion: reservations.length > 0 ? 'con_reserva' : 'sin_reserva',
+                conversionLabel: reservations.length > 0 ? 'Con reserva' : 'Sin reserva',
+            },
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al cargar ficha del contacto.' });
+    }
+});
+
+router.post('/sessions/:phone/clear', requirePermission(PRIV.WHATSAPP_OPERATE), async (req, res) => {
+    try {
+        const phone = normalizePhone(req.params.phone);
+        if (!phone) return res.status(400).json({ error: 'Teléfono inválido.' });
+        const session = await prisma.whatsAppSession.update({
+            where: { phone },
+            data: {
+                step: 'menu',
+                mode: 'rules',
+                handoffActive: false,
+                assignedOperatorId: null,
+                handoffReason: null,
+                data: '{}',
+            },
+        });
+        broadcastWhatsAppEvent('session:cleared', { phone });
+        await writeAudit({
+            action: 'whatsapp.session.clear',
+            entity: 'whatsapp_session',
+            entityId: session.id,
+            userId: req.user.id,
+            meta: { phone },
+            req,
+        });
+        res.json({ message: 'Sesión reiniciada al menú.', session: await enrichSessionRow(session) });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Error al limpiar sesión.' });
     }
 });
 
@@ -484,7 +708,7 @@ router.post('/sessions/:phone/handoff', requirePermission(PRIV.WHATSAPP_OPERATE)
             meta: { phone, reason },
             req,
         });
-        res.json({ message: 'Handoff activado.', session: serializeSession(session) });
+        res.json({ message: 'Handoff activado.', session: await enrichSessionRow(session) });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al activar handoff.' });
@@ -506,7 +730,7 @@ router.post('/sessions/:phone/release', requirePermission(PRIV.WHATSAPP_OPERATE)
             meta: { phone, mode },
             req,
         });
-        res.json({ message: 'Conversación devuelta al bot.', session: serializeSession(session) });
+        res.json({ message: 'Conversación devuelta al bot.', session: await enrichSessionRow(session) });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Error al liberar handoff.' });

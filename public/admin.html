@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo | Adoratio</title>
     <link rel="stylesheet" href="style.css?v=2026072002">
-    <link rel="stylesheet" href="admin.css?v=2026072002">
+    <link rel="stylesheet" href="admin.css?v=2026072013">
 </head>
 <body class="admin">
     <!-- Login -->
@@ -659,26 +659,68 @@
                 </div>
             </div>
 
-            <div class="panel-card" id="waHandoffCard" data-perm="WHATSAPP_OPERATE">
+            <div class="panel-card wa-inbox-card" id="waInboxCard" data-perm="WHATSAPP_OPERATE">
                 <div class="panel-card-header">
-                    <h3>Operador — conversaciones en handoff</h3>
-                    <button type="button" class="ghost-btn" id="waHandoffRefresh">Actualizar</button>
+                    <h3>Bandeja WhatsApp</h3>
+                    <button type="button" class="ghost-btn" id="waInboxRefresh">Actualizar</button>
                 </div>
-                <div class="panel-card-body">
-                    <p class="muted" id="waHandoffStatus">Cargando cola de handoff…</p>
-                    <div class="wa-handoff-layout">
-                        <div class="wa-handoff-list" id="waHandoffList"></div>
-                        <div class="wa-handoff-chat">
-                            <div class="wa-handoff-chat-header muted" id="waHandoffChatTitle">Selecciona una conversación</div>
-                            <div class="wa-handoff-messages" id="waHandoffMessages"></div>
-                            <div class="wa-handoff-reply" id="waHandoffReplyBox" hidden>
-                                <textarea id="waHandoffReplyText" class="touch-input-field dark-input wa-textarea" rows="2" placeholder="Escribe tu respuesta…"></textarea>
-                                <div class="wa-handoff-actions">
-                                    <button type="button" class="sheet-primary-btn" id="waHandoffSendBtn">Enviar</button>
-                                    <button type="button" class="ghost-btn" id="waHandoffReleaseBtn">Devolver al bot</button>
+                <div class="panel-card-body wa-inbox-body">
+                    <div class="wa-inbox-toolbar">
+                        <input type="search" id="waInboxSearch" class="touch-input-field dark-input" placeholder="Buscar nombre o teléfono…" autocomplete="off">
+                        <select id="waInboxModeFilter" class="touch-input-field dark-input" aria-label="Filtro canal">
+                            <option value="all">Todas</option>
+                            <option value="ai">IA</option>
+                            <option value="rules">Bot</option>
+                            <option value="handoff">Humano</option>
+                        </select>
+                        <p class="muted wa-inbox-status" id="waInboxStatus">Cargando conversaciones…</p>
+                    </div>
+                    <div class="wa-inbox-layout" id="waInboxLayout">
+                        <aside class="wa-inbox-list-col" id="waInboxListCol">
+                            <div class="wa-inbox-list" id="waInboxList" role="list"></div>
+                            <div class="wa-inbox-pager">
+                                <button type="button" class="ghost-btn" id="waInboxPrev">Anterior</button>
+                                <span class="muted" id="waInboxPageInfo"></span>
+                                <button type="button" class="ghost-btn" id="waInboxNext">Siguiente</button>
+                            </div>
+                        </aside>
+                        <section class="wa-inbox-chat-col" id="waInboxChatCol">
+                            <div class="wa-inbox-empty" id="waInboxEmpty">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                <p>Selecciona una conversación</p>
+                            </div>
+                            <div class="wa-inbox-chat" id="waInboxChat" hidden>
+                                <header class="wa-inbox-chat-header">
+                                    <button type="button" class="ghost-btn wa-inbox-back" id="waInboxBack" aria-label="Volver a la lista">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                                    </button>
+                                    <div class="wa-inbox-avatar" id="waInboxHeaderAvatar">?</div>
+                                    <div class="wa-inbox-chat-title">
+                                        <strong id="waInboxHeaderName">—</strong>
+                                        <span class="muted" id="waInboxHeaderPhone"></span>
+                                    </div>
+                                    <span class="wa-badge wa-badge-channel" id="waInboxHeaderChannel">—</span>
+                                    <div class="wa-inbox-header-actions">
+                                        <button type="button" class="sheet-primary-btn" id="waInboxTakeBtn">Tomar</button>
+                                        <button type="button" class="ghost-btn" id="waInboxReleaseBtn" hidden>Liberar</button>
+                                        <button type="button" class="ghost-btn" id="waInboxClearBtn">Limpiar sesión</button>
+                                        <button type="button" class="ghost-btn" id="waInboxToggleClient" title="Ficha del contacto">Info</button>
+                                    </div>
+                                </header>
+                                <div class="wa-inbox-messages" id="waInboxMessages"></div>
+                                <div class="wa-inbox-composer" id="waInboxComposer" hidden>
+                                    <textarea id="waInboxReplyText" class="touch-input-field dark-input wa-textarea" rows="2" placeholder="Escribe tu respuesta…"></textarea>
+                                    <button type="button" class="sheet-primary-btn" id="waInboxSendBtn">Enviar →</button>
                                 </div>
                             </div>
-                        </div>
+                        </section>
+                        <aside class="wa-inbox-client-col" id="waInboxClientCol" hidden>
+                            <div class="wa-inbox-client-header">
+                                <h4>Cliente</h4>
+                                <button type="button" class="ghost-btn" id="waInboxCloseClient" aria-label="Cerrar ficha">×</button>
+                            </div>
+                            <div class="wa-inbox-client-body" id="waInboxClientBody"></div>
+                        </aside>
                     </div>
                 </div>
             </div>
@@ -1041,6 +1083,6 @@
 
     <script src="timeFormat.js"></script>
     <script src="app.js"></script>
-    <script src="admin.js?v=2026072001"></script>
+    <script src="admin.js?v=2026072013"></script>
 </body>
 </html>

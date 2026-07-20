@@ -76,7 +76,7 @@
         "tab-perfiles": "Define qué puede ver y hacer cada rol en el back-office (permisos RBAC).",
         "tab-admins": "Usuarios con acceso al panel y el perfil RBAC asignado a cada uno.",
         "tab-auditoria": "Historial de acciones para trazabilidad, seguridad y revisión de cambios.",
-        "tab-whatsapp": "Bandeja de mensajes WhatsApp: entrantes, salientes y estado de entrega.",
+        "tab-whatsapp": "Bandeja WhatsApp: conversaciones, handoff operador, ficha del contacto y log de mensajes.",
         "section-resumen": "Resumen en tiempo real del estado de la capilla: ocupación, asistencias y alertas del día.",
         "timeline-panel": "Línea de tiempo de guardias de hoy. Detecta espacios sin adorador asignado.",
         "section-reservas": "Filtra por semana o mes y exporta la lista para reportes o seguimiento pastoral.",
@@ -484,7 +484,12 @@
     const AUDIT_LIMIT = 40;
     let whatsappOffset = 0;
     const WHATSAPP_LIMIT = 50;
-    let waHandoffSelectedPhone = null;
+    let waInboxSelectedPhone = null;
+    let waInboxOffset = 0;
+    const WA_INBOX_LIMIT = 50;
+    let waInboxListTimer = null;
+    let waInboxChatTimer = null;
+    let waInboxSearchTimer = null;
     let waSseSource = null;
     let slotsCache = [];
     let reservationsCache = [];
@@ -3927,119 +3932,342 @@
             waSseSource.onmessage = function (ev) {
                 try {
                     const payload = JSON.parse(ev.data);
-                    if (payload.type && payload.type.indexOf("handoff") >= 0 && hasPerm("WHATSAPP_OPERATE")) {
-                        loadWhatsAppHandoff();
-                    }
-                    if (payload.type === "handoff:message" && payload.data?.phone === waHandoffSelectedPhone) {
-                        loadWhatsAppHandoffChat(waHandoffSelectedPhone);
+                    if (!payload.type) return;
+                    if (payload.type.indexOf("handoff") >= 0 || payload.type.indexOf("message") >= 0 || payload.type === "session:cleared") {
+                        loadWhatsAppInbox(true);
+                        if (waInboxSelectedPhone && payload.data?.phone === waInboxSelectedPhone) {
+                            loadWhatsAppInboxChat(waInboxSelectedPhone, true);
+                            loadWhatsAppInboxClient(waInboxSelectedPhone);
+                        }
                     }
                 } catch (_) {}
             };
         } catch (_) {}
     }
 
-    async function loadWhatsAppHandoff() {
+    function waRelativeTime(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        const now = new Date();
+        const sameDay = d.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const time = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        if (sameDay) return time;
+        if (d.toDateString() === yesterday.toDateString()) return "Ayer " + time;
+        return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+    }
+
+    function waChannelBadge(session) {
+        const key = session?.channelKey || (session?.handoffActive ? "human" : session?.mode === "ai" ? "ai" : "rules");
+        const label = session?.channelLabel || (key === "human" ? "Humano" : key === "ai" ? "IA" : "Bot");
+        return "<span class='wa-badge wa-badge-" + key + "'>" + escapeHtml(label) + "</span>";
+    }
+
+    function waFunnelBadge(session) {
+        if (!session?.funnelLabel) return "";
+        return "<span class='wa-badge wa-badge-funnel wa-funnel-" + escapeHtml(session.funnelKey || "other") + "'>" +
+            escapeHtml(session.funnelLabel) + "</span>";
+    }
+
+    function startWhatsAppInboxPolling() {
+        stopWhatsAppInboxPolling();
+        waInboxListTimer = setInterval(function () {
+            if (document.getElementById("tab-whatsapp")?.classList.contains("active")) {
+                loadWhatsAppInbox(true);
+            }
+        }, 5000);
+        waInboxChatTimer = setInterval(function () {
+            if (waInboxSelectedPhone && document.getElementById("tab-whatsapp")?.classList.contains("active")) {
+                loadWhatsAppInboxChat(waInboxSelectedPhone, true);
+            }
+        }, 3000);
+    }
+
+    function stopWhatsAppInboxPolling() {
+        if (waInboxListTimer) clearInterval(waInboxListTimer);
+        if (waInboxChatTimer) clearInterval(waInboxChatTimer);
+        waInboxListTimer = null;
+        waInboxChatTimer = null;
+    }
+
+    function setWhatsAppInboxMobileView(showChat) {
+        const layout = document.getElementById("waInboxLayout");
+        if (!layout) return;
+        layout.classList.toggle("wa-inbox-show-chat", !!showChat);
+    }
+
+    function setWhatsAppClientPanel(open) {
+        const col = document.getElementById("waInboxClientCol");
+        const layout = document.getElementById("waInboxLayout");
+        if (!col || !layout) return;
+        col.hidden = !open;
+        layout.classList.toggle("wa-inbox-client-open", !!open);
+    }
+
+    async function loadWhatsAppInbox(silent) {
         if (!hasPerm("WHATSAPP_OPERATE")) return;
-        const statusEl = document.getElementById("waHandoffStatus");
-        const listEl = document.getElementById("waHandoffList");
+        const statusEl = document.getElementById("waInboxStatus");
+        const listEl = document.getElementById("waInboxList");
+        const pageInfo = document.getElementById("waInboxPageInfo");
         if (!listEl) return;
+        const q = (document.getElementById("waInboxSearch")?.value || "").trim();
+        const mode = document.getElementById("waInboxModeFilter")?.value || "all";
         try {
-            const res = await api("/api/admin/whatsapp/sessions?handoff=1&limit=50");
+            const params = new URLSearchParams({
+                limit: String(WA_INBOX_LIMIT),
+                offset: String(waInboxOffset),
+                mode: mode,
+            });
+            if (q) params.set("q", q);
+            const res = await api("/api/admin/whatsapp/sessions?" + params.toString());
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Error");
             const sessions = data.sessions || [];
-            if (statusEl) {
-                statusEl.textContent = sessions.length
-                    ? sessions.length + " conversación(es) esperando operador."
-                    : "No hay conversaciones en handoff ahora.";
+            const total = data.total || 0;
+            if (statusEl && !silent) {
+                statusEl.textContent = total
+                    ? total + " conversación(es)"
+                    : "Sin conversaciones";
+            } else if (statusEl && silent) {
+                statusEl.textContent = total + " conversación(es)";
             }
+            if (pageInfo) {
+                const from = total ? waInboxOffset + 1 : 0;
+                const to = Math.min(waInboxOffset + WA_INBOX_LIMIT, total);
+                pageInfo.textContent = from ? from + "–" + to + " de " + total : "0";
+            }
+            const prevBtn = document.getElementById("waInboxPrev");
+            const nextBtn = document.getElementById("waInboxNext");
+            if (prevBtn) prevBtn.disabled = waInboxOffset <= 0;
+            if (nextBtn) nextBtn.disabled = waInboxOffset + WA_INBOX_LIMIT >= total;
+
             listEl.innerHTML = sessions.length
                 ? sessions.map(function (s) {
-                    const active = s.phone === waHandoffSelectedPhone ? " wa-handoff-item-active" : "";
-                    const name = s.contactName ? escapeHtml(s.contactName) + " · " : "";
-                    return "<button type='button' class='wa-handoff-item" + active + "' data-phone='" + escapeHtml(s.phone) + "'>" +
-                        name + escapeHtml(s.phone) + "<br><span class='muted'>" + escapeHtml(s.handoffReason || "") + "</span></button>";
+                    const active = s.phone === waInboxSelectedPhone ? " wa-inbox-item-active" : "";
+                    const title = s.contactName || s.phone;
+                    const unread = s.unreadCount > 0
+                        ? "<span class='wa-badge wa-badge-unread'>" + s.unreadCount + "</span>"
+                        : "";
+                    return "<button type='button' class='wa-inbox-item" + active + "' data-phone='" + escapeHtml(s.phone) + "' role='listitem'>" +
+                        "<div class='wa-inbox-avatar'>" + escapeHtml(s.initials || "??") + "</div>" +
+                        "<div class='wa-inbox-item-main'>" +
+                        "<div class='wa-inbox-item-top'><span class='wa-inbox-item-name'>" + escapeHtml(title) +
+                        "</span><span class='wa-inbox-item-time'>" + escapeHtml(waRelativeTime(s.lastMessageAt || s.updatedAt)) + "</span></div>" +
+                        "<div class='wa-inbox-item-badges'>" + waChannelBadge(s) + waFunnelBadge(s) + unread + "</div>" +
+                        "<div class='wa-inbox-item-preview muted'>" + escapeHtml(s.lastMessagePreview || "Sin mensajes") + "</div>" +
+                        "</div></button>";
                 }).join("")
-                : "<p class='muted'>Sin handoffs activos.</p>";
-            listEl.querySelectorAll(".wa-handoff-item").forEach(function (btn) {
+                : "<p class='muted wa-inbox-empty-list'>No hay sesiones con este filtro.</p>";
+
+            listEl.querySelectorAll(".wa-inbox-item").forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    waHandoffSelectedPhone = btn.getAttribute("data-phone");
-                    loadWhatsAppHandoff();
-                    loadWhatsAppHandoffChat(waHandoffSelectedPhone);
+                    selectWhatsAppInboxSession(btn.getAttribute("data-phone"));
                 });
             });
         } catch (e) {
-            if (statusEl) statusEl.textContent = e.message || "Error al cargar handoffs.";
+            if (statusEl) statusEl.textContent = e.message || "Error al cargar bandeja.";
         }
     }
 
-    async function loadWhatsAppHandoffChat(phone) {
+    function selectWhatsAppInboxSession(phone) {
+        waInboxSelectedPhone = phone;
+        setWhatsAppInboxMobileView(true);
+        setWhatsAppClientPanel(true);
+        loadWhatsAppInbox(true);
+        loadWhatsAppInboxChat(phone);
+        loadWhatsAppInboxClient(phone);
+    }
+
+    function clearWhatsAppInboxSelection() {
+        waInboxSelectedPhone = null;
+        setWhatsAppInboxMobileView(false);
+        setWhatsAppClientPanel(false);
+        const empty = document.getElementById("waInboxEmpty");
+        const chat = document.getElementById("waInboxChat");
+        if (empty) empty.hidden = false;
+        if (chat) chat.hidden = true;
+        loadWhatsAppInbox(true);
+    }
+
+    async function loadWhatsAppInboxChat(phone, silent) {
         if (!phone || !hasPerm("WHATSAPP_OPERATE")) return;
-        const titleEl = document.getElementById("waHandoffChatTitle");
-        const msgEl = document.getElementById("waHandoffMessages");
-        const replyBox = document.getElementById("waHandoffReplyBox");
+        const empty = document.getElementById("waInboxEmpty");
+        const chat = document.getElementById("waInboxChat");
+        const msgEl = document.getElementById("waInboxMessages");
+        const composer = document.getElementById("waInboxComposer");
+        const takeBtn = document.getElementById("waInboxTakeBtn");
+        const releaseBtn = document.getElementById("waInboxReleaseBtn");
         try {
             const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(phone) + "/messages?limit=120");
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Error");
             const session = data.session;
-            if (titleEl) {
-                titleEl.textContent = (session?.contactName ? session.contactName + " · " : "") + phone +
-                    (session?.handoffActive ? " — handoff activo" : "");
+            if (empty) empty.hidden = true;
+            if (chat) chat.hidden = false;
+
+            const name = session?.contactName || phone;
+            const avatar = document.getElementById("waInboxHeaderAvatar");
+            const nameEl = document.getElementById("waInboxHeaderName");
+            const phoneEl = document.getElementById("waInboxHeaderPhone");
+            const channelEl = document.getElementById("waInboxHeaderChannel");
+            if (avatar) avatar.textContent = session?.initials || "??";
+            if (nameEl) nameEl.textContent = name;
+            if (phoneEl) phoneEl.textContent = phone;
+            if (channelEl) {
+                channelEl.className = "wa-badge wa-badge-channel wa-badge-" + (session?.channelKey || "rules");
+                channelEl.textContent = session?.channelLabel || "Bot";
             }
-            if (replyBox) replyBox.hidden = !session?.handoffActive;
+            if (takeBtn) takeBtn.hidden = !!session?.handoffActive;
+            if (releaseBtn) releaseBtn.hidden = !session?.handoffActive;
+            if (composer) composer.hidden = !session?.handoffActive;
+
             if (msgEl) {
+                const prevBottom = msgEl.scrollHeight - msgEl.scrollTop - msgEl.clientHeight < 80;
                 msgEl.innerHTML = (data.messages || []).map(function (m) {
-                    const cls = m.role === "user" ? "wa-chat-user" : (m.role === "operator" ? "wa-chat-operator" : "wa-chat-bot");
-                    return "<div class='wa-chat-bubble " + cls + "'><span class='muted'>" + escapeHtml(m.role) + " · " +
-                        formatTime(m.createdAt) + "</span><br>" + escapeHtml(m.body || "").replace(/\n/g, "<br>") + "</div>";
+                    if (m.role === "tool" || m.messageType === "tool") {
+                        return "<div class='wa-tool-pill' title='" + escapeHtml(m.body || "") + "'>" +
+                            escapeHtml(m.toolName || "tool") + "</div>";
+                    }
+                    if (m.role === "system") {
+                        return "<div class='wa-system-pill muted'>" + escapeHtml(m.body || "").slice(0, 120) + "</div>";
+                    }
+                    const side = m.role === "user" ? "wa-chat-user" : (m.role === "operator" ? "wa-chat-operator" : "wa-chat-bot");
+                    const who = m.role === "user" ? "Cliente" : (m.role === "operator" ? "Agente" : "Lupe");
+                    return "<div class='wa-chat-bubble " + side + "'><span class='wa-chat-meta muted'>" +
+                        escapeHtml(who) + " · " + formatTime(m.createdAt) + "</span>" +
+                        "<div class='wa-chat-body'>" + escapeHtml(m.body || "").replace(/\n/g, "<br>") + "</div></div>";
                 }).join("") || "<p class='muted'>Sin mensajes en esta sesión.</p>";
-                msgEl.scrollTop = msgEl.scrollHeight;
+                if (!silent || prevBottom) msgEl.scrollTop = msgEl.scrollHeight;
             }
         } catch (e) {
-            if (msgEl) msgEl.innerHTML = "<p class='muted'>" + escapeHtml(e.message || "Error") + "</p>";
+            if (!silent && msgEl) msgEl.innerHTML = "<p class='muted'>" + escapeHtml(e.message || "Error") + "</p>";
         }
     }
 
-    async function sendWhatsAppHandoffReply() {
-        if (!waHandoffSelectedPhone) return;
-        const text = document.getElementById("waHandoffReplyText").value.trim();
-        if (!text) return toast("Escribe un mensaje.", "error");
-        const btn = document.getElementById("waHandoffSendBtn");
-        btn.disabled = true;
+    async function loadWhatsAppInboxClient(phone) {
+        const body = document.getElementById("waInboxClientBody");
+        if (!body || !phone) return;
         try {
-            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waHandoffSelectedPhone) + "/reply", {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(phone) + "/client");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error");
+            const c = data.client || {};
+            const m = data.metrics || {};
+            const draft = c.bookingDraft && typeof c.bookingDraft === "object" ? c.bookingDraft : null;
+            const avg = m.avgResponseSeconds != null ? m.avgResponseSeconds + " s" : "—";
+            const reservations = (data.reservations || []).map(function (r) {
+                return "<li>" + escapeHtml(r.date) +
+                    (r.startTime ? " · " + escapeHtml(r.startTime) : "") +
+                    " · " + escapeHtml(r.status) + "</li>";
+            }).join("") || "<li class='muted'>Sin reservas</li>";
+            const assignments = (data.assignments || []).map(function (a) {
+                const label = a.action === "whatsapp.handoff.start" ? "Tomó"
+                    : a.action === "whatsapp.handoff.release" ? "Liberó"
+                    : "Limpió";
+                return "<li><strong>" + label + "</strong> " +
+                    escapeHtml(a.operatorName || "Operador") +
+                    " · " + escapeHtml(formatTime(a.at)) +
+                    (a.reason ? "<br><span class='muted'>" + escapeHtml(a.reason) + "</span>" : "") +
+                    "</li>";
+            }).join("") || "<li class='muted'>Sin historial</li>";
+
+            body.innerHTML =
+                "<dl class='wa-client-dl'>" +
+                "<dt>Nombre</dt><dd>" + escapeHtml(c.displayName || "—") + "</dd>" +
+                "<dt>Teléfono</dt><dd>" + escapeHtml(c.phone || phone) + "</dd>" +
+                "<dt>Email</dt><dd>" + escapeHtml(c.email || "—") + "</dd>" +
+                "<dt>Dirección</dt><dd>" + escapeHtml(c.address || "No registrada") + "</dd>" +
+                "</dl>" +
+                "<div class='wa-client-metrics'>" +
+                "<div><span class='muted'>Resp. promedio</span><strong>" + escapeHtml(avg) + "</strong></div>" +
+                "<div><span class='muted'>Mensajes</span><strong>" + escapeHtml(String(m.messageCount || 0)) + "</strong></div>" +
+                "<div><span class='muted'>Conversión</span><strong>" + escapeHtml(m.conversionLabel || "—") + "</strong></div>" +
+                "</div>" +
+                (draft ? "<p class='muted wa-client-draft'>Borrador de reserva en curso.</p>" : "") +
+                "<h5>Reservas recientes</h5><ul class='wa-client-list'>" + reservations + "</ul>" +
+                "<h5>Asignaciones</h5><ul class='wa-client-list'>" + assignments + "</ul>";
+        } catch (e) {
+            body.innerHTML = "<p class='muted'>" + escapeHtml(e.message || "Error") + "</p>";
+        }
+    }
+
+    async function takeWhatsAppInboxSession() {
+        if (!waInboxSelectedPhone) return;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waInboxSelectedPhone) + "/handoff", {
                 method: "POST",
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ reason: "Operador tomó la conversación desde bandeja" }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "No se pudo enviar.");
-            document.getElementById("waHandoffReplyText").value = "";
-            loadWhatsAppHandoffChat(waHandoffSelectedPhone);
-            toast("Mensaje enviado.", "success");
+            if (!res.ok) throw new Error(data.error || "Error");
+            toast("Conversación tomada.", "success");
+            loadWhatsAppInbox();
+            loadWhatsAppInboxChat(waInboxSelectedPhone);
+            loadWhatsAppInboxClient(waInboxSelectedPhone);
         } catch (e) {
             toast(e.message || "Error.", "error");
-        } finally {
-            btn.disabled = false;
         }
     }
 
-    async function releaseWhatsAppHandoff() {
-        if (!waHandoffSelectedPhone) return;
+    async function releaseWhatsAppInboxSession() {
+        if (!waInboxSelectedPhone) return;
         try {
-            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waHandoffSelectedPhone) + "/release", {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waInboxSelectedPhone) + "/release", {
                 method: "POST",
                 body: JSON.stringify({ mode: "rules" }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Error");
-            toast("Conversación devuelta al bot.", "success");
-            waHandoffSelectedPhone = null;
-            loadWhatsAppHandoff();
-            document.getElementById("waHandoffMessages").innerHTML = "";
-            document.getElementById("waHandoffReplyBox").hidden = true;
+            toast("Conversación liberada al bot.", "success");
+            loadWhatsAppInbox();
+            loadWhatsAppInboxChat(waInboxSelectedPhone);
+            loadWhatsAppInboxClient(waInboxSelectedPhone);
         } catch (e) {
             toast(e.message || "Error.", "error");
+        }
+    }
+
+    async function clearWhatsAppInboxSession() {
+        if (!waInboxSelectedPhone) return;
+        if (!confirm("¿Reiniciar esta sesión al menú y liberar handoff?")) return;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waInboxSelectedPhone) + "/clear", {
+                method: "POST",
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error");
+            toast(data.message || "Sesión limpia.", "success");
+            loadWhatsAppInbox();
+            loadWhatsAppInboxChat(waInboxSelectedPhone);
+            loadWhatsAppInboxClient(waInboxSelectedPhone);
+        } catch (e) {
+            toast(e.message || "Error.", "error");
+        }
+    }
+
+    async function sendWhatsAppInboxReply() {
+        if (!waInboxSelectedPhone) return;
+        const text = document.getElementById("waInboxReplyText").value.trim();
+        if (!text) return toast("Escribe un mensaje.", "error");
+        const btn = document.getElementById("waInboxSendBtn");
+        btn.disabled = true;
+        try {
+            const res = await api("/api/admin/whatsapp/sessions/" + encodeURIComponent(waInboxSelectedPhone) + "/reply", {
+                method: "POST",
+                body: JSON.stringify({ text }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "No se pudo enviar.");
+            document.getElementById("waInboxReplyText").value = "";
+            loadWhatsAppInboxChat(waInboxSelectedPhone);
+            toast("Mensaje enviado.", "success");
+        } catch (e) {
+            toast(e.message || "Error.", "error");
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -4148,8 +4376,9 @@
         if (!hasPerm("WHATSAPP_VIEW")) return;
         loadWhatsAppBotConfig();
         if (hasPerm("WHATSAPP_OPERATE")) {
-            loadWhatsAppHandoff();
+            loadWhatsAppInbox();
             connectWhatsAppSse();
+            startWhatsAppInboxPolling();
         }
         try {
             const [statsRes, msgRes] = await Promise.all([
@@ -4430,11 +4659,67 @@
     if (waAiSaveBtn) waAiSaveBtn.addEventListener("click", saveWhatsAppAiConfig);
     const waAiTestBtn = document.getElementById("waAiTestBtn");
     if (waAiTestBtn) waAiTestBtn.addEventListener("click", testWhatsAppDeepSeek);
-    if (waHandoffRefresh) waHandoffRefresh.addEventListener("click", loadWhatsAppHandoff);
-    const waHandoffSendBtn = document.getElementById("waHandoffSendBtn");
-    if (waHandoffSendBtn) waHandoffSendBtn.addEventListener("click", sendWhatsAppHandoffReply);
-    const waHandoffReleaseBtn = document.getElementById("waHandoffReleaseBtn");
-    if (waHandoffReleaseBtn) waHandoffReleaseBtn.addEventListener("click", releaseWhatsAppHandoff);
+    const waInboxRefresh = document.getElementById("waInboxRefresh");
+    if (waInboxRefresh) waInboxRefresh.addEventListener("click", function () { loadWhatsAppInbox(); });
+    const waInboxSendBtn = document.getElementById("waInboxSendBtn");
+    if (waInboxSendBtn) waInboxSendBtn.addEventListener("click", sendWhatsAppInboxReply);
+    const waInboxTakeBtn = document.getElementById("waInboxTakeBtn");
+    if (waInboxTakeBtn) waInboxTakeBtn.addEventListener("click", takeWhatsAppInboxSession);
+    const waInboxReleaseBtn = document.getElementById("waInboxReleaseBtn");
+    if (waInboxReleaseBtn) waInboxReleaseBtn.addEventListener("click", releaseWhatsAppInboxSession);
+    const waInboxClearBtn = document.getElementById("waInboxClearBtn");
+    if (waInboxClearBtn) waInboxClearBtn.addEventListener("click", clearWhatsAppInboxSession);
+    const waInboxBack = document.getElementById("waInboxBack");
+    if (waInboxBack) waInboxBack.addEventListener("click", clearWhatsAppInboxSelection);
+    const waInboxToggleClient = document.getElementById("waInboxToggleClient");
+    if (waInboxToggleClient) {
+        waInboxToggleClient.addEventListener("click", function () {
+            const col = document.getElementById("waInboxClientCol");
+            setWhatsAppClientPanel(!!col?.hidden);
+        });
+    }
+    const waInboxCloseClient = document.getElementById("waInboxCloseClient");
+    if (waInboxCloseClient) waInboxCloseClient.addEventListener("click", function () { setWhatsAppClientPanel(false); });
+    const waInboxPrev = document.getElementById("waInboxPrev");
+    if (waInboxPrev) {
+        waInboxPrev.addEventListener("click", function () {
+            waInboxOffset = Math.max(0, waInboxOffset - WA_INBOX_LIMIT);
+            loadWhatsAppInbox();
+        });
+    }
+    const waInboxNext = document.getElementById("waInboxNext");
+    if (waInboxNext) {
+        waInboxNext.addEventListener("click", function () {
+            waInboxOffset += WA_INBOX_LIMIT;
+            loadWhatsAppInbox();
+        });
+    }
+    const waInboxModeFilter = document.getElementById("waInboxModeFilter");
+    if (waInboxModeFilter) {
+        waInboxModeFilter.addEventListener("change", function () {
+            waInboxOffset = 0;
+            loadWhatsAppInbox();
+        });
+    }
+    const waInboxSearch = document.getElementById("waInboxSearch");
+    if (waInboxSearch) {
+        waInboxSearch.addEventListener("input", function () {
+            clearTimeout(waInboxSearchTimer);
+            waInboxSearchTimer = setTimeout(function () {
+                waInboxOffset = 0;
+                loadWhatsAppInbox();
+            }, 300);
+        });
+    }
+    const waInboxReplyText = document.getElementById("waInboxReplyText");
+    if (waInboxReplyText) {
+        waInboxReplyText.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendWhatsAppInboxReply();
+            }
+        });
+    }
     document.getElementById("whatsappApplyFilters").addEventListener("click", function () { whatsappOffset = 0; loadWhatsApp(); });
     document.getElementById("whatsappSearch").addEventListener("keydown", function (e) {
         if (e.key === "Enter") { whatsappOffset = 0; loadWhatsApp(); }
